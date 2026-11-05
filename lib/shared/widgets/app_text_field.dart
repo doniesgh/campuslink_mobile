@@ -14,6 +14,9 @@ class AppTextField extends StatefulWidget {
     this.keyboardType,
     this.validator,
     this.textInputAction,
+    this.onSubmitted,
+    this.autofillHints,
+    this.labelTrailing,
   });
 
   final TextEditingController controller;
@@ -24,6 +27,11 @@ class AppTextField extends StatefulWidget {
   final TextInputType? keyboardType;
   final String? Function(String?)? validator;
   final TextInputAction? textInputAction;
+  final ValueChanged<String>? onSubmitted;
+  final Iterable<String>? autofillHints;
+
+  /// Shown at the end of the label row (e.g. a "Forgot?" link).
+  final Widget? labelTrailing;
 
   @override
   State<AppTextField> createState() => _AppTextFieldState();
@@ -34,22 +42,39 @@ class _AppTextFieldState extends State<AppTextField> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(widget.label, style: Theme.of(context).textTheme.labelMedium),
-        const SizedBox(height: AppSpacing.sm),
+        Row(
+          children: [
+            Expanded(
+              child: Text(
+                widget.label,
+                style: theme.textTheme.labelMedium?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            if (widget.labelTrailing != null) widget.labelTrailing!,
+          ],
+        ),
+        const SizedBox(height: AppSpacing.xs + 2),
         TextFormField(
           controller: widget.controller,
           obscureText: _obscure,
           keyboardType: widget.keyboardType,
           validator: widget.validator,
           textInputAction: widget.textInputAction,
+          onFieldSubmitted: widget.onSubmitted,
+          autofillHints: widget.autofillHints,
           decoration: InputDecoration(
             hintText: widget.hint,
             prefixIcon: widget.prefixIcon == null ? null : Icon(widget.prefixIcon),
             suffixIcon: widget.isPassword
                 ? IconButton(
+                    tooltip: _obscure ? 'Show password' : 'Hide password',
                     icon: Icon(_obscure ? Icons.visibility_outlined : Icons.visibility_off_outlined),
                     onPressed: () => setState(() => _obscure = !_obscure),
                   )

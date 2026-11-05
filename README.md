@@ -13,7 +13,9 @@ Mock mode (`USE_MOCK=true`) runs everything without the Node.js backend.
 Production: `flutter build apk --dart-define-from-file=env/prod.json`.
 
 ## Expected backend contract (to implement in Node.js)
-- POST /auth/login, /auth/register -> { user, accessToken, refreshToken }
+- POST /auth/login {identifier, password} -> { user, accessToken, refreshToken }
+  (`identifier` is the student's ENT ID, e.g. `211JMT0428`, or their email)
+- POST /auth/register {displayName, email, password} -> { user, accessToken, refreshToken }
 - POST /auth/refresh {refreshToken} -> { accessToken, refreshToken? }
 - POST /auth/forgot-password {email}
 - POST /auth/verify-email {code} -> { user }

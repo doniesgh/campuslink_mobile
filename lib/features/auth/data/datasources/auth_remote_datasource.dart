@@ -5,7 +5,8 @@ import '../../../../core/network/interceptors/auth_interceptor.dart';
 import '../models/auth_models.dart';
 
 abstract interface class AuthRemoteDataSource {
-  Future<AuthResponseModel> login(String email, String password);
+  /// [identifier] is the student's ENT ID (e.g. 211JMT0428) or email.
+  Future<AuthResponseModel> login(String identifier, String password);
   Future<AuthResponseModel> register(String name, String email, String password);
   Future<void> forgotPassword(String email);
   Future<UserModel> verifyEmail(String code);
@@ -20,10 +21,10 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Map<String, dynamic> _map(Response<dynamic> r) => r.data as Map<String, dynamic>;
 
   @override
-  Future<AuthResponseModel> login(String email, String password) async {
+  Future<AuthResponseModel> login(String identifier, String password) async {
     final r = await _dio.post(
       ApiEndpoints.login,
-      data: {'email': email, 'password': password},
+      data: {'identifier': identifier, 'password': password},
       options: AuthInterceptor.skipAuth,
     );
     return AuthResponseModel.fromJson(_map(r));
@@ -62,16 +63,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   static const _delay = Duration(milliseconds: 600);
 
-  UserModel _user(String email, {String name = 'Campus Student', bool verified = true}) =>
+  UserModel _user(String email, {String name = 'Dony Mansour', bool verified = true}) =>
       UserModel(id: 'mock-1', email: email, displayName: name, isEmailVerified: verified);
 
   AuthResponseModel _session(UserModel u) =>
       AuthResponseModel(user: u, accessToken: 'mock-access', refreshToken: 'mock-refresh');
 
   @override
-  Future<AuthResponseModel> login(String email, String password) async {
+  Future<AuthResponseModel> login(String identifier, String password) async {
     await Future<void>.delayed(_delay);
-    return _session(_user(email));
+    return _session(_user(identifier.contains('@') ? identifier : 'student@campus.test'));
   }
 
   @override

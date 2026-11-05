@@ -19,8 +19,8 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Result<User>> login({required String email, required String password}) =>
-      guard(() async => _persist(await remote.login(email, password)));
+  Future<Result<User>> login({required String identifier, required String password}) =>
+      guard(() async => _persist(await remote.login(identifier, password)));
 
   @override
   Future<Result<User>> register({

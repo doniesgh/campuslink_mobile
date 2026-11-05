@@ -2,7 +2,11 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../features/auth/presentation/pages/auth_pages.dart';
+import '../../features/auth/domain/entities/user.dart';
+import '../../features/auth/presentation/pages/forgot_password_page.dart';
+import '../../features/auth/presentation/pages/login_page.dart';
+import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/auth/presentation/pages/verify_email_page.dart';
 import '../../features/auth/presentation/providers/auth_controller.dart';
 import '../../features/carpooling/presentation/pages/ride_detail_page.dart';
 import '../../features/forum/presentation/pages/forum_page.dart';
@@ -12,7 +16,6 @@ import '../../features/timetable/presentation/pages/timetable_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
-import '../../features/welcome/presentation/pages/welcome_page.dart';
 import 'route_names.dart';
 import 'shell_scaffold.dart';
 
@@ -23,30 +26,36 @@ class _AuthRefresh extends ChangeNotifier {
   }
 }
 
+/// Where to send the user for [location] given the [auth] state, or null to stay.
+/// Kept free of router/provider types so it can be unit-tested.
+String? authRedirect(AsyncValue<User?> auth, String location) {
+  if (auth.isLoading) return null; // restoring session
+  final user = auth.valueOrNull;
+  final inAuth = location.startsWith(RoutePaths.authPrefix);
+  final inApp = location.startsWith(RoutePaths.appPrefix);
+
+  if (user == null) {
+    // Verify-email needs a signed-in user: it calls an authenticated endpoint.
+    final needsUser = inApp || location == RoutePaths.verifyEmail;
+    return needsUser ? RoutePaths.login : null;
+  }
+  if (!user.isEmailVerified) {
+    return location == RoutePaths.verifyEmail ? null : RoutePaths.verifyEmail;
+  }
+  if (inAuth) return RoutePaths.home;
+  return null;
+}
+
 final routerProvider = Provider<GoRouter>((ref) {
   final refresh = _AuthRefresh(ref);
   ref.onDispose(refresh.dispose);
 
   return GoRouter(
-    initialLocation: RoutePaths.welcome,
+    initialLocation: RoutePaths.login,
     refreshListenable: refresh,
-    redirect: (context, state) {
-      final auth = ref.read(authControllerProvider);
-      if (auth.isLoading) return null; // restoring session
-      final user = auth.valueOrNull;
-      final loc = state.matchedLocation;
-      final inAuth = loc.startsWith(RoutePaths.authPrefix);
-      final inApp = loc.startsWith(RoutePaths.appPrefix);
-
-      if (user == null) return inApp ? RoutePaths.welcome : null;
-      if (!user.isEmailVerified) {
-        return loc == RoutePaths.verifyEmail ? null : RoutePaths.verifyEmail;
-      }
-      if (inAuth || loc == RoutePaths.welcome) return RoutePaths.home;
-      return null;
-    },
+    redirect: (context, state) =>
+        authRedirect(ref.read(authControllerProvider), state.matchedLocation),
     routes: [
-      GoRoute(path: RoutePaths.welcome, builder: (_, __) => const WelcomePage()),
       GoRoute(path: RoutePaths.login, builder: (_, __) => const LoginPage()),
       GoRoute(path: RoutePaths.register, builder: (_, __) => const RegisterPage()),
       GoRoute(path: RoutePaths.forgotPassword, builder: (_, __) => const ForgotPasswordPage()),

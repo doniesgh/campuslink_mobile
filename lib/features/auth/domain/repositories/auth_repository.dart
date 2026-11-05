@@ -3,7 +3,8 @@ import '../entities/user.dart';
 
 /// Contract used by presentation. Implemented in the data layer.
 abstract interface class AuthRepository {
-  Future<Result<User>> login({required String email, required String password});
+  /// [identifier] is the student's ENT ID or email.
+  Future<Result<User>> login({required String identifier, required String password});
   Future<Result<User>> register({
     required String displayName,
     required String email,

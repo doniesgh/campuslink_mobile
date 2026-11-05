@@ -1,7 +1,6 @@
 /// All route paths in one place. No string literals in pages.
 abstract final class RoutePaths {
-  static const welcome = '/welcome';
-
+  /// Also the onboarding screen: signed-out users land here.
   static const login = '/auth/login';
   static const register = '/auth/register';
   static const forgotPassword = '/auth/forgot-password';

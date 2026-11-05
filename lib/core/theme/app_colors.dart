@@ -20,6 +20,10 @@ abstract final class AppColors {
   static const Color warning = Color(0xFFE0A100);
   static const Color danger = Color(0xFFD64545);
 
+  // On top of the purple hero surfaces (login hero, "Up next" card)
+  static const Color onHero = Color(0xFFDECCFF);
+  static const Color heroAccent = Color(0xFFFFDAD2);
+
   // Text colors used on soft (tinted) badges in light mode
   static const Color accentText = Color(0xFFA33B1F);
   static const Color successText = Color(0xFF14694A);
@@ -28,7 +32,7 @@ abstract final class AppColors {
   static const Color mapWater = Color(0xFFBEE3F2);
   static const Color mapWaterDark = Color(0xFF1C3A4A);
 
-  // Gradients (hero header of the welcome/login screens)
+  // Gradients (hero header of the login/auth screens)
   static const LinearGradient hero = LinearGradient(
     begin: Alignment.topLeft,
     end: Alignment.bottomRight,

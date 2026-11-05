@@ -32,8 +32,8 @@ class AuthController extends AsyncNotifier<User?> {
   Future<User?> build() async => (await _repo.restoreSession()).dataOrNull;
 
   /// Each action returns a [Failure] on error, or null on success.
-  Future<Failure?> login(String email, String password) async {
-    final r = await _repo.login(email: email, password: password);
+  Future<Failure?> login(String identifier, String password) async {
+    final r = await _repo.login(identifier: identifier, password: password);
     return r.when(
       success: (user) {
         state = AsyncData(user);
