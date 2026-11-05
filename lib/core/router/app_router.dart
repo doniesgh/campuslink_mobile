@@ -9,7 +9,9 @@ import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/verify_email_page.dart';
 import '../../features/auth/presentation/providers/auth_controller.dart';
 import '../../features/carpooling/presentation/pages/ride_detail_page.dart';
+import '../../features/courses/presentation/pages/courses_page.dart';
 import '../../features/forum/presentation/pages/forum_page.dart';
+import '../../features/grades/presentation/pages/grades_page.dart';
 import '../../features/jobs/presentation/pages/job_detail_page.dart';
 import '../../features/jobs/presentation/pages/jobs_page.dart';
 import '../../features/timetable/presentation/pages/timetable_page.dart';
@@ -72,7 +74,17 @@ final routerProvider = Provider<GoRouter>((ref) {
             GoRoute(path: RoutePaths.home, builder: (_, __) => const HomePage()),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(path: RoutePaths.timetable, builder: (_, __) => const TimetablePage()),
+            GoRoute(
+              path: RoutePaths.timetable,
+              builder: (_, __) => const TimetablePage(),
+              routes: [
+                GoRoute(
+                  path: 'courses',
+                  builder: (_, state) =>
+                      CoursesPage(initialCourseId: state.uri.queryParameters['course']),
+                ),
+              ],
+            ),
           ]),
           StatefulShellBranch(routes: [
             GoRoute(
@@ -101,7 +113,13 @@ final routerProvider = Provider<GoRouter>((ref) {
             ),
           ]),
           StatefulShellBranch(routes: [
-            GoRoute(path: RoutePaths.profile, builder: (_, __) => const ProfilePage()),
+            GoRoute(
+              path: RoutePaths.profile,
+              builder: (_, __) => const ProfilePage(),
+              routes: [
+                GoRoute(path: 'grades', builder: (_, __) => const GradesPage()),
+              ],
+            ),
           ]),
         ],
       ),

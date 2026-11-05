@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/router/route_names.dart';
@@ -6,22 +7,28 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_badge.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../../forum/presentation/pages/forum_page.dart';
 
 class _QuickAction {
-  const _QuickAction(this.label, this.icon, this.tone, this.path);
+  const _QuickAction(this.label, this.icon, this.tone, this.path, [this.forumSection]);
 
   final String label;
   final IconData icon;
   final BadgeTone tone;
   final String path;
+
+  /// Forum section to open, for shortcuts into the Forum tab.
+  final ForumSection? forumSection;
 }
 
-// TODO: open the matching forum section once ForumPage accepts one.
 const _actions = [
-  _QuickAction('Covoiturage', Icons.directions_car, BadgeTone.accent, RoutePaths.forum),
-  _QuickAction('Objets Perdus', Icons.manage_search, BadgeTone.primary, RoutePaths.forum),
+  _QuickAction('Covoiturage', Icons.directions_car, BadgeTone.accent, RoutePaths.forum,
+      ForumSection.carpooling),
+  _QuickAction('Objets Perdus', Icons.manage_search, BadgeTone.primary, RoutePaths.forum,
+      ForumSection.lostFound),
   _QuickAction('Planning', Icons.calendar_month, BadgeTone.accent, RoutePaths.timetable),
-  _QuickAction('Idées', Icons.lightbulb_outline, BadgeTone.primary, RoutePaths.forum),
+  _QuickAction('Idées', Icons.lightbulb_outline, BadgeTone.primary, RoutePaths.forum,
+      ForumSection.ideas),
 ];
 
 /// Row of 4 shortcut tiles under the "Up next" card.
@@ -41,18 +48,24 @@ class QuickActions extends StatelessWidget {
   }
 }
 
-class _QuickActionTile extends StatelessWidget {
+class _QuickActionTile extends ConsumerWidget {
   const _QuickActionTile({required this.action});
 
   final _QuickAction action;
 
+  void _open(BuildContext context, WidgetRef ref) {
+    final section = action.forumSection;
+    if (section != null) ref.read(forumSectionProvider.notifier).state = section;
+    context.go(action.path);
+  }
+
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final (bg, fg) = toneColors(theme.colorScheme, action.tone);
     return AppCard(
       padding: const EdgeInsets.symmetric(horizontal: AppSpacing.xs, vertical: AppSpacing.sm),
-      onTap: () => context.go(action.path),
+      onTap: () => _open(context, ref),
       child: Column(
         children: [
           Container(

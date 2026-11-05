@@ -13,6 +13,14 @@ abstract final class RoutePaths {
   static const profile = '/app/profile';
   static const notifications = '/app/notifications';
 
+  /// Pushed inside their tab, so the bottom bar stays visible.
+  static const courses = '$timetable/courses';
+  static const grades = '$profile/grades';
+
+  /// Courses screen opened on [course] (a course id or title).
+  static String coursesFor(String course) =>
+      Uri(path: courses, queryParameters: {'course': course}).toString();
+
   static String ride(String id) => '$forum/rides/$id';
   static String job(String id) => '$jobs/$id';
 

@@ -3,10 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_search_field.dart';
+import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/campus_header.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../../../carpooling/presentation/providers/carpool_providers.dart';
 import '../../../carpooling/presentation/widgets/carpooling_section.dart';
+import '../widgets/lost_found_section.dart';
 
 enum ForumSection {
   carpooling('Covoiturage', Icons.directions_car_outlined),
@@ -19,6 +21,10 @@ enum ForumSection {
   final IconData icon;
 }
 
+/// Section shown by the Forum tab. Other screens set it before opening the
+/// tab (e.g. Home's "Objets Perdus" shortcut opens Lost & Found).
+final forumSectionProvider = StateProvider<ForumSection>((ref) => ForumSection.carpooling);
+
 /// Forum hub: search, section chips and the content of the selected section.
 class ForumPage extends ConsumerStatefulWidget {
   const ForumPage({super.key});
@@ -28,27 +34,44 @@ class ForumPage extends ConsumerStatefulWidget {
 }
 
 class _ForumPageState extends ConsumerState<ForumPage> {
-  ForumSection _section = ForumSection.carpooling;
   String _query = '';
+
+  /// Bumped to rebuild (and so empty) the search field.
+  int _searchFieldGeneration = 0;
 
   void _comingSoon(String what) => ScaffoldMessenger.of(context)
       .showSnackBar(SnackBar(content: Text('$what - coming soon')));
+
+  void _clearSearch() => setState(() {
+        _query = '';
+        _searchFieldGeneration++;
+      });
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
     final ridesCount = ref.watch(ridesProvider).valueOrNull?.length;
+    final section = ref.watch(forumSectionProvider);
 
     return Scaffold(
-      floatingActionButton: _section == ForumSection.carpooling
-          ? FloatingActionButton.extended(
-              onPressed: () => _comingSoon('Proposer un trajet'),
-              backgroundColor: scheme.secondary,
-              foregroundColor: scheme.onSecondary,
-              icon: const Icon(Icons.directions_car),
-              label: const Text('Proposer un trajet +'),
-            )
-          : null,
+      floatingActionButton: switch (section) {
+        ForumSection.carpooling => FloatingActionButton.extended(
+            onPressed: () => _comingSoon('Proposer un trajet'),
+            backgroundColor: scheme.secondary,
+            foregroundColor: scheme.onSecondary,
+            icon: const Icon(Icons.directions_car),
+            label: const Text('Proposer un trajet +'),
+          ),
+        ForumSection.lostFound => FloatingActionButton.extended(
+            // TODO: open the "lost / found notice" form once the API exists.
+            onPressed: () => showAppSnack(context, 'Publishing a notice is coming soon.'),
+            backgroundColor: scheme.secondary,
+            foregroundColor: scheme.onSecondary,
+            icon: const Icon(Icons.add_circle_outline),
+            label: const Text('Publier une annonce'),
+          ),
+        _ => null,
+      },
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -57,7 +80,10 @@ class _ForumPageState extends ConsumerState<ForumPage> {
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
               child: AppSearchField(
-                hint: 'Search rides, lost items, or campus...',
+                key: ValueKey(_searchFieldGeneration),
+                hint: section == ForumSection.lostFound
+                    ? 'Rechercher par objet, salle ou bloc...'
+                    : 'Search rides, lost items, or campus...',
                 onChanged: (v) => setState(() => _query = v),
                 onFilterTap: () => _comingSoon('Filters'),
               ),
@@ -74,20 +100,22 @@ class _ForumPageState extends ConsumerState<ForumPage> {
                   final s = ForumSection.values[i];
                   return _SectionChip(
                     section: s,
-                    selected: s == _section,
+                    selected: s == section,
                     count: s == ForumSection.carpooling ? ridesCount : null,
                     // Placeholder "new activity" dot until the API provides it.
                     hasUpdates: s == ForumSection.lostFound,
-                    onTap: () => setState(() => _section = s),
+                    onTap: () => ref.read(forumSectionProvider.notifier).state = s,
                   );
                 },
               ),
             ),
             const SizedBox(height: AppSpacing.md),
             Expanded(
-              child: switch (_section) {
+              child: switch (section) {
                 ForumSection.carpooling => CarpoolingSection(query: _query),
-                _ => EmptyView(message: '${_section.label} is coming soon.', icon: _section.icon),
+                ForumSection.lostFound =>
+                  LostFoundSection(query: _query, onClearSearch: _clearSearch),
+                _ => EmptyView(message: '${section.label} is coming soon.', icon: section.icon),
               },
             ),
           ],

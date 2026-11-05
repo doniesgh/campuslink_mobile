@@ -14,6 +14,7 @@ class HomeGreeting extends StatelessWidget {
     required this.onSearch,
     required this.onNotifications,
     this.semesterWeek,
+    this.hasUnreadNotifications = false,
   });
 
   final String name;
@@ -21,6 +22,9 @@ class HomeGreeting extends StatelessWidget {
   final int? semesterWeek;
   final VoidCallback onSearch;
   final VoidCallback onNotifications;
+
+  /// Shows the coral dot on the bell.
+  final bool hasUnreadNotifications;
 
   @override
   Widget build(BuildContext context) {
@@ -82,7 +86,7 @@ class HomeGreeting extends StatelessWidget {
           icon: Icons.notifications_outlined,
           tooltip: 'Notifications',
           onTap: onNotifications,
-          showDot: true,
+          showDot: hasUnreadNotifications,
         ),
       ],
     );

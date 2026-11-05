@@ -24,27 +24,36 @@ class DetailTopBar extends StatelessWidget {
     final scheme = theme.colorScheme;
     return Row(
       children: [
-        Material(
-          color: scheme.surfaceContainerLowest,
-          shape: StadiumBorder(side: BorderSide(color: scheme.outlineVariant)),
-          child: InkWell(
-            customBorder: const StadiumBorder(),
-            onTap: () => context.canPop() ? context.pop() : context.go(fallbackPath),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppSpacing.md, vertical: AppSpacing.sm,
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.arrow_back, size: 16, color: scheme.primary),
-                  const SizedBox(width: AppSpacing.xs + 2),
-                  Text(
-                    backLabel,
-                    style: theme.textTheme.labelMedium
-                        ?.copyWith(color: scheme.primary, fontWeight: FontWeight.w700),
-                  ),
-                ],
+        // Capped so a long label (or a large font) ellipsizes instead of
+        // pushing the trailing actions off screen.
+        ConstrainedBox(
+          constraints: BoxConstraints(maxWidth: MediaQuery.sizeOf(context).width * 0.55),
+          child: Material(
+            color: scheme.surfaceContainerLowest,
+            shape: StadiumBorder(side: BorderSide(color: scheme.outlineVariant)),
+            child: InkWell(
+              customBorder: const StadiumBorder(),
+              onTap: () => context.canPop() ? context.pop() : context.go(fallbackPath),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: AppSpacing.md, vertical: AppSpacing.sm,
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_back, size: 16, color: scheme.primary),
+                    const SizedBox(width: AppSpacing.xs + 2),
+                    Flexible(
+                      child: Text(
+                        backLabel,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelMedium
+                            ?.copyWith(color: scheme.primary, fontWeight: FontWeight.w700),
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),

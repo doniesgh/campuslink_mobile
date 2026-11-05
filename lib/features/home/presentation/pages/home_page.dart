@@ -11,7 +11,10 @@ import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/campus_header.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
+import '../../../forum/domain/entities/forum_post.dart';
+import '../../../forum/presentation/pages/forum_page.dart';
 import '../../../forum/presentation/providers/forum_providers.dart';
+import '../../../notifications/presentation/providers/notification_providers.dart';
 import '../../../timetable/presentation/providers/timetable_providers.dart';
 import '../widgets/highlight_post_card.dart';
 import '../widgets/home_greeting.dart';
@@ -21,6 +24,12 @@ import '../widgets/today_schedule.dart';
 import '../widgets/up_next_card.dart';
 
 const _page = EdgeInsets.symmetric(horizontal: AppSpacing.page);
+
+ForumSection _forumSectionFor(PostCategory category) => switch (category) {
+      PostCategory.carpool => ForumSection.carpooling,
+      PostCategory.lostFound => ForumSection.lostFound,
+      PostCategory.idea => ForumSection.ideas,
+    };
 
 /// Stitch "02. Home & Today Hub".
 class HomePage extends ConsumerWidget {
@@ -47,6 +56,7 @@ class HomePage extends ConsumerWidget {
     final timetable = ref.watch(todayTimetableProvider);
     final highlights = ref.watch(highlightsProvider);
     final courseCount = timetable.valueOrNull?.sessions.length;
+    final unreadNotifications = ref.watch(unreadNotificationCountProvider);
 
     return Scaffold(
       body: SafeArea(
@@ -69,6 +79,7 @@ class HomePage extends ConsumerWidget {
                           name: name,
                           now: now,
                           semesterWeek: timetable.valueOrNull?.semesterWeek,
+                          hasUnreadNotifications: unreadNotifications > 0,
                           onSearch: () => showAppSnack(context, 'Search is coming soon.'),
                           onNotifications: () => context.push(RoutePaths.notifications),
                         ),
@@ -152,7 +163,11 @@ class HomePage extends ConsumerWidget {
                                         child: HighlightPostCard(
                                           post: post,
                                           now: now,
-                                          onOpen: () => context.go(RoutePaths.forum),
+                                          onOpen: () {
+                                            ref.read(forumSectionProvider.notifier).state =
+                                                _forumSectionFor(post.category);
+                                            context.go(RoutePaths.forum);
+                                          },
                                         ),
                                       ),
                                   ],

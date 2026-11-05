@@ -1,4 +1,4 @@
-enum SessionKind { lecture, lab, exam }
+enum SessionKind { lecture, lab, exam, workshop }
 
 /// Where a session stands relative to "now". Only the first upcoming
 /// session of the day is [next]; the ones after it are [later].
@@ -16,6 +16,8 @@ class ClassSession {
     this.kind = SessionKind.lecture,
     this.lectureNumber,
     this.lectureCount,
+    this.coefficient,
+    this.notes,
   });
 
   final String id;
@@ -29,6 +31,14 @@ class ClassSession {
   /// Position of this lecture in the course (e.g. 7 of 14), when known.
   final int? lectureNumber;
   final int? lectureCount;
+
+  /// Weight of an evaluation in the course grade (e.g. 2.0), when known.
+  final double? coefficient;
+
+  /// Practical details ("Chapters 1–4 · Bring a calculator"), when any.
+  final String? notes;
+
+  Duration get duration => end.difference(start);
 
   bool isOverAt(DateTime now) => !end.isAfter(now);
   bool isOngoingAt(DateTime now) => !start.isAfter(now) && end.isAfter(now);
