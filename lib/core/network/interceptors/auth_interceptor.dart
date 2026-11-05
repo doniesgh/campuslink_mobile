@@ -20,6 +20,11 @@ class AuthInterceptor extends QueuedInterceptor {
   static const _skipKey = 'skipAuth';
   static Options get skipAuth => Options(extra: {_skipKey: true});
 
+  /// Same options as [dio] but without interceptors, for the refresh call and
+  /// the retry. Sending the retry through [dio] would deadlock if it failed:
+  /// its error would queue behind the onError call that is awaiting it.
+  late final Dio _plainDio = Dio(dio.options.copyWith());
+
   @override
   Future<void> onRequest(
     RequestOptions options,
@@ -43,23 +48,34 @@ class AuthInterceptor extends QueuedInterceptor {
       return handler.next(err);
     }
 
+    final String access;
     try {
-      // Separate Dio instance: avoids re-entering this interceptor.
-      final res = await Dio(BaseOptions(baseUrl: dio.options.baseUrl))
+      final res = await _plainDio
           .post(ApiEndpoints.refresh, data: {'refreshToken': refresh});
       final data = res.data as Map<String, dynamic>;
-      final access = data['accessToken'] as String;
+      access = data['accessToken'] as String;
       await storage.saveTokens(
         access: access,
         refresh: (data['refreshToken'] as String?) ?? refresh,
       );
-      final retry = err.requestOptions
-        ..headers['Authorization'] = 'Bearer $access';
-      handler.resolve(await dio.fetch(retry));
-    } on DioException {
+    } catch (_) {
+      // Catch everything (not just DioException): a malformed response throws
+      // a TypeError, and an uncaught error here would never call the handler.
       await storage.clear();
       onSessionExpired?.call();
-      handler.next(err);
+      return handler.next(err);
+    }
+
+    // The session is valid again, so a failed retry is reported as-is
+    // instead of logging the user out.
+    final retry = err.requestOptions
+      ..headers['Authorization'] = 'Bearer $access';
+    try {
+      handler.resolve(await _plainDio.fetch(retry));
+    } on DioException catch (e) {
+      handler.next(e);
+    } catch (e, st) {
+      handler.next(DioException(requestOptions: retry, error: e, stackTrace: st));
     }
   }
 }
