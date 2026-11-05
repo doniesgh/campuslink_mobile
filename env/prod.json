@@ -1,0 +1,5 @@
+{
+  "ENV": "prod",
+  "API_BASE_URL": "https://api.campuspulse.example/api",
+  "USE_MOCK": "false"
+}
