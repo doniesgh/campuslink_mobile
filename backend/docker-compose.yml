@@ -1,0 +1,12 @@
+# Optional: a MongoDB for teammates who don't have one installed.
+#   docker compose up -d
+services:
+  mongo:
+    image: mongo:8
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+
+volumes:
+  mongo-data:

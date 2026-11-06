@@ -12,12 +12,17 @@ Requires Flutter 3.27+ (uses `Color.withValues` and `Column.spacing`).
 Mock mode (`USE_MOCK=true`) runs everything without the Node.js backend.
 Production: `flutter build apk --dart-define-from-file=env/prod.json`.
 
-## Expected backend contract (to implement in Node.js)
+## Backend
+The Node.js API lives in [`backend/`](backend/README.md) (Express + TypeScript + MongoDB).
+It implements the auth contract the app uses:
 - POST /auth/login {identifier, password} -> { user, accessToken, refreshToken }
   (`identifier` is the student's ENT ID, e.g. `211JMT0428`, or their email)
 - POST /auth/register {displayName, email, password} -> { user, accessToken, refreshToken }
-- POST /auth/refresh {refreshToken} -> { accessToken, refreshToken? }
+- POST /auth/refresh {refreshToken} -> { accessToken, refreshToken }
 - POST /auth/forgot-password {email}
 - POST /auth/verify-email {code} -> { user }
 - GET  /users/me -> user
-- Errors: JSON { "message": "..." } with proper HTTP status (400/401/422/500)
+- Errors: JSON { "message": "..." } with proper HTTP status (400/401/409/422/500)
+
+To sign in against it: start it (`cd backend && npm run dev`, see its README), then run the app
+with `--dart-define-from-file=env/local.json` (VS Code: "CampusPulse (local backend)").

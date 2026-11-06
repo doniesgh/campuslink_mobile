@@ -7,6 +7,13 @@
       "type": "dart",
       "program": "lib/main.dart",
       "toolArgs": ["--dart-define-from-file=env/dev.json"]
+    },
+    {
+      "name": "CampusPulse (local backend)",
+      "request": "launch",
+      "type": "dart",
+      "program": "lib/main.dart",
+      "toolArgs": ["--dart-define-from-file=env/local.json"]
     }
   ]
 }
