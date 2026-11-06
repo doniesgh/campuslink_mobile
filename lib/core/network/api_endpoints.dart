@@ -1,14 +1,51 @@
 /// Every backend path lives here. Never hardcode a path elsewhere.
+/// The backend is in backend/ (see backend/README.md for the full contract).
 abstract final class ApiEndpoints {
   // Auth
   static const login = '/auth/login';
   static const register = '/auth/register';
   static const refresh = '/auth/refresh';
+  static const logout = '/auth/logout';
   static const forgotPassword = '/auth/forgot-password';
   static const verifyEmail = '/auth/verify-email';
   static const me = '/users/me';
 
-  // Forum (added per feature later)
-  static const rides = '/rides';
-  static String ride(String id) => '/rides/$id';
+  // Timetable (query: ?date=YYYY-MM-DD)
+  static const timetableDay = '/timetable/day';
+  static const timetableWeek = '/timetable/week';
+
+  // Courses
+  static const courses = '/courses';
+  static String courseAttendance(String courseId) => '/courses/$courseId/attendance';
+  static String courseResourceDownload(String resourceId) =>
+      '/courses/resources/$resourceId/download';
+  static String courseAssignmentSubmission(String assignmentId) =>
+      '/courses/assignments/$assignmentId/submission';
+
+  // Carpooling
+  static const rides = '/carpool/rides';
+  static String ride(String id) => '/carpool/rides/$id';
+  static String rideReservations(String id) => '/carpool/rides/$id/reservations';
+  static const carpoolImpact = '/carpool/impact';
+
+  // Jobs
+  static const jobs = '/jobs';
+  static String job(String id) => '/jobs/$id';
+  static String jobApplications(String id) => '/jobs/$id/applications';
+
+  // Forum
+  static const forumHighlights = '/forum/highlights';
+  static const lostItems = '/forum/lost-items';
+  static String lostItemRequests(String id) => '/forum/lost-items/$id/requests';
+
+  // Grades
+  static const transcript = '/grades/transcript';
+
+  // Profile
+  static const profile = '/profile';
+
+  // Notifications
+  static const notifications = '/notifications';
+  static String notificationRead(String id) => '/notifications/$id/read';
+  static const notificationsReadAll = '/notifications/read-all';
 }

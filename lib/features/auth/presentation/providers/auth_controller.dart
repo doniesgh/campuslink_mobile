@@ -25,6 +25,13 @@ final authRepositoryProvider = Provider<AuthRepository>((ref) {
 final authControllerProvider =
     AsyncNotifierProvider<AuthController, User?>(AuthController.new);
 
+/// Id of the signed-in student, or null. Caches that hold one student's data
+/// and outlive a screen watch it, so they reload when another student signs
+/// in on the same phone (instead of showing the previous student's data).
+final currentUserIdProvider = Provider<String?>(
+  (ref) => ref.watch(authControllerProvider.select((auth) => auth.valueOrNull?.id)),
+);
+
 class AuthController extends AsyncNotifier<User?> {
   AuthRepository get _repo => ref.read(authRepositoryProvider);
 

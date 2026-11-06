@@ -1,0 +1,285 @@
+{
+  "start": "2026-11-02",
+  "days": [
+    {
+      "date": "2026-11-02",
+      "semesterWeek": 7,
+      "sessions": [
+        {
+          "id": "algo-cm-2026-11-2",
+          "course": "Algorithmes & Complexité",
+          "room": "Amphi A",
+          "teacher": "Prof. Trabelsi",
+          "date": "2026-11-02",
+          "start": "08:30",
+          "end": "10:00",
+          "kind": "lecture",
+          "lectureNumber": 8,
+          "lectureCount": 14,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "genie-logiciel-tp-2026-11-2",
+          "course": "Génie Logiciel & Architecture",
+          "room": "Lab 204",
+          "teacher": "Prof. Ben Ali",
+          "date": "2026-11-02",
+          "start": "10:15",
+          "end": "12:15",
+          "kind": "lab",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "nosql-2026-11-2",
+          "course": "Bases de Données Avancées (NoSQL)",
+          "room": "Salle B12",
+          "teacher": "Prof. Mansour",
+          "date": "2026-11-02",
+          "start": "13:30",
+          "end": "15:30",
+          "kind": "workshop",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "cc-reseaux-2026-11-2",
+          "course": "Contrôle Continu : Réseaux & Télécom",
+          "room": "Grand Amphi C",
+          "teacher": "Dr. Hammami",
+          "date": "2026-11-02",
+          "start": "16:00",
+          "end": "18:00",
+          "kind": "exam",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": 2,
+          "notes": "Chapters 1–4 · Bring scientific calculator & Student ID"
+        }
+      ]
+    },
+    {
+      "date": "2026-11-03",
+      "semesterWeek": 8,
+      "sessions": [
+        {
+          "id": "algo-2026-11-3",
+          "course": "Algorithmes & Complexité",
+          "room": "Lab 14",
+          "teacher": "Dr. Fersi",
+          "date": "2026-11-03",
+          "start": "08:30",
+          "end": "10:00",
+          "kind": "lab",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "genie-logiciel-2026-11-3",
+          "course": "Génie Logiciel & Architecture",
+          "room": "Amphi 3B",
+          "teacher": "Prof. Ben Ali",
+          "date": "2026-11-03",
+          "start": "10:15",
+          "end": "12:15",
+          "kind": "lecture",
+          "lectureNumber": 7,
+          "lectureCount": 14,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "bases-de-donnees-2026-11-3",
+          "course": "Bases de Données",
+          "room": "Salle 208",
+          "teacher": "Dr. Gharbi",
+          "date": "2026-11-03",
+          "start": "13:30",
+          "end": "15:30",
+          "kind": "lecture",
+          "lectureNumber": 9,
+          "lectureCount": 12,
+          "coefficient": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "date": "2026-11-04",
+      "semesterWeek": 8,
+      "sessions": [
+        {
+          "id": "reseaux-2026-11-4",
+          "course": "Réseaux & Télécom",
+          "room": "Amphi B",
+          "teacher": "Dr. Hammami",
+          "date": "2026-11-04",
+          "start": "08:30",
+          "end": "10:00",
+          "kind": "lecture",
+          "lectureNumber": 9,
+          "lectureCount": 14,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "flutter-tp-2026-11-4",
+          "course": "Développement Mobile (Flutter)",
+          "room": "Lab 204",
+          "teacher": "Ing. Jlassi",
+          "date": "2026-11-04",
+          "start": "10:15",
+          "end": "12:15",
+          "kind": "lab",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "pi-2026-11-4",
+          "course": "Projet Intégré (PI)",
+          "room": "Salle B12",
+          "teacher": "Prof. Mansour",
+          "date": "2026-11-04",
+          "start": "13:30",
+          "end": "15:30",
+          "kind": "workshop",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "date": "2026-11-05",
+      "semesterWeek": 8,
+      "sessions": [
+        {
+          "id": "algo-2026-11-5",
+          "course": "Algorithmes & Complexité",
+          "room": "Lab 14",
+          "teacher": "Dr. Fersi",
+          "date": "2026-11-05",
+          "start": "08:30",
+          "end": "10:00",
+          "kind": "lab",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "genie-logiciel-2026-11-5",
+          "course": "Génie Logiciel & Architecture",
+          "room": "Amphi 3B",
+          "teacher": "Prof. Ben Ali",
+          "date": "2026-11-05",
+          "start": "10:15",
+          "end": "12:15",
+          "kind": "lecture",
+          "lectureNumber": 8,
+          "lectureCount": 14,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "bases-de-donnees-2026-11-5",
+          "course": "Bases de Données",
+          "room": "Salle 208",
+          "teacher": "Dr. Gharbi",
+          "date": "2026-11-05",
+          "start": "13:30",
+          "end": "15:30",
+          "kind": "lecture",
+          "lectureNumber": 10,
+          "lectureCount": 12,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "exam-flutter-2026-11-5",
+          "course": "Examen TP : Développement Mobile",
+          "room": "Lab 204",
+          "teacher": "Ing. Jlassi",
+          "date": "2026-11-05",
+          "start": "16:00",
+          "end": "17:30",
+          "kind": "exam",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": 1.5,
+          "notes": "Bring your laptop with the Flutter SDK installed"
+        }
+      ]
+    },
+    {
+      "date": "2026-11-06",
+      "semesterWeek": 8,
+      "sessions": [
+        {
+          "id": "stats-2026-11-6",
+          "course": "Probabilités & Statistiques",
+          "room": "Amphi A",
+          "teacher": "Dr. Ayari",
+          "date": "2026-11-06",
+          "start": "08:30",
+          "end": "10:00",
+          "kind": "lecture",
+          "lectureNumber": 10,
+          "lectureCount": 14,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "reseaux-tp-2026-11-6",
+          "course": "Réseaux & Télécom",
+          "room": "Lab 12",
+          "teacher": "Dr. Hammami",
+          "date": "2026-11-06",
+          "start": "10:15",
+          "end": "12:15",
+          "kind": "lab",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": null,
+          "notes": null
+        },
+        {
+          "id": "entrepreneuriat-2026-11-6",
+          "course": "Entrepreneuriat & Innovation",
+          "room": "Espace Coworking",
+          "teacher": "Mme. Karoui",
+          "date": "2026-11-06",
+          "start": "13:30",
+          "end": "15:30",
+          "kind": "workshop",
+          "lectureNumber": null,
+          "lectureCount": null,
+          "coefficient": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "date": "2026-11-07",
+      "semesterWeek": 8,
+      "sessions": []
+    },
+    {
+      "date": "2026-11-08",
+      "semesterWeek": 8,
+      "sessions": []
+    }
+  ],
+  "semester": 1,
+  "classGroup": "Tech Track 4BI"
+}

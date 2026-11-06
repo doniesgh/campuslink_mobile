@@ -11,6 +11,9 @@ abstract interface class AuthRemoteDataSource {
   Future<void> forgotPassword(String email);
   Future<UserModel> verifyEmail(String code);
   Future<UserModel> me();
+
+  /// Ends this device's session on the server (revokes [refreshToken]).
+  Future<void> logout(String refreshToken);
 }
 
 /// Real implementation talking to the Node.js API.
@@ -57,6 +60,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<UserModel> me() async => UserModel.fromJson(_map(await _dio.get(ApiEndpoints.me)));
+
+  @override
+  Future<void> logout(String refreshToken) async {
+    await _dio.post(
+      ApiEndpoints.logout,
+      data: {'refreshToken': refreshToken},
+      options: AuthInterceptor.skipAuth,
+    );
+  }
 }
 
 /// Fake implementation (USE_MOCK=true) so the app runs without a backend.
@@ -95,4 +107,7 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
     await Future<void>.delayed(_delay);
     return _user('student@campus.test');
   }
+
+  @override
+  Future<void> logout(String refreshToken) async {}
 }

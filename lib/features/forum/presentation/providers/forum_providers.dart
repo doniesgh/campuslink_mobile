@@ -1,12 +1,17 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/env.dart';
+import '../../../../core/providers/core_providers.dart';
+import '../../data/repositories/forum_repository_impl.dart';
 import '../../data/repositories/mock_forum_repository.dart';
 import '../../domain/entities/forum_post.dart';
 import '../../domain/entities/lost_item.dart';
 import '../../domain/repositories/forum_repository.dart';
 
-/// Swap MockForumRepository for the Dio-based implementation when the API is ready.
-final forumRepositoryProvider = Provider<ForumRepository>((ref) => MockForumRepository());
+/// The API (/api/forum), or in-memory demo data when USE_MOCK=true.
+final forumRepositoryProvider = Provider<ForumRepository>((ref) {
+  return Env.useMock ? MockForumRepository() : ForumRepositoryImpl(ref.watch(dioProvider));
+});
 
 final highlightsProvider = FutureProvider.autoDispose<List<ForumPost>>(
   (ref) async => (await ref.watch(forumRepositoryProvider).getHighlights()).unwrap(),

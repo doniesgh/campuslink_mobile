@@ -1,15 +1,22 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/env.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/error/result.dart';
+import '../../../../core/providers/core_providers.dart';
+import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../data/repositories/mock_notification_repository.dart';
+import '../../data/repositories/notification_repository_impl.dart';
 import '../../domain/entities/app_notification.dart';
 import '../../domain/entities/notification_feed.dart';
 import '../../domain/repositories/notification_repository.dart';
 
-/// Swap MockNotificationRepository for the Dio-based implementation when the API is ready.
-final notificationRepositoryProvider =
-    Provider<NotificationRepository>((ref) => MockNotificationRepository());
+/// The API (`/notifications`), or in-memory demo data when USE_MOCK=true.
+final notificationRepositoryProvider = Provider<NotificationRepository>((ref) {
+  return Env.useMock
+      ? MockNotificationRepository()
+      : NotificationRepositoryImpl(ref.watch(dioProvider));
+});
 
 /// All notifications, newest first, with their read state.
 /// Kept alive so the unread count is available outside the notifications screen.
@@ -31,9 +38,13 @@ class NotificationsController extends AsyncNotifier<List<AppNotification>> {
   NotificationRepository get _repo => ref.read(notificationRepositoryProvider);
 
   @override
-  Future<List<AppNotification>> build() async => sortNewestFirst(
-        (await ref.watch(notificationRepositoryProvider).getNotifications()).unwrap(),
-      );
+  Future<List<AppNotification>> build() async {
+    // This list outlives the screen: reload it when another student signs in.
+    ref.watch(currentUserIdProvider);
+    return sortNewestFirst(
+      (await ref.watch(notificationRepositoryProvider).getNotifications()).unwrap(),
+    );
+  }
 
   /// Reloads the list (pull to refresh). Errors are exposed through the state.
   Future<void> refresh() async {

@@ -1,0 +1,400 @@
+[
+  {
+    "id": "genie-logiciel",
+    "code": "GLA-401",
+    "location": "Block 2B",
+    "title": "Génie Logiciel & Architecture",
+    "term": "Winter Semester",
+    "track": "Advanced Software Systems Track",
+    "professor": {
+      "title": "Prof.",
+      "name": "Ben Ali",
+      "office": "Office Bloc B-114",
+      "email": "benali@campus.edu",
+      "isOnline": true
+    },
+    "modules": [
+      {
+        "number": 1,
+        "title": "Software Engineering Foundations",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 2,
+        "title": "Agile Lifecycles & Scrum",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 3,
+        "title": "Requirements Engineering",
+        "hours": 4,
+        "isCompleted": true
+      },
+      {
+        "number": 4,
+        "title": "UML Modeling",
+        "hours": 4,
+        "isCompleted": true
+      },
+      {
+        "number": 5,
+        "title": "Design Patterns",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 6,
+        "title": "Layered Architecture",
+        "hours": 4,
+        "isCompleted": true
+      },
+      {
+        "number": 7,
+        "title": "Microservices & REST APIs",
+        "hours": 4,
+        "isCompleted": true
+      },
+      {
+        "number": 8,
+        "title": "Clean Code & SOLID",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 9,
+        "title": "Unit Testing & TDD",
+        "hours": 4,
+        "isCompleted": true
+      },
+      {
+        "number": 10,
+        "title": "CI/CD Pipelines",
+        "hours": 4,
+        "isCompleted": true
+      },
+      {
+        "number": 11,
+        "title": "Docker Orchestration",
+        "hours": 3,
+        "isCompleted": false
+      },
+      {
+        "number": 12,
+        "title": "Kubernetes in Production",
+        "hours": 4,
+        "isCompleted": false
+      },
+      {
+        "number": 13,
+        "title": "Software Quality Metrics",
+        "hours": 3,
+        "isCompleted": false
+      },
+      {
+        "number": 14,
+        "title": "Architecture Final Project",
+        "hours": 4,
+        "isCompleted": false
+      }
+    ],
+    "lecturesHeld": 7,
+    "lectureCount": 14,
+    "nextQuiz": {
+      "topic": "Arch Microservices",
+      "date": "2026-11-09T09:15:00.000Z"
+    },
+    "resources": [
+      {
+        "type": "document",
+        "id": "gl-lesson-7",
+        "title": "Lesson 7: Microservices & REST APIs",
+        "format": "PDF",
+        "sizeBytes": 4404019,
+        "updatedAt": "2026-10-11T23:00:00.000Z"
+      },
+      {
+        "type": "video",
+        "id": "gl-lesson-8",
+        "title": "Lesson 8: Clean Code & SOLID",
+        "durationSeconds": 2700,
+        "quality": "1080p"
+      },
+      {
+        "type": "assignment",
+        "id": "gl-lab-3",
+        "title": "Lab 3: Docker Orchestration",
+        "description": "Kubernetes cluster config & compose manifest",
+        "dueAt": "2026-11-06T22:59:00.000Z",
+        "points": 20,
+        "isMandatory": true,
+        "submittedRepoUrl": "https://github.com/dony/docker-lab"
+      }
+    ],
+    "community": {
+      "onlineCount": 24,
+      "onlineClassmates": [
+        "Yasmine Trabelsi",
+        "Omar Jebali",
+        "Ines Hammami",
+        "Mehdi Bouzid",
+        "Sarra Chaouch",
+        "Aziz Mabrouk",
+        "Nour Ayari",
+        "Karim Ferchichi",
+        "Rania Mansour",
+        "Hedi Kallel"
+      ]
+    },
+    "isPresent": true
+  },
+  {
+    "id": "algo",
+    "code": "ALG-302",
+    "location": "Lab 14",
+    "title": "Algorithmes & Complexité",
+    "term": "Winter Semester",
+    "track": "Core Computer Science Track",
+    "professor": {
+      "title": "Dr.",
+      "name": "Fersi",
+      "office": "Office Bloc E-205",
+      "email": "fersi@campus.edu",
+      "isOnline": false
+    },
+    "modules": [
+      {
+        "number": 1,
+        "title": "Asymptotic Complexity",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 2,
+        "title": "Recursion & Divide and Conquer",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 3,
+        "title": "Advanced Sorting",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 4,
+        "title": "Trees & Binary Search Trees",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 5,
+        "title": "Heaps & Priority Queues",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 6,
+        "title": "Hash Tables",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 7,
+        "title": "Dynamic Programming",
+        "hours": 3,
+        "isCompleted": false
+      },
+      {
+        "number": 8,
+        "title": "Greedy Algorithms",
+        "hours": 3,
+        "isCompleted": false
+      },
+      {
+        "number": 9,
+        "title": "Graph Traversals (BFS/DFS)",
+        "hours": 3,
+        "isCompleted": false
+      },
+      {
+        "number": 10,
+        "title": "Shortest Paths",
+        "hours": 3,
+        "isCompleted": false
+      },
+      {
+        "number": 11,
+        "title": "Flows & Matchings",
+        "hours": 3,
+        "isCompleted": false
+      },
+      {
+        "number": 12,
+        "title": "NP-Completeness",
+        "hours": 3,
+        "isCompleted": false
+      }
+    ],
+    "lecturesHeld": 6,
+    "lectureCount": 12,
+    "nextQuiz": {
+      "topic": "Dynamic Programming",
+      "date": "2026-11-06T07:30:00.000Z"
+    },
+    "resources": [
+      {
+        "type": "document",
+        "id": "algo-lesson-6",
+        "title": "Lesson 6: Hash Tables & Hashing",
+        "format": "PDF",
+        "sizeBytes": 2936013,
+        "updatedAt": "2026-10-26T23:00:00.000Z"
+      },
+      {
+        "type": "assignment",
+        "id": "algo-lab-4",
+        "title": "Lab 4: Graph Traversals",
+        "description": "BFS/DFS on the Tunis metro network",
+        "dueAt": "2026-11-14T17:00:00.000Z",
+        "points": 15,
+        "isMandatory": true,
+        "submittedRepoUrl": null
+      }
+    ],
+    "community": {
+      "onlineCount": 11,
+      "onlineClassmates": [
+        "Omar Jebali",
+        "Nour Ayari",
+        "Hedi Kallel"
+      ]
+    },
+    "isPresent": true
+  },
+  {
+    "id": "bases-de-donnees",
+    "code": "BDD-303",
+    "location": "Salle 208",
+    "title": "Bases de Données",
+    "term": "Winter Semester",
+    "track": "Data Engineering Track",
+    "professor": {
+      "title": "Dr.",
+      "name": "Gharbi",
+      "office": "Office Bloc C-310",
+      "email": "gharbi@campus.edu",
+      "isOnline": true
+    },
+    "modules": [
+      {
+        "number": 1,
+        "title": "Relational Model",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 2,
+        "title": "Relational Algebra",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 3,
+        "title": "SQL Fundamentals",
+        "hours": 4,
+        "isCompleted": true
+      },
+      {
+        "number": 4,
+        "title": "Advanced SQL & Joins",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 5,
+        "title": "Normalization (1NF to BCNF)",
+        "hours": 4,
+        "isCompleted": true
+      },
+      {
+        "number": 6,
+        "title": "Entity-Relationship Design",
+        "hours": 3,
+        "isCompleted": true
+      },
+      {
+        "number": 7,
+        "title": "Indexing & Query Plans",
+        "hours": 4,
+        "isCompleted": true
+      },
+      {
+        "number": 8,
+        "title": "Transactions & ACID",
+        "hours": 3,
+        "isCompleted": false
+      },
+      {
+        "number": 9,
+        "title": "Concurrency Control",
+        "hours": 4,
+        "isCompleted": false
+      },
+      {
+        "number": 10,
+        "title": "PL/SQL & Triggers",
+        "hours": 3,
+        "isCompleted": false
+      },
+      {
+        "number": 11,
+        "title": "NoSQL Overview",
+        "hours": 4,
+        "isCompleted": false
+      },
+      {
+        "number": 12,
+        "title": "Database Security",
+        "hours": 3,
+        "isCompleted": false
+      }
+    ],
+    "lecturesHeld": 9,
+    "lectureCount": 12,
+    "nextQuiz": null,
+    "resources": [
+      {
+        "type": "document",
+        "id": "bdd-lesson-9",
+        "title": "Lesson 9: Transactions & ACID",
+        "format": "PDF",
+        "sizeBytes": 3250586,
+        "updatedAt": "2026-11-02T23:00:00.000Z"
+      },
+      {
+        "type": "video",
+        "id": "bdd-lesson-7",
+        "title": "Lesson 7: Indexing & Query Plans",
+        "durationSeconds": 3120,
+        "quality": "720p"
+      },
+      {
+        "type": "assignment",
+        "id": "bdd-tp-5",
+        "title": "TP 5: PL/SQL Triggers",
+        "description": "Audit triggers on the campus library schema",
+        "dueAt": "2026-11-07T11:00:00.000Z",
+        "points": 10,
+        "isMandatory": false,
+        "submittedRepoUrl": null
+      }
+    ],
+    "community": {
+      "onlineCount": 6,
+      "onlineClassmates": []
+    },
+    "isPresent": false
+  }
+]

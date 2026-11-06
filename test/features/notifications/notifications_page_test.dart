@@ -84,6 +84,9 @@ Future<void> _pumpPage(
   // Load the notifications, then let the clock emit.
   await tester.pump();
   await tester.pump(const Duration(milliseconds: 50));
+  // The feed's first frame uses the real DateTime.now(): rebuild it with the
+  // frozen clock, or the "today" texts depend on the day the test runs.
+  await tester.pump();
 }
 
 void main() {

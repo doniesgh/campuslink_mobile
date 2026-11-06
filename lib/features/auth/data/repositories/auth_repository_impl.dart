@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import '../../../../core/error/failure_mapper.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/error/result.dart';
@@ -51,6 +53,12 @@ class AuthRepositoryImpl implements AuthRepository {
     }
   }
 
+  /// Signs out locally right away, then revokes the session on the server in
+  /// the background: the user never waits on (or is blocked by) the network.
   @override
-  Future<void> logout() => storage.clear();
+  Future<void> logout() async {
+    final refreshToken = await storage.readRefreshToken();
+    await storage.clear();
+    if (refreshToken != null) unawaited(guard(() => remote.logout(refreshToken)));
+  }
 }

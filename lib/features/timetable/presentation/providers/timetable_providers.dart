@@ -1,13 +1,19 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../../core/config/env.dart';
+import '../../../../core/providers/core_providers.dart';
 import '../../data/repositories/mock_timetable_repository.dart';
+import '../../data/repositories/timetable_repository_impl.dart';
 import '../../domain/entities/class_session.dart';
 import '../../domain/entities/timetable_week.dart';
 import '../../domain/repositories/timetable_repository.dart';
 
-/// Swap MockTimetableRepository for the Dio-based implementation when the API is ready.
-final timetableRepositoryProvider =
-    Provider<TimetableRepository>((ref) => MockTimetableRepository());
+/// The API (USE_MOCK=false) or the in-memory fake.
+final timetableRepositoryProvider = Provider<TimetableRepository>((ref) {
+  return Env.useMock
+      ? MockTimetableRepository()
+      : TimetableRepositoryImpl(ref.watch(dioProvider));
+});
 
 final todayTimetableProvider = FutureProvider.autoDispose<TimetableDay>(
   (ref) async =>
