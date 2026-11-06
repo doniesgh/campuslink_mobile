@@ -2,6 +2,10 @@
 
 REST API for the CampusPulse app: Express 5 + TypeScript, MongoDB (Mongoose), Zod validation, JWT auth.
 
+- **Endpoints, with request and response examples:** [docs/api.md](../docs/api.md)
+- **How the backend is built** (modules, request life cycle, auth design): [docs/architecture.md § 4](../docs/architecture.md#4-the-backend-api)
+- **Common problems:** [docs/troubleshooting.md](../docs/troubleshooting.md#backend)
+
 ## Run it
 
 Requirements: Node 20+ and a MongoDB on `localhost:27017`. If you don't have one, `docker compose up -d` starts it.
@@ -10,107 +14,46 @@ Requirements: Node 20+ and a MongoDB on `localhost:27017`. If you don't have one
 cd backend
 npm install
 cp .env.example .env      # then put a long random value in JWT_ACCESS_SECRET
-npm run seed              # creates the demo student (below)
+npm run seed              # demo student + demo data for every screen
 npm run dev               # http://127.0.0.1:3000/api, restarts on file changes
 ```
 
 Demo student: ENT ID `211JMT0428` (or email `dony.mansour@campus.test`), password `CampusPulse2026!`.
 
-## Use it from the app
-
-Start the API, then run the app with `env/local.json` (`USE_MOCK=false`): in VS Code, pick the **CampusPulse (local backend)** launch configuration.
-
-- **Emulator:** it reaches the PC as `10.0.2.2`, which `env/local.json` already uses.
-- **Real phone on the same Wi-Fi:** set `HOST=0.0.0.0` in `.env` and put the PC's IP address in `API_BASE_URL`.
-
-With `USE_MOCK=false` every screen reads from this API. With `env/dev.json` (`USE_MOCK=true`) the app keeps using its built-in mock data and needs no server.
-
-`npm run seed` gives the demo student the same content as the mock: timetable, courses, rides, jobs, forum, grades, profile and notifications. Run it again to reset the demo. Dates such as "today 13:15" or "15 min ago" are worked out when the seed runs.
+Run the app with `env/local.json` (VS Code: **CampusPulse (local backend)**) to use this API. With `env/dev.json` the app uses its built-in demo data and needs no server.
 
 ## Scripts
 
 | Command | What it does |
 |---|---|
 | `npm run dev` | Start in watch mode (tsx) |
-| `npm test` | Jest + Supertest. Each worker uses its own `campuspulse_test_<n>` database on the local MongoDB, or `MONGO_URL_TEST` if set |
+| `npm run seed` | Create or reset the demo student and every module's demo data (idempotent). Re-run it to refresh dates like "today 13:15" |
+| `npm test` | Jest + Supertest on a throwaway `campuspulse_test_<n>` database. Set `TEST_DB_PREFIX` to keep simultaneous runs apart |
 | `npm run typecheck` | Type-check src and tests |
 | `npm run build` / `npm start` | Compile to `dist/` and run it |
-| `npm run seed` | Create or reset the demo student |
 
-## Endpoints
+## Layout
 
-Base path: `/api`. Errors are always `{ "message": "..." }` with the right status:
+```text
+src/
+├── server.ts / app.ts        start-up · Express app (security middleware, /api routers, error handler)
+├── config/env.ts             .env validated with Zod
+├── lib/ · middleware/        HttpError, validateBody, requireAuth, rate limit, error handler
+├── modules/<name>/           routes · schemas · service · model · seed (one folder per feature)
+└── scripts/seed.ts           npm run seed
+```
 
-- `400` bad request
-- `401` invalid credentials or expired session
-- `409` duplicate
-- `422` invalid data
-- `429` too many attempts
-- `500` server error
+The modules are auth, users, timetable, courses, carpool, jobs, forum, grades, profile and notifications.
 
-| Method | Path | Body | Response |
-|---|---|---|---|
-| GET | `/health` | | `{ status: "ok" }` |
-| POST | `/auth/register` | `{ displayName, email, password }` | `201 { user, accessToken, refreshToken }` (and emails a 6-digit code) |
-| POST | `/auth/login` | `{ identifier, password }`: identifier is the ENT ID or the email | `{ user, accessToken, refreshToken }` |
-| POST | `/auth/refresh` | `{ refreshToken }` | `{ accessToken, refreshToken }` (rotated) |
-| POST | `/auth/logout` | `{ refreshToken }` | `204` |
-| POST | `/auth/forgot-password` | `{ email }` | `200 { message }`: emails a 6-digit code (same answer whether the account exists or not) |
-| POST | `/auth/reset-password` | `{ email, code, password }` | `200 { message }`, and ends every session |
-| POST | `/auth/verify-email` 🔒 | `{ code }` | `{ user }` |
-| POST | `/auth/resend-verification` 🔒 | | `204` |
-| GET | `/users/me` 🔒 | | `user` |
-| GET | `/timetable/day?date=YYYY-MM-DD` 🔒 | | `{ date, semesterWeek, sessions[] }` |
-| GET | `/timetable/week?date=YYYY-MM-DD` 🔒 | | `{ start, days[7], semester, classGroup }` |
-| GET | `/courses` 🔒 | | `Course[]` with your attendance and submissions |
-| PUT | `/courses/:courseId/attendance` 🔒 | `{ present }` | `204` |
-| POST | `/courses/resources/:resourceId/download` 🔒 | | `{ url }` |
-| POST | `/courses/assignments/:assignmentId/submission` 🔒 | `{ repoUrl }` | `201` |
-| GET | `/carpool/rides` 🔒 | | `Ride[]` (your seats are labelled "You"; `isMine` on rides you drive) |
-| GET | `/carpool/rides/:id` 🔒 | | `Ride` |
-| POST | `/carpool/rides` 🔒 | `{ pickup, pickupTag, dropoff, dropoffTag, departure, arrival, seatCount, pricePerSeat, carModel, carColor, plate, amenities?, dropoffNote?, distanceKm? }` | `201 Ride`; you are the driver, id `es-4094`… |
-| POST | `/carpool/rides/:id/reservations` 🔒 | `{ seatIds }` | `201` with the updated `Ride`; `409` if a seat is taken or the ride is yours |
-| GET | `/carpool/impact` 🔒 | | `{ savedKg, goalKg }` |
-| GET | `/jobs` 🔒 | | `Job[]`, each with your `hasApplied` |
-| GET | `/jobs/:id` 🔒 | | `Job` with your `hasApplied` |
-| POST | `/jobs/:id/applications` 🔒 | | `201`; `409` if you already applied |
-| GET | `/forum/highlights` 🔒 | | `ForumPost[]`, newest first |
-| GET | `/forum/lost-items` 🔒 | | `LostItem[]`, newest first |
-| POST | `/forum/lost-items` 🔒 | `{ kind, title, category, zone, location, place, … }` | `201 LostItem` with a generated reference (LF-412…) |
-| POST | `/forum/lost-items/:id/requests` 🔒 | `{ proof }` | `201`; `409` if you already asked |
-| GET | `/forum/ideas` 🔒 | | idea `ForumPost[]`, most upvoted first, each with `isUpvotedByMe` |
-| POST | `/forum/ideas` 🔒 | `{ body, tag? }` | `201 ForumPost` |
-| POST | `/forum/ideas/:id/upvote` 🔒 | | toggles your vote: `{ upvotes, isUpvotedByMe }` |
-| GET | `/grades/transcript` 🔒 | | `{ studentId, semesters[] }` with raw marks (the app computes averages) |
-| GET | `/profile` 🔒 | | `StudentProfile` (credits and rank come from the transcript, the unread count and carpool activity from their modules) |
-| GET | `/notifications` 🔒 | | your `AppNotification[]`, newest first |
-| POST | `/notifications/:id/read` 🔒 | | `204` |
-| POST | `/notifications/read-all` 🔒 | | `204` |
+## Settings
 
-🔒 = needs `Authorization: Bearer <accessToken>`. A `user` is `{ id, email, studentId, displayName, avatarUrl, isEmailVerified }`. The exact JSON of every other type is checked by the contract tests in the app (`test/features/*`), which parse real responses from these endpoints.
+Every setting is documented in [`.env.example`](.env.example). The main ones are:
 
-Each module lives in `src/modules/<name>/`: model, service, routes, Zod schemas and a seed.
+- `JWT_ACCESS_SECRET`, which is required.
+- `MONGO_URL`.
+- `HOST` and `PORT`. Use `HOST=0.0.0.0` for real phones on your Wi-Fi.
+- `SMTP_*`, for real emails. Without `SMTP_HOST`, verification and reset codes are printed in the console as `[mail] …`.
 
-- **Time:** campus time is Tunis (UTC+1 all year).
-- **Dates and times:** class times are sent as `HH:mm` plus `YYYY-MM-DD`, so 08:30 stays 08:30 on any phone. Other dates are ISO UTC instants.
+## Known limitation
 
-## Security notes
-
-- **Passwords:** hashed with bcrypt.
-- **Access tokens:** JWT (HS256) that expire after 15 minutes by default.
-- **Refresh tokens:**
-  - random, and stored only as SHA-256 hashes;
-  - replaced on every refresh (rotation);
-  - reusing an old one ends every session of that user, since it suggests the token was stolen.
-- **Email verification and password-reset codes:** 6 digits, stored hashed, valid for 15 minutes, and locked after 5 wrong attempts. Every reset failure gets the same message, so the endpoint can't reveal who has an account.
-- **Email sending:** if it fails, the error is logged and the request still succeeds (the student can ask for a new code).
-- **Login errors:** the same message and similar timing whether the account exists or not.
-- **Rate limiting:** on the auth routes (strict in production).
-
-## Email
-
-Without `SMTP_HOST` the codes are printed in the server console (`[mail] ...`). To send real emails, fill in the `SMTP_*` lines of `.env` (see `.env.example`) and restart. Any SMTP provider works: Gmail with an app password, Brevo, or Mailtrap to catch test emails.
-
-## Not done yet
-
-- **Grading rules exist twice:** in `src/modules/grades/grading.ts` and in the app's `grading.dart`. Change both together.
+The grading rules exist twice: in `src/modules/grades/grading.ts` and in the app's `lib/features/grades/domain/grading.dart`. Change both together.
