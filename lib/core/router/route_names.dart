@@ -4,7 +4,12 @@ abstract final class RoutePaths {
   static const login = '/auth/login';
   static const register = '/auth/register';
   static const forgotPassword = '/auth/forgot-password';
+  static const resetPassword = '/auth/reset-password';
   static const verifyEmail = '/auth/verify-email';
+
+  /// Reset screen for [email] (the code was emailed to it).
+  static String resetPasswordFor(String email) =>
+      Uri(path: resetPassword, queryParameters: {'email': email}).toString();
 
   static const home = '/app/home';
   static const timetable = '/app/timetable';
@@ -21,6 +26,8 @@ abstract final class RoutePaths {
   static String coursesFor(String course) =>
       Uri(path: courses, queryParameters: {'course': course}).toString();
 
+  /// "Proposer un trajet" form.
+  static const newRide = '$forum/rides/new';
   static String ride(String id) => '$forum/rides/$id';
   static String job(String id) => '$jobs/$id';
 

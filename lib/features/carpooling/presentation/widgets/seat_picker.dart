@@ -13,11 +13,15 @@ class SeatPicker extends StatelessWidget {
     required this.seats,
     required this.selected,
     required this.onToggle,
+    this.enabled = true,
   });
 
   final List<Seat> seats;
   final Set<String> selected;
   final ValueChanged<String> onToggle;
+
+  /// False for the driver of the ride: they see the seats but can't book.
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) {
@@ -26,17 +30,19 @@ class SeatPicker extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Flexible parts: wraps / ellipsizes instead of overflowing with large text.
           Row(
             children: [
-              Text('Available Seats', style: theme.textTheme.titleMedium),
-              const Spacer(),
+              Expanded(child: Text('Available Seats', style: theme.textTheme.titleMedium)),
               if (selected.isNotEmpty)
-                AppBadge('${selected.length} Seat${selected.length > 1 ? 's' : ''} Picked'),
+                Flexible(
+                  child: AppBadge('${selected.length} Seat${selected.length > 1 ? 's' : ''} Picked'),
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            'Tap an available seat to select',
+            enabled ? 'Tap an available seat to select' : 'Students book your free seats here',
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -52,7 +58,7 @@ class SeatPicker extends StatelessWidget {
                 _SeatTile(
                   seat: seat,
                   selected: selected.contains(seat.id),
-                  onTap: seat.status == SeatStatus.free ? () => onToggle(seat.id) : null,
+                  onTap: enabled && seat.status == SeatStatus.free ? () => onToggle(seat.id) : null,
                 ),
             ],
           ),

@@ -1,16 +1,33 @@
 import '../../../../core/error/failures.dart';
 import '../../../../core/error/result.dart';
 import '../../domain/entities/carpool_impact.dart';
+import '../../domain/entities/new_ride.dart';
 import '../../domain/entities/ride.dart';
+import '../../domain/new_ride_rules.dart';
 import '../../domain/repositories/carpool_repository.dart';
 
-/// In-memory fake used until the Node.js API exists.
-/// Later: add `CarpoolRepositoryImpl` (Dio) and swap it in carpool_providers.dart.
+/// In-memory fake used with USE_MOCK=true (no backend needed). Published
+/// rides live until the app restarts and follow the server's rules.
 class MockCarpoolRepository implements CarpoolRepository {
-  MockCarpoolRepository() : _rides = _seed();
+  /// [driverName] names the signed-in student on the rides they publish.
+  MockCarpoolRepository({
+    Duration latency = const Duration(milliseconds: 500),
+    String Function()? driverName,
+    DateTime Function()? clock,
+  })  : _latency = latency,
+        _driverName = driverName ?? (() => 'You'),
+        _clock = clock ?? DateTime.now,
+        _rides = _seed();
 
   final List<Ride> _rides;
-  static const _latency = Duration(milliseconds: 500);
+  final Duration _latency;
+  final String Function() _driverName;
+  final DateTime Function() _clock;
+
+  /// Published rides are numbered after the demo ones, like on the server.
+  int _lastRideNumber = 4093;
+
+  static const _ownRide = "You can't book a seat in your own ride.";
 
   static List<Ride> _seed() {
     final now = DateTime.now();
@@ -139,6 +156,7 @@ class MockCarpoolRepository implements CarpoolRepository {
     if (index < 0) return const Err(ServerFailure('Ride not found.'));
 
     final ride = _rides[index];
+    if (ride.isMine) return const Err(ServerFailure(_ownRide));
     final free = ride.freeSeats.map((s) => s.id).toSet();
     if (seatIds.isEmpty || !seatIds.every(free.contains)) {
       return const Err(ValidationFailure('This seat is no longer available.'));
@@ -156,5 +174,49 @@ class MockCarpoolRepository implements CarpoolRepository {
   Future<Result<CarpoolImpact>> getMonthlyImpact() async {
     await Future<void>.delayed(_latency);
     return const Success(CarpoolImpact(savedKg: 1420, goalKg: 2000));
+  }
+
+  /// Like the server: the student drives (seat "s1", with their name), as a
+  /// new driver (no rating yet) whose car isn't verified.
+  @override
+  Future<Result<Ride>> createRide(NewRide ride) async {
+    await Future<void>.delayed(_latency);
+    final errors = validateNewRide(ride, now: _clock());
+    if (errors.isNotEmpty) return Err(ValidationFailure(errors.values.first));
+
+    final number = ++_lastRideNumber;
+    final name = _driverName();
+    final note = ride.dropoffNote.trim();
+    final created = Ride(
+      id: 'es-$number',
+      code: 'ES-$number',
+      pickup: ride.pickup.trim(),
+      dropoff: ride.dropoff.trim(),
+      pickupTag: ride.pickupTag.trim(),
+      dropoffTag: ride.dropoffTag.trim(),
+      dropoffNote: note,
+      departure: ride.departure,
+      arrival: ride.arrival,
+      distanceKm: ride.distanceKm ?? 0,
+      pricePerSeat: ride.pricePerSeat,
+      driver: Driver(
+        name: name,
+        rating: 0,
+        profile: 'ESPRIT student',
+        ridesCompleted: 0,
+        carModel: ride.carModel.trim(),
+        carColor: ride.carColor.trim(),
+        plate: ride.plate.trim(),
+      ),
+      seats: [
+        Seat(id: 's1', label: name, status: SeatStatus.driver),
+        for (var i = 2; i <= ride.seatCount + 1; i++)
+          Seat(id: 's$i', label: 'Seat #$i', status: SeatStatus.free),
+      ],
+      amenities: ride.amenities.toSet().toList(),
+      isMine: true,
+    );
+    _rides.add(created);
+    return Success(created);
   }
 }

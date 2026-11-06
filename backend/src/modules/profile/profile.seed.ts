@@ -18,8 +18,6 @@ export const DEMO_PROFILE: ProfileData = {
   isVerified: true,
   nfcReady: true,
   hasEspritKey: true,
-  unreadNotifications: 3,
-  hasCarpoolActivity: true,
 };
 
 /**

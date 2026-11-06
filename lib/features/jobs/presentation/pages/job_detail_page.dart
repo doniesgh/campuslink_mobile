@@ -44,6 +44,8 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
     result.when(
       success: (_) {
         setState(() => _applied = true);
+        // The list shows an "Applied" badge too.
+        ref.invalidate(jobsProvider);
         _snack('Application sent to ${job.company}');
       },
       failure: (f) => _snack(f.message),
@@ -71,6 +73,8 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
   Widget _buildContent(Job job) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
+    // From the API (applied earlier) or from this visit.
+    final applied = _applied || job.hasApplied;
     return Column(
       children: [
         Expanded(
@@ -123,11 +127,11 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
             ],
           ),
           action: AppButton(
-            label: _applied ? 'Applied' : 'Apply Now',
-            icon: _applied ? Icons.check : Icons.send_rounded,
+            label: applied ? 'Applied' : 'Apply Now',
+            icon: applied ? Icons.check : Icons.send_rounded,
             variant: AppButtonVariant.accent,
             isLoading: _applying,
-            onPressed: _applied ? null : () => _apply(job),
+            onPressed: applied ? null : () => _apply(job),
           ),
         ),
       ],

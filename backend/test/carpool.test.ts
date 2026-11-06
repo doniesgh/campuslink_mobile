@@ -50,6 +50,7 @@ describe('campus time', () => {
 describe('every carpool route needs a token', () => {
   test.each([
     ['get', '/api/carpool/rides'],
+    ['post', '/api/carpool/rides'],
     ['get', '/api/carpool/rides/es-4091'],
     ['post', '/api/carpool/rides/es-4091/reservations'],
     ['get', '/api/carpool/impact'],
@@ -97,6 +98,7 @@ describe('GET /api/carpool/rides', () => {
         { id: 's4', label: 'Seat #4', status: 'free' },
       ],
       amenities: ['nonSmoking', 'airConditioned', 'musicOk'],
+      isMine: false,
     });
     expect(rides[1]).toMatchObject({
       id: 'es-4093',

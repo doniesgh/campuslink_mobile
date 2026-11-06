@@ -26,9 +26,6 @@ export interface ProfileData {
   isVerified: boolean;
   nfcReady: boolean;
   hasEspritKey: boolean;
-  // TODO: read these two from the notifications and carpool modules.
-  unreadNotifications: number;
-  hasCarpoolActivity: boolean;
 }
 
 /**
@@ -47,8 +44,6 @@ export const DEFAULT_PROFILE: Readonly<ProfileData> = Object.freeze({
   isVerified: false,
   nfcReady: false,
   hasEspritKey: false,
-  unreadNotifications: 0,
-  hasCarpoolActivity: false,
 });
 
 const d = DEFAULT_PROFILE;
@@ -68,8 +63,6 @@ const profileSchema = new Schema(
     isVerified: { type: Boolean, required: true, default: d.isVerified },
     nfcReady: { type: Boolean, required: true, default: d.nfcReady },
     hasEspritKey: { type: Boolean, required: true, default: d.hasEspritKey },
-    unreadNotifications: { type: Number, required: true, min: 0, default: d.unreadNotifications },
-    hasCarpoolActivity: { type: Boolean, required: true, default: d.hasCarpoolActivity },
   },
   { timestamps: true },
 );
@@ -93,7 +86,5 @@ export async function findProfile(userId: string | Types.ObjectId): Promise<Prof
     isVerified: doc.isVerified,
     nfcReady: doc.nfcReady,
     hasEspritKey: doc.hasEspritKey,
-    unreadNotifications: doc.unreadNotifications,
-    hasCarpoolActivity: doc.hasCarpoolActivity,
   };
 }

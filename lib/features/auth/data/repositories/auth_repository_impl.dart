@@ -37,6 +37,14 @@ class AuthRepositoryImpl implements AuthRepository {
       guard(() => remote.forgotPassword(email));
 
   @override
+  Future<Result<void>> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+  }) =>
+      guard(() => remote.resetPassword(email, code, password));
+
+  @override
   Future<Result<User>> verifyEmail(String code) =>
       guard(() async => (await remote.verifyEmail(code)).toEntity());
 

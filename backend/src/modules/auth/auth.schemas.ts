@@ -37,17 +37,18 @@ export const refreshSchema = z.object({
 
 export const forgotPasswordSchema = z.object({ email });
 
+const sixDigitCode = z
+  .string({ error: 'Enter the 6-digit code' })
+  .trim()
+  .regex(/^\d{6}$/, 'Enter the 6-digit code');
+
 export const resetPasswordSchema = z.object({
-  token: z.string({ error: 'Missing reset token' }).min(1, 'Missing reset token'),
+  email,
+  code: sixDigitCode,
   password: newPassword,
 });
 
-export const verifyEmailSchema = z.object({
-  code: z
-    .string({ error: 'Enter the 6-digit code' })
-    .trim()
-    .regex(/^\d{6}$/, 'Enter the 6-digit code'),
-});
+export const verifyEmailSchema = z.object({ code: sixDigitCode });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

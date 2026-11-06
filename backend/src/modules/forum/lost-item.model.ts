@@ -15,8 +15,9 @@ export const LOST_ITEM_PLACES = ['classroom', 'parking', 'library', 'cafeteria',
 
 /**
  * A post of the Lost & Found board: an item reported missing by its owner
- * (`lost`) or handed in by a finder (`found`). The reporter is stored as a
- * name, not as a user account. Ids are strings so the demo items keep the
+ * (`lost`) or handed in by a finder (`found`). The reporter is shown as a
+ * name; notices published from the app also keep the reporter's account id
+ * (the demo items have none). Ids are strings so the demo items keep the
  * app's ids ("lf-409").
  */
 const lostItemSchema = new Schema(
@@ -32,11 +33,12 @@ const lostItemSchema = new Schema(
     /** Full location: "Salle C12 (Ghazela)". */
     location: { type: String, required: true },
     place: { type: String, enum: LOST_ITEM_PLACES, required: true },
+    reporterId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
     reporterName: { type: String, required: true },
     reporterIsStaff: { type: Boolean, default: false },
     reportedAt: { type: Date, required: true },
 
-    /** Handover reference given by the desk ("TF-409"). */
+    /** Handover reference: given by the desk ("TF-409"), or generated on publish ("LF-412"). */
     reference: { type: String, default: null },
     photoCount: { type: Number, default: 0, min: 0 },
     isUrgent: { type: Boolean, default: false },

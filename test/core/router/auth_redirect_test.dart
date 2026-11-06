@@ -44,6 +44,7 @@ void main() {
         expect(authRedirect(_signedOut, RoutePaths.login), isNull);
         expect(authRedirect(_signedOut, RoutePaths.register), isNull);
         expect(authRedirect(_signedOut, RoutePaths.forgotPassword), isNull);
+        expect(authRedirect(_signedOut, RoutePaths.resetPassword), isNull);
       });
     });
 

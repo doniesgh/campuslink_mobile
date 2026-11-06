@@ -1,10 +1,13 @@
 import '../../domain/entities/forum_post.dart';
 import '../../domain/entities/lost_item.dart';
+import '../../domain/entities/lost_item_draft.dart';
 
-/// Expected backend post JSON (one entry of GET /forum/highlights):
+/// Expected backend post JSON (one entry of GET /forum/highlights and
+/// GET /forum/ideas, and the body of POST /forum/ideas):
 /// { "id": "post-1", "authorName": "Sarra K.", "authorInfo": "5A - Informatique",
 ///   "category": "carpool", "tag": "2 places", "body": "...", "place": "Passage → Ghazela",
-///   "upvotes": 0, "comments": 0, "status": null, "postedAt": "2026-11-06T12:48:00.000Z" }
+///   "upvotes": 0, "comments": 0, "status": null, "postedAt": "2026-11-06T12:48:00.000Z",
+///   "isUpvotedByMe": false }
 class ForumPostModel extends ForumPost {
   const ForumPostModel({
     required super.id,
@@ -18,6 +21,7 @@ class ForumPostModel extends ForumPost {
     super.upvotes,
     super.comments,
     super.status,
+    super.isUpvotedByMe,
   });
 
   factory ForumPostModel.fromJson(Map<String, dynamic> json) => ForumPostModel(
@@ -32,10 +36,18 @@ class ForumPostModel extends ForumPost {
         upvotes: _int(json['upvotes']),
         comments: _int(json['comments']),
         status: json['status'] as String?,
+        isUpvotedByMe: (json['isUpvotedByMe'] as bool?) ?? false,
       );
 }
 
-/// Expected backend item JSON (one entry of GET /forum/lost-items):
+/// Body of POST /forum/ideas/:id/upvote: { "upvotes": 43, "isUpvotedByMe": true }.
+IdeaUpvote ideaUpvoteFromJson(Map<String, dynamic> json) => (
+      upvotes: _int(json['upvotes']),
+      isUpvotedByMe: (json['isUpvotedByMe'] as bool?) ?? false,
+    );
+
+/// Expected backend item JSON (one entry of GET /forum/lost-items, and the
+/// body of POST /forum/lost-items):
 /// { "id": "lf-409", "kind": "found", "title": "...", "category": "calculator",
 ///   "zone": "Bloc C", "location": "Salle C12 (Ghazela)", "place": "classroom",
 ///   "reporterName": "Youssef M.", "reporterIsStaff": false,
@@ -89,6 +101,38 @@ class LostItemModel extends LostItem {
         pickupDesk: json['pickupDesk'] as String?,
         isSerialHidden: (json['isSerialHidden'] as bool?) ?? false,
       );
+}
+
+extension LostItemDraftJson on LostItemDraft {
+  /// Body of POST /forum/lost-items:
+  /// { "kind": "lost", "title": "...", "category": "keys", "zone": "Parking",
+  ///   "location": "...", "place": "parking", "distinctiveDetail": "...",
+  ///   "reward": "Café offert ☕", "isUrgent": true }
+  /// or, for a found item, "dropOffNote" and "pickupDesk" instead of "reward"
+  /// and "isUrgent". Blank optional fields are left out.
+  Map<String, dynamic> toJson() {
+    String? text(String? value) {
+      final trimmed = value?.trim() ?? '';
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    return {
+      'kind': kind.name,
+      'title': title.trim(),
+      'category': category.name,
+      'zone': zone.trim(),
+      'location': location.trim(),
+      'place': place.name,
+      if (text(distinctiveDetail) case final detail?) 'distinctiveDetail': detail,
+      if (isLost) ...{
+        if (text(reward) case final reward?) 'reward': reward,
+        'isUrgent': isUrgent,
+      } else ...{
+        if (text(dropOffNote) case final note?) 'dropOffNote': note,
+        if (text(pickupDesk) case final desk?) 'pickupDesk': desk,
+      },
+    };
+  }
 }
 
 /// The API sends enums as the Dart value names ("lostFound").

@@ -4,6 +4,8 @@ import 'dart:typed_data';
 import 'package:campuspulse/core/error/failures.dart';
 import 'package:campuspulse/core/error/result.dart';
 import 'package:campuspulse/features/carpooling/data/repositories/carpool_repository_impl.dart';
+import 'package:campuspulse/features/carpooling/domain/entities/new_ride.dart';
+import 'package:campuspulse/features/carpooling/domain/entities/ride.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -45,6 +47,22 @@ class _FakeApi implements HttpClientAdapter {
 
 Failure _failureOf(Result<Object?> r) =>
     r.when(success: (_) => fail('expected a failure'), failure: (f) => f);
+
+/// The ride of the backend test that produced [createdRideJson].
+final _newRide = NewRide(
+  pickup: 'Lac 2 (Tunis City)',
+  pickupTag: 'Lac 2',
+  dropoff: 'ESPRIT Ghazela (Bloc E)',
+  dropoffTag: 'ESPRIT Bloc E',
+  departure: DateTime.utc(2026, 11, 7, 7, 30),
+  arrival: DateTime.utc(2026, 11, 7, 8, 5),
+  seatCount: 3,
+  pricePerSeat: 2.5,
+  carModel: 'Volkswagen Polo',
+  carColor: 'Blue',
+  plate: '231 TN 1187',
+  amenities: const [RideAmenity.nonSmoking, RideAmenity.musicOk],
+);
 
 void main() {
   test('getRides reads GET /carpool/rides', () async {
@@ -106,6 +124,37 @@ void main() {
     expect(api.requests.single.path, '/carpool/impact');
     expect(impact.savedKg, 1420);
     expect(impact.goalKg, 2000);
+  });
+
+  test('createRide posts the ride and reads the 201 answer', () async {
+    final (repo, api) = _repo((_) => (201, createdRideJson));
+
+    final ride = (await repo.createRide(_newRide)).unwrap();
+
+    final request = api.requests.single;
+    expect(request.method, 'POST');
+    expect(request.path, '/carpool/rides');
+    expect(jsonDecode(jsonEncode(request.data)), jsonDecode(newRideRequestJson));
+    expect(ride.id, 'es-4094');
+    expect(ride.isMine, isTrue);
+    expect(ride.driver.isNewDriver, isTrue);
+  });
+
+  test('createRide shows the 422 message as a validation failure', () async {
+    final (repo, _) = _repo((_) => (422, invalidRideJson));
+
+    final failure = _failureOf(await repo.createRide(_newRide));
+
+    expect(failure, isA<ValidationFailure>());
+    expect(failure.message, 'Proposez entre 1 et 4 places.');
+  });
+
+  test("reserveSeats in the student's own ride shows the 409 message", () async {
+    final (repo, _) = _repo((_) => (409, ownRideJson));
+
+    final failure = _failureOf(await repo.reserveSeats(rideId: 'es-4094', seatIds: ['s2']));
+
+    expect(failure.message, "You can't book a seat in your own ride.");
   });
 
   test('an unexpected body becomes a failure, not a crash', () async {

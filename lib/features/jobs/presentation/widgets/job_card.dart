@@ -49,6 +49,8 @@ class JobCard extends StatelessWidget {
             spacing: AppSpacing.sm,
             runSpacing: AppSpacing.xs,
             children: [
+              if (job.hasApplied)
+                const AppBadge('Applied', tone: BadgeTone.primary, icon: Icons.check, solid: true),
               for (final t in job.tags) AppBadge(t, tone: BadgeTone.neutral),
               AppBadge('${formatThousands(job.stipendTnd)} TND/mo', tone: BadgeTone.accent),
             ],

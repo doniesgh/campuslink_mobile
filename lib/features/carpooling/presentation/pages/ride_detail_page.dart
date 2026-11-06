@@ -33,6 +33,8 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
   bool _reserving = false;
 
   Set<String> _selection(Ride ride) {
+    // The driver can't book a seat in their own ride.
+    if (ride.isMine) return const {};
     final free = ride.freeSeats.map((s) => s.id).toSet();
     final base = _picked ?? (free.isEmpty ? <String>{} : {free.first});
     return base.where(free.contains).toSet();
@@ -99,15 +101,20 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
       children: [
         Expanded(
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(
-              AppSpacing.page, AppSpacing.md, AppSpacing.page, AppSpacing.lg,
+            padding: EdgeInsets.fromLTRB(
+              AppSpacing.page,
+              AppSpacing.md,
+              AppSpacing.page,
+              // Without the booking bar, keep clear of the system bar.
+              AppSpacing.lg + (ride.isMine ? MediaQuery.paddingOf(context).bottom : 0),
             ),
             children: [
               DetailTopBar(
                 backLabel: 'Back to Forum',
                 fallbackPath: RoutePaths.forum,
                 trailing: [
-                  AppBadge('RIDE #${ride.code}', tone: BadgeTone.neutral),
+                  // Flexible: ellipsized rather than overflowing with large text.
+                  Flexible(child: AppBadge('RIDE #${ride.code}', tone: BadgeTone.neutral)),
                 ],
               ),
               const SizedBox(height: AppSpacing.lg),
@@ -117,9 +124,20 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
               const SizedBox(height: AppSpacing.md),
               DriverCard(driver: ride.driver, amenities: ride.amenities),
               const SizedBox(height: AppSpacing.md),
+              if (ride.isMine) ...[
+                const InfoBanner(
+                  icon: Icons.drive_eta_outlined,
+                  tone: BadgeTone.success,
+                  title: "You're driving this ride",
+                  message: 'Students book your free seats from here. Their names '
+                      'appear on the seats they take.',
+                ),
+                const SizedBox(height: AppSpacing.md),
+              ],
               SeatPicker(
                 seats: ride.seats,
                 selected: selected,
+                enabled: !ride.isMine,
                 onToggle: (id) => _toggle(ride, id),
               ),
               const SizedBox(height: AppSpacing.md),
@@ -133,35 +151,36 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
             ],
           ),
         ),
-        BottomActionBar(
-          leading: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'TOTAL BOOKING',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-              Text(
-                '${ride.totalFor(count).toStringAsFixed(3)} TND',
-                style: theme.textTheme.titleLarge,
-              ),
-              Text(
-                '$count seat${count == 1 ? '' : 's'} selected',
-                style: theme.textTheme.labelSmall
-                    ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              ),
-            ],
+        if (!ride.isMine)
+          BottomActionBar(
+            leading: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'TOTAL BOOKING',
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+                Text(
+                  '${ride.totalFor(count).toStringAsFixed(3)} TND',
+                  style: theme.textTheme.titleLarge,
+                ),
+                Text(
+                  '$count seat${count == 1 ? '' : 's'} selected',
+                  style: theme.textTheme.labelSmall
+                      ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+                ),
+              ],
+            ),
+            action: AppButton(
+              label: 'Reserve Seat',
+              icon: Icons.bolt,
+              variant: AppButtonVariant.accent,
+              isLoading: _reserving,
+              onPressed: count == 0 ? null : () => _reserve(ride),
+            ),
           ),
-          action: AppButton(
-            label: 'Reserve Seat',
-            icon: Icons.bolt,
-            variant: AppButtonVariant.accent,
-            isLoading: _reserving,
-            onPressed: count == 0 ? null : () => _reserve(ride),
-          ),
-        ),
       ],
     );
   }

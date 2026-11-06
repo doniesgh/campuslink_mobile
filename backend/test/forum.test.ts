@@ -86,6 +86,7 @@ describe('GET /api/forum/highlights', () => {
       comments: 0,
       status: null,
       postedAt: expect.stringMatching(/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/),
+      isUpvotedByMe: false,
     });
     expect(res.body[2]).toMatchObject({ category: 'idea', upvotes: 42, comments: 8, place: null });
     expect(res.body[1]).toMatchObject({ category: 'lostFound', status: 'En examen BDE' });

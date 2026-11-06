@@ -7,6 +7,7 @@ abstract final class ApiEndpoints {
   static const refresh = '/auth/refresh';
   static const logout = '/auth/logout';
   static const forgotPassword = '/auth/forgot-password';
+  static const resetPassword = '/auth/reset-password';
   static const verifyEmail = '/auth/verify-email';
   static const me = '/users/me';
 
@@ -22,7 +23,7 @@ abstract final class ApiEndpoints {
   static String courseAssignmentSubmission(String assignmentId) =>
       '/courses/assignments/$assignmentId/submission';
 
-  // Carpooling
+  // Carpooling (POST on rides publishes a ride)
   static const rides = '/carpool/rides';
   static String ride(String id) => '/carpool/rides/$id';
   static String rideReservations(String id) => '/carpool/rides/$id/reservations';
@@ -33,10 +34,12 @@ abstract final class ApiEndpoints {
   static String job(String id) => '/jobs/$id';
   static String jobApplications(String id) => '/jobs/$id/applications';
 
-  // Forum
+  // Forum (POST on lostItems publishes a notice, POST on ideas publishes an idea)
   static const forumHighlights = '/forum/highlights';
   static const lostItems = '/forum/lost-items';
   static String lostItemRequests(String id) => '/forum/lost-items/$id/requests';
+  static const ideas = '/forum/ideas';
+  static String ideaUpvote(String id) => '/forum/ideas/$id/upvote';
 
   // Grades
   static const transcript = '/grades/transcript';

@@ -1,23 +1,82 @@
+import { createTransport, type Transporter } from 'nodemailer';
+
+import { env } from '../../config/env';
+
 /** Sends the auth emails. Swap the implementation with [setMailer]. */
 export interface Mailer {
   sendVerificationCode(to: string, code: string): Promise<void>;
-  sendPasswordReset(to: string, token: string): Promise<void>;
+  sendPasswordResetCode(to: string, code: string): Promise<void>;
 }
 
-/**
- * Development mailer: prints the messages in the server console instead of
- * sending them. TODO: SMTP (e.g. nodemailer) for production.
- */
+export interface EmailContent {
+  subject: string;
+  text: string;
+  html: string;
+}
+
+const layout = (title: string, intro: string, code: string, outro: string): EmailContent => ({
+  subject: title,
+  text: `${intro}\n\n${code}\n\n${outro}\n\n— CampusPulse`,
+  html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#1e192b">
+  <h2 style="color:#6949a8">${title}</h2>
+  <p>${intro}</p>
+  <p style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#6949a8">${code}</p>
+  <p style="color:#4a4551">${outro}</p>
+  <p style="color:#7b7582">— CampusPulse</p>
+</div>`,
+});
+
+/** [code] is always 6 digits, so it is safe to put in the HTML as-is. */
+export const verificationEmail = (code: string): EmailContent =>
+  layout(
+    'Verify your CampusPulse email',
+    'Welcome to CampusPulse! Enter this code in the app to verify your email:',
+    code,
+    'The code expires in 15 minutes. If you did not create an account, ignore this email.',
+  );
+
+export const passwordResetEmail = (code: string): EmailContent =>
+  layout(
+    'Reset your CampusPulse password',
+    'Enter this code in the app to choose a new password:',
+    code,
+    'The code expires in 15 minutes. If you did not ask for it, ignore this email: your password stays the same.',
+  );
+
+/** Development mailer: prints the messages in the server console. */
 export const consoleMailer: Mailer = {
   async sendVerificationCode(to, code) {
     console.info(`[mail] Verification code for ${to}: ${code}`);
   },
-  async sendPasswordReset(to, token) {
-    console.info(`[mail] Password reset token for ${to}: ${token}`);
+  async sendPasswordResetCode(to, code) {
+    console.info(`[mail] Password reset code for ${to}: ${code}`);
   },
 };
 
-let current: Mailer = consoleMailer;
+/** Real emails through any SMTP server (Gmail app password, Outlook, Mailtrap, Brevo...). */
+export function createSmtpMailer(transport: Pick<Transporter, 'sendMail'>, from: string): Mailer {
+  const send = async (to: string, content: EmailContent) => {
+    await transport.sendMail({ from, to, ...content });
+  };
+  return {
+    sendVerificationCode: (to, code) => send(to, verificationEmail(code)),
+    sendPasswordResetCode: (to, code) => send(to, passwordResetEmail(code)),
+  };
+}
+
+/** SMTP when SMTP_HOST is set (see .env.example), the console otherwise. */
+function defaultMailer(): Mailer {
+  if (!env.SMTP_HOST) return consoleMailer;
+  const transport = createTransport({
+    host: env.SMTP_HOST,
+    port: env.SMTP_PORT,
+    secure: env.SMTP_PORT === 465,
+    auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS ?? '' } : undefined,
+  });
+  return createSmtpMailer(transport, env.SMTP_FROM);
+}
+
+let current: Mailer = defaultMailer();
 
 export const setMailer = (mailer: Mailer): void => {
   current = mailer;
@@ -25,5 +84,5 @@ export const setMailer = (mailer: Mailer): void => {
 
 export const mailer: Mailer = {
   sendVerificationCode: (to, code) => current.sendVerificationCode(to, code),
-  sendPasswordReset: (to, token) => current.sendPasswordReset(to, token),
+  sendPasswordResetCode: (to, code) => current.sendPasswordResetCode(to, code),
 };

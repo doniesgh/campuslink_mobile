@@ -7,7 +7,8 @@ import '../../domain/entities/job.dart';
 ///   "labGroup": "...", "labGroupNote": "...", "workspaceTitle": "...",
 ///   "workspaceBadges": [...], "mission": "...",
 ///   "missionItems": [{ "title": "...", "description": "..." }],
-///   "matchPercent": 94, "criteria": [...], "skills": [...] }
+///   "matchPercent": 94, "criteria": [...], "skills": [...],
+///   "hasApplied": false }   // for the signed-in student
 abstract final class JobModel {
   static Job fromJson(Map<String, dynamic> json) => Job(
         id: json['id'] as String,
@@ -34,6 +35,7 @@ abstract final class JobModel {
         matchPercent: (json['matchPercent'] as num).toInt(),
         criteria: _strings(json['criteria']),
         skills: _strings(json['skills']),
+        hasApplied: json['hasApplied'] as bool? ?? false,
       );
 
   static List<Job> listFromJson(List<dynamic> json) =>

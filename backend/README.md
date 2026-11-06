@@ -55,8 +55,8 @@ Base path: `/api`. Errors are always `{ "message": "..." }` with the right statu
 | POST | `/auth/login` | `{ identifier, password }`: identifier is the ENT ID or the email | `{ user, accessToken, refreshToken }` |
 | POST | `/auth/refresh` | `{ refreshToken }` | `{ accessToken, refreshToken }` (rotated) |
 | POST | `/auth/logout` | `{ refreshToken }` | `204` |
-| POST | `/auth/forgot-password` | `{ email }` | `200 { message }` (the same whether the account exists or not) |
-| POST | `/auth/reset-password` | `{ token, password }` | `200 { message }` |
+| POST | `/auth/forgot-password` | `{ email }` | `200 { message }`: emails a 6-digit code (same answer whether the account exists or not) |
+| POST | `/auth/reset-password` | `{ email, code, password }` | `200 { message }`, and ends every session |
 | POST | `/auth/verify-email` 🔒 | `{ code }` | `{ user }` |
 | POST | `/auth/resend-verification` 🔒 | | `204` |
 | GET | `/users/me` 🔒 | | `user` |
@@ -66,18 +66,23 @@ Base path: `/api`. Errors are always `{ "message": "..." }` with the right statu
 | PUT | `/courses/:courseId/attendance` 🔒 | `{ present }` | `204` |
 | POST | `/courses/resources/:resourceId/download` 🔒 | | `{ url }` |
 | POST | `/courses/assignments/:assignmentId/submission` 🔒 | `{ repoUrl }` | `201` |
-| GET | `/carpool/rides` 🔒 | | `Ride[]` (your seats are labelled "You") |
+| GET | `/carpool/rides` 🔒 | | `Ride[]` (your seats are labelled "You"; `isMine` on rides you drive) |
 | GET | `/carpool/rides/:id` 🔒 | | `Ride` |
-| POST | `/carpool/rides/:id/reservations` 🔒 | `{ seatIds }` | `201` with the updated `Ride`; `409` if a seat is taken |
+| POST | `/carpool/rides` 🔒 | `{ pickup, pickupTag, dropoff, dropoffTag, departure, arrival, seatCount, pricePerSeat, carModel, carColor, plate, amenities?, dropoffNote?, distanceKm? }` | `201 Ride`; you are the driver, id `es-4094`… |
+| POST | `/carpool/rides/:id/reservations` 🔒 | `{ seatIds }` | `201` with the updated `Ride`; `409` if a seat is taken or the ride is yours |
 | GET | `/carpool/impact` 🔒 | | `{ savedKg, goalKg }` |
-| GET | `/jobs` 🔒 | | `Job[]` |
-| GET | `/jobs/:id` 🔒 | | `Job` |
+| GET | `/jobs` 🔒 | | `Job[]`, each with your `hasApplied` |
+| GET | `/jobs/:id` 🔒 | | `Job` with your `hasApplied` |
 | POST | `/jobs/:id/applications` 🔒 | | `201`; `409` if you already applied |
 | GET | `/forum/highlights` 🔒 | | `ForumPost[]`, newest first |
 | GET | `/forum/lost-items` 🔒 | | `LostItem[]`, newest first |
+| POST | `/forum/lost-items` 🔒 | `{ kind, title, category, zone, location, place, … }` | `201 LostItem` with a generated reference (LF-412…) |
 | POST | `/forum/lost-items/:id/requests` 🔒 | `{ proof }` | `201`; `409` if you already asked |
+| GET | `/forum/ideas` 🔒 | | idea `ForumPost[]`, most upvoted first, each with `isUpvotedByMe` |
+| POST | `/forum/ideas` 🔒 | `{ body, tag? }` | `201 ForumPost` |
+| POST | `/forum/ideas/:id/upvote` 🔒 | | toggles your vote: `{ upvotes, isUpvotedByMe }` |
 | GET | `/grades/transcript` 🔒 | | `{ studentId, semesters[] }` with raw marks (the app computes averages) |
-| GET | `/profile` 🔒 | | `StudentProfile` (credits and rank come from the transcript) |
+| GET | `/profile` 🔒 | | `StudentProfile` (credits and rank come from the transcript, the unread count and carpool activity from their modules) |
 | GET | `/notifications` 🔒 | | your `AppNotification[]`, newest first |
 | POST | `/notifications/:id/read` 🔒 | | `204` |
 | POST | `/notifications/read-all` 🔒 | | `204` |
@@ -97,14 +102,15 @@ Each module lives in `src/modules/<name>/`: model, service, routes, Zod schemas 
   - random, and stored only as SHA-256 hashes;
   - replaced on every refresh (rotation);
   - reusing an old one ends every session of that user, since it suggests the token was stolen.
-- **Email verification codes and reset tokens:** stored hashed, with an expiry. A code is locked after 5 wrong attempts.
+- **Email verification and password-reset codes:** 6 digits, stored hashed, valid for 15 minutes, and locked after 5 wrong attempts. Every reset failure gets the same message, so the endpoint can't reveal who has an account.
+- **Email sending:** if it fails, the error is logged and the request still succeeds (the student can ask for a new code).
 - **Login errors:** the same message and similar timing whether the account exists or not.
 - **Rate limiting:** on the auth routes (strict in production).
 
+## Email
+
+Without `SMTP_HOST` the codes are printed in the server console (`[mail] ...`). To send real emails, fill in the `SMTP_*` lines of `.env` (see `.env.example`) and restart. Any SMTP provider works: Gmail with an app password, Brevo, or Mailtrap to catch test emails.
+
 ## Not done yet
 
-- **Real email sending:** emails are printed in the server console (`[mail] ...`). See `src/modules/auth/mailer.ts`.
-- **Creating content from the app:** publishing a ride, a lost-and-found notice or a forum post. The screens show "coming soon".
-- **Already-applied jobs:** the job JSON doesn't say whether you already applied. After reopening an offer the app shows "Apply" again, and the API answers 409.
-- **Profile counters:** the profile's unread-notification count and carpool flag are stored values; they should come from the notifications and carpool modules.
 - **Grading rules exist twice:** in `src/modules/grades/grading.ts` and in the app's `grading.dart`. Change both together.

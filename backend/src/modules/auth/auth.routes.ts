@@ -42,7 +42,7 @@ authRouter.post(
   validateBody(forgotPasswordSchema),
   async (req, res) => {
     await auth.forgotPassword((req.body as { email: string }).email);
-    res.json({ message: 'If an account exists for this email, a reset link is on its way.' });
+    res.json({ message: 'If an account exists for this email, a 6-digit code is on its way.' });
   },
 );
 
@@ -52,7 +52,7 @@ authRouter.post(
   validateBody(resetPasswordSchema),
   async (req, res) => {
     await auth.resetPassword(req.body as ResetPasswordInput);
-    res.json({ message: 'Password updated. You can sign in now.' });
+    res.json({ message: 'Password updated. Sign in with your new password.' });
   },
 );
 

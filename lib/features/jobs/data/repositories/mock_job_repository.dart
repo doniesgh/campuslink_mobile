@@ -100,24 +100,32 @@ class MockJobRepository implements JobRepository {
     ),
   ];
 
+  /// Offers this fake student applied to, so "Applied" survives leaving the page.
+  final _applied = <String>{};
+
   @override
   Future<Result<List<Job>>> getJobs() async {
     await Future<void>.delayed(_latency);
-    return const Success(_jobs);
+    return Success([for (final job in _jobs) job.withApplied(_applied.contains(job.id))]);
   }
 
   @override
   Future<Result<Job>> getJob(String id) async {
     await Future<void>.delayed(_latency);
     for (final job in _jobs) {
-      if (job.id == id) return Success(job);
+      if (job.id == id) return Success(job.withApplied(_applied.contains(id)));
     }
     return const Err(ServerFailure('Job not found.'));
   }
 
+  /// Same answers as the API: 404-like for unknown offers, 409-like when applying twice.
   @override
   Future<Result<void>> apply(String jobId) async {
     await Future<void>.delayed(_latency);
+    if (!_jobs.any((job) => job.id == jobId)) return const Err(ServerFailure('Job not found.'));
+    if (!_applied.add(jobId)) {
+      return const Err(ServerFailure('You already applied to this offer.'));
+    }
     return const Success(null);
   }
 }

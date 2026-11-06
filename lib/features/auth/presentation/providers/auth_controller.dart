@@ -66,6 +66,13 @@ class AuthController extends AsyncNotifier<User?> {
     return r.when(success: (_) => null, failure: (f) => f);
   }
 
+  /// Sets a new password with the emailed code. The student then signs in
+  /// again (the server ends every existing session).
+  Future<Failure?> resetPassword(String email, String code, String password) async {
+    final r = await _repo.resetPassword(email: email, code: code, password: password);
+    return r.when(success: (_) => null, failure: (f) => f);
+  }
+
   Future<Failure?> verifyEmail(String code) async {
     final r = await _repo.verifyEmail(code);
     return r.when(

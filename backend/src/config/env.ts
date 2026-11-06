@@ -15,6 +15,13 @@ const schema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(15 * 60),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   CORS_ORIGIN: z.string().default('*'),
+
+  // Email. Without SMTP_HOST, emails are printed in the console instead.
+  SMTP_HOST: z.string().optional(),
+  SMTP_PORT: z.coerce.number().int().positive().default(587),
+  SMTP_USER: z.string().optional(),
+  SMTP_PASS: z.string().optional(),
+  SMTP_FROM: z.string().default('CampusPulse <no-reply@campuspulse.test>'),
 });
 
 const parsed = schema.safeParse(process.env);

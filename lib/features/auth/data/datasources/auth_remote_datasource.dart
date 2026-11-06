@@ -8,7 +8,11 @@ abstract interface class AuthRemoteDataSource {
   /// [identifier] is the student's ENT ID (e.g. 211JMT0428) or email.
   Future<AuthResponseModel> login(String identifier, String password);
   Future<AuthResponseModel> register(String name, String email, String password);
+  /// Emails a 6-digit reset code (the API answers the same for unknown emails).
   Future<void> forgotPassword(String email);
+
+  /// Sets a new password with the code emailed by [forgotPassword].
+  Future<void> resetPassword(String email, String code, String password);
   Future<UserModel> verifyEmail(String code);
   Future<UserModel> me();
 
@@ -48,6 +52,15 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     await _dio.post(
       ApiEndpoints.forgotPassword,
       data: {'email': email},
+      options: AuthInterceptor.skipAuth,
+    );
+  }
+
+  @override
+  Future<void> resetPassword(String email, String code, String password) async {
+    await _dio.post(
+      ApiEndpoints.resetPassword,
+      data: {'email': email, 'code': code, 'password': password},
       options: AuthInterceptor.skipAuth,
     );
   }
@@ -95,6 +108,10 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
 
   @override
   Future<void> forgotPassword(String email) => Future<void>.delayed(_delay);
+
+  @override
+  Future<void> resetPassword(String email, String code, String password) =>
+      Future<void>.delayed(_delay);
 
   @override
   Future<UserModel> verifyEmail(String code) async {

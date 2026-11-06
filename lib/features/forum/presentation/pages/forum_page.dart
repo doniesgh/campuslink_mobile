@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_search_field.dart';
 import '../../../../shared/widgets/app_snack.dart';
@@ -8,7 +10,11 @@ import '../../../../shared/widgets/campus_header.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../../../carpooling/presentation/providers/carpool_providers.dart';
 import '../../../carpooling/presentation/widgets/carpooling_section.dart';
+import '../providers/forum_providers.dart';
+import '../widgets/idea_composer_sheet.dart';
+import '../widgets/ideas_section.dart';
 import '../widgets/lost_found_section.dart';
+import '../widgets/lost_item_publish_sheet.dart';
 
 enum ForumSection {
   carpooling('Covoiturage', Icons.directions_car_outlined),
@@ -47,6 +53,29 @@ class _ForumPageState extends ConsumerState<ForumPage> {
         _searchFieldGeneration++;
       });
 
+  /// "Publier une annonce": the board reloads with the new notice first.
+  Future<void> _publishLostItem() async {
+    final item = await showPublishLostItemSheet(context);
+    if (item == null || !mounted) return;
+    ref.invalidate(lostItemsProvider);
+    // Show the new notice even if the current search would hide it.
+    if (!item.matches(_query)) _clearSearch();
+    showAppSnack(
+      context,
+      item.isLost
+          ? 'Annonce publiée : la communauté ESPRIT est prévenue !'
+          : 'Merci ! Votre annonce est en ligne.',
+    );
+  }
+
+  /// "Proposer une idée": the new idea is added first in the list.
+  Future<void> _proposeIdea() async {
+    final idea = await showIdeaComposerSheet(context);
+    if (idea == null || !mounted) return;
+    if (!idea.matches(_query)) _clearSearch();
+    showAppSnack(context, 'Idée publiée ! Les étudiants peuvent maintenant voter.');
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -56,19 +85,25 @@ class _ForumPageState extends ConsumerState<ForumPage> {
     return Scaffold(
       floatingActionButton: switch (section) {
         ForumSection.carpooling => FloatingActionButton.extended(
-            onPressed: () => _comingSoon('Proposer un trajet'),
+            onPressed: () => context.push(RoutePaths.newRide),
             backgroundColor: scheme.secondary,
             foregroundColor: scheme.onSecondary,
             icon: const Icon(Icons.directions_car),
             label: const Text('Proposer un trajet +'),
           ),
         ForumSection.lostFound => FloatingActionButton.extended(
-            // TODO: open the "lost / found notice" form once the API exists.
-            onPressed: () => showAppSnack(context, 'Publishing a notice is coming soon.'),
+            onPressed: _publishLostItem,
             backgroundColor: scheme.secondary,
             foregroundColor: scheme.onSecondary,
             icon: const Icon(Icons.add_circle_outline),
             label: const Text('Publier une annonce'),
+          ),
+        ForumSection.ideas => FloatingActionButton.extended(
+            onPressed: _proposeIdea,
+            backgroundColor: scheme.secondary,
+            foregroundColor: scheme.onSecondary,
+            icon: const Icon(Icons.tips_and_updates_outlined),
+            label: const Text('Proposer une idée'),
           ),
         _ => null,
       },
@@ -81,9 +116,11 @@ class _ForumPageState extends ConsumerState<ForumPage> {
               padding: const EdgeInsets.symmetric(horizontal: AppSpacing.page),
               child: AppSearchField(
                 key: ValueKey(_searchFieldGeneration),
-                hint: section == ForumSection.lostFound
-                    ? 'Rechercher par objet, salle ou bloc...'
-                    : 'Search rides, lost items, or campus...',
+                hint: switch (section) {
+                  ForumSection.lostFound => 'Rechercher par objet, salle ou bloc...',
+                  ForumSection.ideas => 'Rechercher une idée, un thème...',
+                  _ => 'Search rides, lost items, or campus...',
+                },
                 onChanged: (v) => setState(() => _query = v),
                 onFilterTap: () => _comingSoon('Filters'),
               ),
@@ -115,6 +152,7 @@ class _ForumPageState extends ConsumerState<ForumPage> {
                 ForumSection.carpooling => CarpoolingSection(query: _query),
                 ForumSection.lostFound =>
                   LostFoundSection(query: _query, onClearSearch: _clearSearch),
+                ForumSection.ideas => IdeasSection(query: _query, onClearSearch: _clearSearch),
                 _ => EmptyView(message: '${section.label} is coming soon.', icon: section.icon),
               },
             ),

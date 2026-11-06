@@ -44,8 +44,8 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
       showAppSnack(context, failure.message);
       return;
     }
-    showAppSnack(context, 'If an account exists for $email, a reset link is on its way.');
-    _backToLogin();
+    // Step 2: enter the emailed code and a new password. Back goes to login.
+    context.pushReplacement(RoutePaths.resetPasswordFor(email));
   }
 
   @override
@@ -53,7 +53,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     return AuthScaffold(
       heroHeight: 220,
       title: 'Reset your password',
-      subtitle: "We'll email you a link to choose a new one",
+      subtitle: "We'll email you a 6-digit code to choose a new one",
       child: Form(
         key: _formKey,
         child: Column(
@@ -72,7 +72,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
             ),
             const SizedBox(height: AppSpacing.xl),
             AppButton(
-              label: 'Send reset link',
+              label: 'Send the code',
               trailingIcon: Icons.send_rounded,
               variant: AppButtonVariant.accent,
               isLoading: _loading,

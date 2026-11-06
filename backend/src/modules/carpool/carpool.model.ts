@@ -42,13 +42,22 @@ const rideSchema = new Schema(
     /** Readable id used in the app's URLs and notifications, e.g. "es-4091". */
     _id: { type: String, required: true },
     code: { type: String, required: true },
+
+    /**
+     * The student who published the ride. Null for the demo rides, whose
+     * drivers have no account. Indexed to find a student's own rides.
+     */
+    driverId: { type: Schema.Types.ObjectId, ref: 'User', default: null, index: true },
+
     pickup: { type: String, required: true },
     dropoff: { type: String, required: true },
     pickupTag: { type: String, required: true },
     dropoffTag: { type: String, required: true },
-    dropoffNote: { type: String, required: true },
+    /** Empty when the driver added no note. */
+    dropoffNote: { type: String, default: '' },
     departure: { type: Date, required: true, index: true },
     arrival: { type: Date, required: true },
+    /** 0 when the driver didn't give it. */
     distanceKm: { type: Number, required: true },
     pricePerSeat: { type: Number, required: true },
     driver: { type: driverSchema, required: true },
@@ -62,6 +71,17 @@ export type Ride = InferSchemaType<typeof rideSchema>;
 export type RideDocument = HydratedDocument<Ride>;
 
 export const RideModel = model('Ride', rideSchema);
+
+/**
+ * Hands out the numbers of published rides ("ES-4094", "ES-4095"...), one
+ * atomic increment per ride. A single document: { _id: "rides", seq }.
+ */
+const rideCounterSchema = new Schema({
+  _id: { type: String, required: true },
+  seq: { type: Number, required: true },
+});
+
+export const RideCounterModel = model('RideCounter', rideCounterSchema);
 
 /** Campus-wide CO2 savings, one document per campus month ("2026-11"). */
 const carpoolImpactSchema = new Schema(

@@ -161,8 +161,23 @@ class _DriverRow extends StatelessWidget {
                     child: Text(d.name, maxLines: 1, overflow: TextOverflow.ellipsis, style: theme.textTheme.titleSmall),
                   ),
                   const SizedBox(width: AppSpacing.xs),
-                  const Icon(Icons.star_rounded, size: 14, color: AppColors.warning),
-                  Text(d.rating.toStringAsFixed(1), style: theme.textTheme.labelSmall),
+                  // No rating yet: say so rather than show 0 stars.
+                  if (d.isNewDriver)
+                    Flexible(
+                      child: Text(
+                        'New driver',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.labelSmall?.copyWith(
+                          color: theme.colorScheme.primary,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    )
+                  else ...[
+                    const Icon(Icons.star_rounded, size: 14, color: AppColors.warning),
+                    Text(d.rating.toStringAsFixed(1), style: theme.textTheme.labelSmall),
+                  ],
                 ],
               ),
               Text(

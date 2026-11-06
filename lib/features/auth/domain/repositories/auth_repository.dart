@@ -11,6 +11,11 @@ abstract interface class AuthRepository {
     required String password,
   });
   Future<Result<void>> forgotPassword(String email);
+  Future<Result<void>> resetPassword({
+    required String email,
+    required String code,
+    required String password,
+  });
   Future<Result<User>> verifyEmail(String code);
 
   /// Returns the current user if a valid session exists, otherwise null.

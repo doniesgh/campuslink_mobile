@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/config/env.dart';
 import '../../../../core/providers/core_providers.dart';
+import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../data/repositories/carpool_repository_impl.dart';
 import '../../data/repositories/mock_carpool_repository.dart';
 import '../../domain/entities/carpool_impact.dart';
@@ -11,7 +12,11 @@ import '../../domain/repositories/carpool_repository.dart';
 /// Mock data with USE_MOCK=true, the Node.js API otherwise.
 final carpoolRepositoryProvider = Provider<CarpoolRepository>((ref) {
   return Env.useMock
-      ? MockCarpoolRepository()
+      ? MockCarpoolRepository(
+          // Read when a ride is published: the mock's driver is the signed-in student.
+          driverName: () =>
+              ref.read(authControllerProvider).valueOrNull?.displayName ?? 'You',
+        )
       : CarpoolRepositoryImpl(ref.watch(dioProvider));
 });
 

@@ -6,6 +6,8 @@ import 'package:campuspulse/core/error/result.dart';
 import 'package:campuspulse/features/forum/data/repositories/forum_repository_impl.dart';
 import 'package:campuspulse/features/forum/data/repositories/mock_forum_repository.dart';
 import 'package:campuspulse/features/forum/domain/entities/forum_post.dart';
+import 'package:campuspulse/features/forum/domain/entities/lost_item.dart';
+import 'package:campuspulse/features/forum/domain/entities/lost_item_draft.dart';
 import 'package:campuspulse/features/forum/presentation/providers/forum_providers.dart';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -120,6 +122,151 @@ void main() {
       final twice = await failing(409, 'You already sent a request for this item.');
       expect(twice, isA<ServerFailure>());
       expect(twice.message, 'You already sent a request for this item.');
+    });
+  });
+
+  group('publishLostItem', () {
+    const lost = LostItemDraft(
+      kind: LostItemKind.lost,
+      title: '  AirPods Pro ',
+      category: LostItemCategory.audio,
+      zone: 'Bloc E',
+      location: 'Salle E204',
+      place: LostItemPlace.classroom,
+      distinctiveDetail: '  ',
+      reward: 'Café offert ☕',
+      isUrgent: true,
+      // Not a lost item's field: never sent.
+      pickupDesk: 'Accueil Bloc C',
+    );
+
+    test('posts the lost fields to POST /forum/lost-items and reads the item', () async {
+      api
+        ..status = 201
+        ..body = publishedLostItemResponse;
+
+      final item = (await repo.publishLostItem(lost)).unwrap();
+
+      final sent = api.requests.single;
+      expect(sent.method, 'POST');
+      expect(sent.uri.toString(), 'http://api.test/api/forum/lost-items');
+      expect(sent.data, {
+        'kind': 'lost',
+        'title': 'AirPods Pro',
+        'category': 'audio',
+        'zone': 'Bloc E',
+        'location': 'Salle E204',
+        'place': 'classroom',
+        'reward': 'Café offert ☕',
+        'isUrgent': true,
+      });
+      expect(item.reference, 'LF-412');
+      expect(item.reporterName, 'Dony Mansour');
+    });
+
+    test('sends the drop-off fields of a found item only', () async {
+      api
+        ..status = 201
+        ..body = publishedFoundItemResponse;
+
+      await repo.publishLostItem(const LostItemDraft(
+        kind: LostItemKind.found,
+        title: 'Parapluie noir',
+        category: LostItemCategory.other,
+        zone: 'Bibliothèque',
+        location: 'Bibliothèque centrale',
+        place: LostItemPlace.library,
+        reward: 'ignored',
+        isUrgent: true,
+        dropOffNote: ' ',
+        pickupDesk: 'Accueil Bloc C',
+      ));
+
+      expect(api.requests.single.data, {
+        'kind': 'found',
+        'title': 'Parapluie noir',
+        'category': 'other',
+        'zone': 'Bibliothèque',
+        'location': 'Bibliothèque centrale',
+        'place': 'library',
+        'pickupDesk': 'Accueil Bloc C',
+      });
+    });
+
+    test('a 422 is a validation failure with the French message', () async {
+      api
+        ..status = 422
+        ..body = jsonEncode({'message': 'Indiquez la zone (ex : Bloc C).'});
+      final failure = failureOf(await repo.publishLostItem(lost));
+      expect(failure, isA<ValidationFailure>());
+      expect(failure.message, 'Indiquez la zone (ex : Bloc C).');
+    });
+  });
+
+  group('ideas', () {
+    test('getIdeas reads GET /forum/ideas', () async {
+      api.body = ideasResponse;
+
+      final ideas = (await repo.getIdeas()).unwrap();
+
+      expect(api.requests.single.method, 'GET');
+      expect(api.requests.single.uri.toString(), 'http://api.test/api/forum/ideas');
+      expect(ideas.first.id, 'post-3');
+      expect(ideas.first.upvote, (upvotes: 43, isUpvotedByMe: true));
+    });
+
+    test('publishIdea posts the trimmed text and theme', () async {
+      api
+        ..status = 201
+        ..body = publishedIdeaResponse;
+
+      final idea =
+          (await repo.publishIdea(body: '  Un distributeur au Bloc E ? ', tag: ' Vie de campus '))
+              .unwrap();
+
+      final sent = api.requests.single;
+      expect(sent.method, 'POST');
+      expect(sent.uri.toString(), 'http://api.test/api/forum/ideas');
+      expect(sent.data, {'body': 'Un distributeur au Bloc E ?', 'tag': 'Vie de campus'});
+      expect(idea.authorInfo, '4BI - Software Eng.');
+    });
+
+    test('publishIdea leaves a blank theme out', () async {
+      api
+        ..status = 201
+        ..body = publishedIdeaResponse;
+      await repo.publishIdea(body: 'Un distributeur au Bloc E ?', tag: '  ');
+      expect(api.requests.single.data, {'body': 'Un distributeur au Bloc E ?'});
+    });
+
+    test('a refused idea is a validation failure', () async {
+      api
+        ..status = 422
+        ..body = jsonEncode({'message': 'Décrivez votre idée.'});
+      final failure = failureOf(await repo.publishIdea(body: ' '));
+      expect(failure, isA<ValidationFailure>());
+      expect(failure.message, 'Décrivez votre idée.');
+    });
+
+    test('toggleIdeaUpvote posts to the encoded idea path and reads the state', () async {
+      api.body = ideaUpvoteResponse;
+
+      final upvote = (await repo.toggleIdeaUpvote('post-3')).unwrap();
+      await repo.toggleIdeaUpvote('a/b');
+
+      expect(api.requests.first.method, 'POST');
+      expect(api.requests.first.uri.toString(), 'http://api.test/api/forum/ideas/post-3/upvote');
+      expect(api.requests.last.uri.path, '/api/forum/ideas/a%2Fb/upvote');
+      expect(upvote, (upvotes: 43, isUpvotedByMe: true));
+    });
+
+    test('an idea that is gone is a server failure with the API message', () async {
+      api
+        ..status = 404
+        ..body = jsonEncode({'message': "Cette idée n'existe plus."});
+      final failure = failureOf(await repo.toggleIdeaUpvote('idea-0'));
+      expect(failure, isA<ServerFailure>());
+      expect(failure.message, "Cette idée n'existe plus.");
     });
   });
 

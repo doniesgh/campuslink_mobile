@@ -1,6 +1,7 @@
 import request from 'supertest';
 
 import { createApp } from '../src/app';
+import { setMailer } from '../src/modules/auth/mailer';
 import { UserModel } from '../src/modules/users/user.model';
 import { captureMail, clearTestDb, closeTestDb, connectTestDb } from './helpers';
 
@@ -247,16 +248,18 @@ describe('password reset', () => {
     expect(mail.resets).toHaveLength(0);
   });
 
-  test('the emailed token sets a new password, once, and signs out everywhere', async () => {
+  const invalidReset = { message: 'Invalid or expired code. Check the email or request a new code.' };
+  const reset = (body: object) => request(app).post('/api/auth/reset-password').send(body);
+
+  test('the emailed 6-digit code sets a new password, once, and signs out everywhere', async () => {
     const { refreshToken } = await registerStudent();
     await request(app).post('/api/auth/forgot-password').send({ email: student.email }).expect(200);
-    expect(mail.resets).toHaveLength(1);
-    const { token } = mail.resets[0];
+    expect(mail.resets).toEqual([
+      { to: 'sarra.kefi@campus.test', code: expect.stringMatching(/^\d{6}$/) },
+    ]);
+    const { code } = mail.resets[0];
 
-    await request(app)
-      .post('/api/auth/reset-password')
-      .send({ token, password: 'new-password-456' })
-      .expect(200);
+    await reset({ email: student.email, code, password: 'new-password-456' }).expect(200);
 
     await request(app)
       .post('/api/auth/login')
@@ -268,9 +271,52 @@ describe('password reset', () => {
       .expect(200);
     await request(app).post('/api/auth/refresh').send({ refreshToken }).expect(401);
 
-    await request(app)
-      .post('/api/auth/reset-password')
-      .send({ token, password: 'another-pass-789' })
-      .expect(400, { message: 'This reset link is invalid or has expired.' });
+    // The code works once.
+    await reset({ email: student.email, code, password: 'another-pass-789' }).expect(400, invalidReset);
+  });
+
+  test('locks the code after 5 wrong attempts', async () => {
+    await registerStudent();
+    await request(app).post('/api/auth/forgot-password').send({ email: student.email }).expect(200);
+    const { code } = mail.resets[0];
+    const wrong = code === '000000' ? '111111' : '000000';
+    for (let i = 0; i < 5; i++) {
+      await reset({ email: student.email, code: wrong, password: 'new-password-456' }).expect(400);
+    }
+    await reset({ email: student.email, code, password: 'new-password-456' }).expect(400, invalidReset);
+  });
+
+  test('gives the same answer for an unknown email', async () => {
+    await reset({ email: 'nobody@campus.test', code: '123456', password: 'new-password-456' }).expect(
+      400,
+      invalidReset,
+    );
+  });
+
+  test('validates the code and the new password', async () => {
+    await reset({ email: student.email, code: '12ab56', password: 'new-password-456' }).expect(422, {
+      message: 'Enter the 6-digit code',
+    });
+    await reset({ email: student.email, code: '123456', password: 'short' }).expect(422, {
+      message: 'Use at least 8 characters',
+    });
+  });
+});
+
+describe('when the mail server fails', () => {
+  test('registration still succeeds and the student can ask for a new code', async () => {
+    const failing = jest.spyOn(console, 'error').mockImplementation(() => undefined);
+    setMailer({
+      sendVerificationCode: () => Promise.reject(new Error('SMTP down')),
+      sendPasswordResetCode: () => Promise.reject(new Error('SMTP down')),
+    });
+    try {
+      await request(app).post('/api/auth/register').send(student).expect(201);
+      await request(app).post('/api/auth/forgot-password').send({ email: student.email }).expect(200);
+      expect(failing).toHaveBeenCalled();
+    } finally {
+      failing.mockRestore();
+      captureMail(mail); // back to capturing for the other tests
+    }
   });
 });

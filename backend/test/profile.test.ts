@@ -1,7 +1,10 @@
+import { Types } from 'mongoose';
 import request from 'supertest';
 
 import { createApp } from '../src/app';
+import { seedCarpool } from '../src/modules/carpool/carpool.seed';
 import { seedGrades } from '../src/modules/grades/grades.seed';
+import { seedNotifications } from '../src/modules/notifications/notifications.seed';
 import { TranscriptModel } from '../src/modules/grades/transcript.model';
 import { clock, tunisTime } from '../src/modules/profile/academic-calendar';
 import { StudentProfileModel } from '../src/modules/profile/profile.model';
@@ -32,6 +35,7 @@ async function seededDemoStudent() {
   });
   await seedGrades(student.user._id);
   await seedProfile(student.user._id);
+  await seedNotifications(student.user._id); // 9 notifications, 3 unread
   return student;
 }
 
@@ -75,9 +79,29 @@ describe('GET /api/profile', () => {
       isVerified: true,
       nfcReady: true,
       hasEspritKey: true,
-      unreadNotifications: 3,
-      hasCarpoolActivity: true,
+      unreadNotifications: 3, // from the notifications module
+      hasCarpoolActivity: false, // no ride published or booked yet
     });
+  });
+
+  test('the counters follow the notifications and carpool modules', async () => {
+    clock.now = () => NOV_2026;
+    const { auth } = await seededDemoStudent();
+    await seedCarpool(new Types.ObjectId());
+    const profile = async () =>
+      (await request(app).get('/api/profile').set(auth).expect(200)).body as StudentProfileJson;
+
+    expect((await profile()).hasCarpoolActivity).toBe(false);
+    await request(app)
+      .post('/api/carpool/rides/es-4091/reservations')
+      .set(auth)
+      .send({ seatIds: ['s3'] })
+      .expect(201);
+    expect((await profile()).hasCarpoolActivity).toBe(true);
+
+    expect((await profile()).unreadNotifications).toBe(3);
+    await request(app).post('/api/notifications/read-all').set(auth).expect(204);
+    expect((await profile()).unreadNotifications).toBe(0);
   });
 
   test('a student without a profile gets the default one', async () => {

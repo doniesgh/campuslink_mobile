@@ -47,18 +47,17 @@ export async function closeTestDb(): Promise<void> {
 
 export interface SentMail {
   codes: { to: string; code: string }[];
-  resets: { to: string; token: string }[];
+  resets: { to: string; code: string }[];
 }
 
-/** Captures the auth emails instead of printing them. */
-export function captureMail(): SentMail {
-  const sent: SentMail = { codes: [], resets: [] };
+/** Captures the auth emails (into [sent], or a new record) instead of sending them. */
+export function captureMail(sent: SentMail = { codes: [], resets: [] }): SentMail {
   setMailer({
     async sendVerificationCode(to, code) {
       sent.codes.push({ to, code });
     },
-    async sendPasswordReset(to, token) {
-      sent.resets.push({ to, token });
+    async sendPasswordResetCode(to, code) {
+      sent.resets.push({ to, code });
     },
   });
   return sent;

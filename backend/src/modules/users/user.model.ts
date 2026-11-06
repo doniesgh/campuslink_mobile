@@ -16,8 +16,9 @@ const userSchema = new Schema(
     verificationCodeHash: { type: String, select: false },
     verificationExpiresAt: { type: Date, select: false },
     verificationAttempts: { type: Number, default: 0, select: false },
-    resetTokenHash: { type: String, select: false, index: { sparse: true } },
+    resetCodeHash: { type: String, select: false },
     resetExpiresAt: { type: Date, select: false },
+    resetAttempts: { type: Number, default: 0, select: false },
   },
   { timestamps: true },
 );

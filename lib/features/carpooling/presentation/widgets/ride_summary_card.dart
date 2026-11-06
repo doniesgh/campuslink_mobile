@@ -42,16 +42,18 @@ class RideSummaryCard extends StatelessWidget {
                         ),
                       ],
                     ),
-                    const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        Icon(Icons.school_outlined, size: 14, color: muted),
-                        const SizedBox(width: AppSpacing.xs),
-                        Expanded(
-                          child: Text(ride.dropoffNote, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
-                        ),
-                      ],
-                    ),
+                    if (ride.dropoffNote.trim().isNotEmpty) ...[
+                      const SizedBox(height: AppSpacing.xs),
+                      Row(
+                        children: [
+                          Icon(Icons.school_outlined, size: 14, color: muted),
+                          const SizedBox(width: AppSpacing.xs),
+                          Expanded(
+                            child: Text(ride.dropoffNote, style: theme.textTheme.bodySmall?.copyWith(color: muted)),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -90,8 +92,8 @@ class RideSummaryCard extends StatelessWidget {
               Expanded(
                 child: StatTile(
                   label: 'Distance',
-                  value: ride.distanceKm.toStringAsFixed(1),
-                  caption: 'km total',
+                  value: ride.hasDistance ? ride.distanceKm.toStringAsFixed(1) : '—',
+                  caption: ride.hasDistance ? 'km total' : 'not given',
                   centered: true,
                 ),
               ),

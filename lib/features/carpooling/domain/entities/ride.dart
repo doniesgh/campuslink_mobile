@@ -34,6 +34,10 @@ class Driver {
   final String carColor;
   final String plate;
   final bool isCarVerified;
+
+  /// There is no rating system yet: a student who publishes a ride has a
+  /// rating of 0 and 0 rides, and the app shows "New driver" instead of stars.
+  bool get isNewDriver => ridesCompleted == 0 || rating <= 0;
 }
 
 class Ride {
@@ -52,6 +56,7 @@ class Ride {
     required this.driver,
     required this.seats,
     this.amenities = const [],
+    this.isMine = false,
   });
 
   final String id;
@@ -60,14 +65,24 @@ class Ride {
   final String dropoff;
   final String pickupTag;
   final String dropoffTag;
+
+  /// Empty when the driver added no note.
   final String dropoffNote;
   final DateTime departure;
   final DateTime arrival;
+
+  /// 0 when the driver didn't give it (see [hasDistance]).
   final double distanceKm;
   final double pricePerSeat;
   final Driver driver;
   final List<Seat> seats;
   final List<RideAmenity> amenities;
+
+  /// The signed-in student published this ride: they drive it, so they
+  /// can't book a seat in it.
+  final bool isMine;
+
+  bool get hasDistance => distanceKm > 0;
 
   List<Seat> get freeSeats => seats.where((s) => s.status == SeatStatus.free).toList();
   int get freeSeatCount => freeSeats.length;
@@ -99,5 +114,6 @@ class Ride {
         driver: driver,
         seats: newSeats,
         amenities: amenities,
+        isMine: isMine,
       );
 }

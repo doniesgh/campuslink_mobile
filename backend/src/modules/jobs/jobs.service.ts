@@ -24,9 +24,11 @@ export interface JobJson {
   matchPercent: number;
   criteria: string[];
   skills: string[];
+  /** Whether the signed-in student already applied (so the app shows "Applied"). */
+  hasApplied: boolean;
 }
 
-export const toJobJson = (job: JobDocument): JobJson => ({
+export const toJobJson = (job: JobDocument, hasApplied = false): JobJson => ({
   id: job.id as string,
   featuredLabel: job.featuredLabel ?? null,
   title: job.title,
@@ -45,18 +47,26 @@ export const toJobJson = (job: JobDocument): JobJson => ({
   matchPercent: job.matchPercent,
   criteria: [...job.criteria],
   skills: [...job.skills],
+  hasApplied,
 });
 
-/** Every offer, best match first. */
-export async function listJobs(): Promise<JobJson[]> {
-  const jobs = await JobModel.find().sort({ matchPercent: -1, _id: 1 });
-  return jobs.map(toJobJson);
+/** Every offer, best match first, with the student's own application state. */
+export async function listJobs(userId: string): Promise<JobJson[]> {
+  const [jobs, applied] = await Promise.all([
+    JobModel.find().sort({ matchPercent: -1, _id: 1 }),
+    JobApplicationModel.distinct('jobId', { userId }),
+  ]);
+  const appliedIds = new Set(applied.map(String));
+  return jobs.map((job) => toJobJson(job, appliedIds.has(job.id as string)));
 }
 
-export async function getJob(jobId: string): Promise<JobJson> {
-  const job = await JobModel.findById(jobId);
+export async function getJob(jobId: string, userId: string): Promise<JobJson> {
+  const [job, applied] = await Promise.all([
+    JobModel.findById(jobId),
+    JobApplicationModel.exists({ jobId, userId }),
+  ]);
   if (!job) throw notFound(JOB_NOT_FOUND);
-  return toJobJson(job);
+  return toJobJson(job, applied !== null);
 }
 
 /** MongoDB unique-index violation. */

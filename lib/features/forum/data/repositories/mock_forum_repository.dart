@@ -2,17 +2,92 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/error/result.dart';
 import '../../domain/entities/forum_post.dart';
 import '../../domain/entities/lost_item.dart';
+import '../../domain/entities/lost_item_draft.dart';
+import '../../domain/forum_rules.dart';
 import '../../domain/repositories/forum_repository.dart';
 
-/// In-memory fake. Replace with a Dio-based implementation when the API exists.
+/// In-memory demo data, used when USE_MOCK=true (the same content as the
+/// backend seed). What the student publishes and upvotes is kept in memory
+/// for the life of this object, and checked with the API's rules.
 class MockForumRepository implements ForumRepository {
   static const _latency = Duration(milliseconds: 450);
+
+  /// The demo student (MockAuthRemoteDataSource signs in as Dony Mansour,
+  /// whose seeded profile is 4BI - Software Eng.).
+  static const _studentName = 'Dony Mansour';
+  static const _studentInfo = '4BI - Software Eng.';
+
+  static const _ideaGone = "Cette idée n'existe plus.";
+
+  /// Published during this session, newest first.
+  final _publishedItems = <LostItem>[];
+  final _publishedIdeas = <ForumPost>[];
+
+  /// Ideas the student upvoted (one vote each, on top of the seeded count).
+  final _upvotedIdeaIds = <String>{};
+  var _nextReference = 412;
+  var _nextId = 1;
 
   @override
   Future<Result<List<ForumPost>>> getHighlights() async {
     await Future<void>.delayed(_latency);
-    final now = DateTime.now();
-    return Success([
+    final posts = [..._publishedIdeas, ..._seedPosts(DateTime.now())]
+      ..sort((a, b) => b.postedAt.compareTo(a.postedAt));
+    return Success([for (final post in posts) _withMyVote(post)]);
+  }
+
+  @override
+  Future<Result<List<ForumPost>>> getIdeas() async {
+    await Future<void>.delayed(_latency);
+    final ideas = [for (final idea in _allIdeas(DateTime.now())) _withMyVote(idea)]
+      ..sort((a, b) {
+        final byVotes = b.upvotes.compareTo(a.upvotes);
+        return byVotes != 0 ? byVotes : b.postedAt.compareTo(a.postedAt);
+      });
+    return Success(ideas);
+  }
+
+  @override
+  Future<Result<ForumPost>> publishIdea({required String body, String? tag}) async {
+    await Future<void>.delayed(_latency);
+    final error = ideaBodyError(body) ?? ideaTagError(tag);
+    if (error != null) return Err(ValidationFailure(error));
+
+    final theme = tag?.trim() ?? '';
+    final idea = ForumPost(
+      id: 'idea-mock-${_nextId++}',
+      authorName: _studentName,
+      authorInfo: _studentInfo,
+      category: PostCategory.idea,
+      tag: theme.isEmpty ? defaultIdeaTag : theme,
+      body: body.trim(),
+      postedAt: DateTime.now(),
+    );
+    _publishedIdeas.insert(0, idea);
+    return Success(idea);
+  }
+
+  @override
+  Future<Result<IdeaUpvote>> toggleIdeaUpvote(String id) async {
+    await Future<void>.delayed(_latency);
+    final ideas = _allIdeas(DateTime.now()).where((idea) => idea.id == id);
+    if (ideas.isEmpty) return const Err(ServerFailure(_ideaGone));
+    if (!_upvotedIdeaIds.remove(id)) _upvotedIdeaIds.add(id);
+    return Success(_withMyVote(ideas.first).upvote);
+  }
+
+  List<ForumPost> _allIdeas(DateTime now) => [
+        ..._publishedIdeas,
+        ..._seedPosts(now).where((post) => post.category == PostCategory.idea),
+      ];
+
+  /// [post] with the student's vote added to its count.
+  ForumPost _withMyVote(ForumPost post) {
+    if (!_upvotedIdeaIds.contains(post.id)) return post;
+    return post.withUpvote((upvotes: post.upvotes + 1, isUpvotedByMe: true));
+  }
+
+  static List<ForumPost> _seedPosts(DateTime now) => [
       ForumPost(
         id: 'post-1',
         authorName: 'Sarra K.',
@@ -48,13 +123,48 @@ class MockForumRepository implements ForumRepository {
         status: 'En examen BDE',
         postedAt: now.subtract(const Duration(hours: 2)),
       ),
-    ]);
-  }
+    ];
 
   @override
   Future<Result<List<LostItem>>> getLostItems() async {
     await Future<void>.delayed(_latency);
-    return Success(List<LostItem>.unmodifiable(_seedLostItems(DateTime.now())));
+    return Success(List<LostItem>.unmodifiable(_allLostItems(DateTime.now())));
+  }
+
+  List<LostItem> _allLostItems(DateTime now) =>
+      [..._publishedItems, ..._seedLostItems(now)]
+        ..sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+
+  @override
+  Future<Result<LostItem>> publishLostItem(LostItemDraft draft) async {
+    await Future<void>.delayed(_latency);
+    final error = lostItemDraftError(draft);
+    if (error != null) return Err(ValidationFailure(error));
+
+    String? text(String? value) {
+      final trimmed = value?.trim() ?? '';
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    final item = LostItem(
+      id: 'lf-mock-${_nextId++}',
+      kind: draft.kind,
+      title: draft.title.trim(),
+      category: draft.category,
+      zone: draft.zone.trim(),
+      location: draft.location.trim(),
+      place: draft.place,
+      reporterName: _studentName,
+      reportedAt: DateTime.now(),
+      reference: 'LF-${_nextReference++}',
+      distinctiveDetail: text(draft.distinctiveDetail),
+      reward: draft.isLost ? text(draft.reward) : null,
+      isUrgent: draft.isLost && draft.isUrgent,
+      dropOffNote: draft.isLost ? null : text(draft.dropOffNote),
+      pickupDesk: draft.isLost ? null : text(draft.pickupDesk),
+    );
+    _publishedItems.insert(0, item);
+    return Success(item);
   }
 
   @override
@@ -63,8 +173,7 @@ class MockForumRepository implements ForumRepository {
     required String proof,
   }) async {
     await Future<void>.delayed(_latency);
-    // TODO: POST the request to the API once the lost & found endpoints exist.
-    if (!_seedLostItems(DateTime.now()).any((item) => item.id == itemId)) {
+    if (!_allLostItems(DateTime.now()).any((item) => item.id == itemId)) {
       return const Err(ServerFailure('This item is no longer listed.'));
     }
     if (proof.trim().isEmpty) {

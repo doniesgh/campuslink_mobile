@@ -143,14 +143,17 @@ class AuthFooter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
+    // Wrap, not Row: on narrow screens or large fonts the link goes to a
+    // second line instead of overflowing.
+    return Wrap(
+      alignment: WrapAlignment.center,
+      crossAxisAlignment: WrapCrossAlignment.center,
+      spacing: AppSpacing.xs,
       children: [
         Text(
           prompt,
           style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
         ),
-        const SizedBox(width: AppSpacing.xs),
         AuthLink(label: action, onTap: onTap),
       ],
     );

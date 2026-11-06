@@ -24,6 +24,7 @@ class Job {
     required this.criteria,
     required this.skills,
     this.featuredLabel,
+    this.hasApplied = false,
   });
 
   final String id;
@@ -49,7 +50,33 @@ class Job {
   /// Shown above the title when the offer is featured.
   final String? featuredLabel;
 
+  /// Whether the signed-in student already applied to this offer.
+  final bool hasApplied;
+
   bool get isFeatured => featuredLabel != null;
+
+  /// This offer with [hasApplied] set to [applied].
+  Job withApplied(bool applied) => Job(
+        id: id,
+        title: title,
+        company: company,
+        location: location,
+        tags: tags,
+        stipendTnd: stipendTnd,
+        durationMonths: durationMonths,
+        period: period,
+        labGroup: labGroup,
+        labGroupNote: labGroupNote,
+        workspaceTitle: workspaceTitle,
+        workspaceBadges: workspaceBadges,
+        mission: mission,
+        missionItems: missionItems,
+        matchPercent: matchPercent,
+        criteria: criteria,
+        skills: skills,
+        featuredLabel: featuredLabel,
+        hasApplied: applied,
+      );
 
   String get companyInitials {
     final words = company.trim().split(RegExp(r'\s+')).where((w) => w.isNotEmpty).toList();

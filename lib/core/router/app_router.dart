@@ -6,8 +6,10 @@ import '../../features/auth/domain/entities/user.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
+import '../../features/auth/presentation/pages/reset_password_page.dart';
 import '../../features/auth/presentation/pages/verify_email_page.dart';
 import '../../features/auth/presentation/providers/auth_controller.dart';
+import '../../features/carpooling/presentation/pages/new_ride_page.dart';
 import '../../features/carpooling/presentation/pages/ride_detail_page.dart';
 import '../../features/courses/presentation/pages/courses_page.dart';
 import '../../features/forum/presentation/pages/forum_page.dart';
@@ -61,6 +63,11 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: RoutePaths.login, builder: (_, __) => const LoginPage()),
       GoRoute(path: RoutePaths.register, builder: (_, __) => const RegisterPage()),
       GoRoute(path: RoutePaths.forgotPassword, builder: (_, __) => const ForgotPasswordPage()),
+      GoRoute(
+        path: RoutePaths.resetPassword,
+        builder: (_, state) =>
+            ResetPasswordPage(email: state.uri.queryParameters['email'] ?? ''),
+      ),
       GoRoute(path: RoutePaths.verifyEmail, builder: (_, __) => const VerifyEmailPage()),
       GoRoute(
         path: RoutePaths.notifications,
@@ -91,6 +98,8 @@ final routerProvider = Provider<GoRouter>((ref) {
               path: RoutePaths.forum,
               builder: (_, __) => const ForumPage(),
               routes: [
+                // Before 'rides/:rideId', or "new" would be read as a ride id.
+                GoRoute(path: 'rides/new', builder: (_, __) => const NewRidePage()),
                 GoRoute(
                   path: 'rides/:rideId',
                   builder: (_, state) =>

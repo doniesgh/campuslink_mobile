@@ -4,6 +4,7 @@ import 'package:campuspulse/features/forum/data/models/forum_models.dart';
 import 'package:campuspulse/features/forum/data/repositories/mock_forum_repository.dart';
 import 'package:campuspulse/features/forum/domain/entities/forum_post.dart';
 import 'package:campuspulse/features/forum/domain/entities/lost_item.dart';
+import 'package:campuspulse/features/forum/domain/entities/lost_item_draft.dart';
 import 'package:campuspulse/features/forum/presentation/utils/lost_found_formatters.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -11,6 +12,8 @@ import 'forum_api_fixtures.dart';
 
 List<Map<String, dynamic>> _decode(String body) =>
     (jsonDecode(body) as List<dynamic>).cast<Map<String, dynamic>>();
+
+Map<String, dynamic> _decodeObject(String body) => jsonDecode(body) as Map<String, dynamic>;
 
 /// Every field but the date (the mock's dates are relative to the real "now").
 Map<String, Object?> _postFields(ForumPost p) => {
@@ -24,7 +27,12 @@ Map<String, Object?> _postFields(ForumPost p) => {
       'upvotes': p.upvotes,
       'comments': p.comments,
       'status': p.status,
+      'isUpvotedByMe': p.isUpvotedByMe,
     };
+
+/// Every field but the id and the date (both set by whoever stores the post).
+Map<String, Object?> _publishedPostFields(ForumPost p) => _postFields(p)..remove('id');
+
 
 Map<String, Object?> _itemFields(LostItem i) => {
       'id': i.id,
@@ -46,6 +54,33 @@ Map<String, Object?> _itemFields(LostItem i) => {
       'isSerialHidden': i.isSerialHidden,
       'action': i.action,
     };
+
+Map<String, Object?> _publishedItemFields(LostItem i) => _itemFields(i)..remove('id');
+
+/// The drafts the fixtures were published with.
+const _lostDraft = LostItemDraft(
+  kind: LostItemKind.lost,
+  title: 'AirPods Pro (boîtier blanc)',
+  category: LostItemCategory.audio,
+  zone: 'Bloc E',
+  location: 'Salle E204 (Charguia)',
+  place: LostItemPlace.classroom,
+  distinctiveDetail: 'Gravure « D.M. » sur le boîtier',
+  reward: 'Café offert ☕',
+  isUrgent: true,
+);
+
+const _foundDraft = LostItemDraft(
+  kind: LostItemKind.found,
+  title: 'Parapluie noir',
+  category: LostItemCategory.other,
+  zone: 'Bibliothèque',
+  location: 'Bibliothèque centrale (Étage 1)',
+  place: LostItemPlace.library,
+  pickupDesk: 'Accueil Bloc C',
+);
+
+const _ideaBody = 'Un distributeur de boissons chaudes au Bloc E pour les cours du soir ?';
 
 void main() {
   final mock = MockForumRepository();
@@ -98,6 +133,118 @@ void main() {
     });
   });
 
+  group('POST /forum/lost-items response', () {
+    final lost = LostItemModel.fromJson(_decodeObject(publishedLostItemResponse));
+    final found = LostItemModel.fromJson(_decodeObject(publishedFoundItemResponse));
+
+    test('parses into the published items, with the server-set fields', () {
+      expect(lost.reporterName, 'Dony Mansour');
+      expect(lost.reporterIsStaff, isFalse);
+      expect(lost.reference, 'LF-412');
+      expect(lost.photoCount, 0);
+      expect(lost.isUrgent, isTrue);
+      expect(lost.reward, 'Café offert ☕');
+      expect(lost.action, LostItemAction.reportFound);
+      expect(lost.reportedAt.isUtc, isFalse);
+
+      expect(found.reference, 'LF-413');
+      expect(found.pickupDesk, 'Accueil Bloc C');
+      expect(found.dropOffNote, isNull);
+      expect(found.action, LostItemAction.claim);
+    });
+
+    test('the draft body sends what the API stored', () {
+      final sent = _lostDraft.toJson();
+      for (final key in sent.keys) {
+        expect(_decodeObject(publishedLostItemResponse)[key], sent[key], reason: key);
+      }
+      final sentFound = _foundDraft.toJson();
+      for (final key in sentFound.keys) {
+        expect(_decodeObject(publishedFoundItemResponse)[key], sentFound[key], reason: key);
+      }
+    });
+
+    test('the mock publishes the same items (but the id and date)', () async {
+      final repo = MockForumRepository();
+      final mockLost = (await repo.publishLostItem(_lostDraft)).unwrap();
+      final mockFound = (await repo.publishLostItem(_foundDraft)).unwrap();
+      expect(_publishedItemFields(mockLost), _publishedItemFields(lost));
+      expect(_publishedItemFields(mockFound), _publishedItemFields(found));
+    });
+
+    test('the board then lists them first, newest first', () {
+      final board = [
+        for (final json in _decode(lostItemsAfterPublishingResponse)) LostItemModel.fromJson(json),
+      ];
+      expect([for (final i in board) i.id], [found.id, lost.id]);
+    });
+  });
+
+  group('POST /forum/ideas response', () {
+    final idea = ForumPostModel.fromJson(_decodeObject(publishedIdeaResponse));
+
+    test('parses into the published idea', () {
+      expect(idea.category, PostCategory.idea);
+      expect(idea.authorName, 'Dony Mansour');
+      expect(idea.authorInfo, '4BI - Software Eng.');
+      expect(idea.tag, 'Vie de campus');
+      expect(idea.body, _ideaBody);
+      expect(idea.upvotes, 0);
+      expect(idea.comments, 0);
+      expect(idea.status, isNull);
+      expect(idea.isUpvotedByMe, isFalse);
+      expect(idea.postedAt.isUtc, isFalse);
+    });
+
+    test('the mock publishes the same idea (but the id and date)', () async {
+      final mockIdea =
+          (await MockForumRepository().publishIdea(body: _ideaBody, tag: 'Vie de campus'))
+              .unwrap();
+      expect(_publishedPostFields(mockIdea), _publishedPostFields(idea));
+    });
+  });
+
+  group('POST /forum/ideas/:id/upvote response', () {
+    test('parses into the new count and state, like the mock', () async {
+      final upvote = ideaUpvoteFromJson(_decodeObject(ideaUpvoteResponse));
+      expect(upvote, (upvotes: 43, isUpvotedByMe: true));
+      expect((await MockForumRepository().toggleIdeaUpvote('post-3')).unwrap(), upvote);
+    });
+  });
+
+  group('GET /forum/ideas response', () {
+    final ideas = [for (final json in _decode(ideasResponse)) ForumPostModel.fromJson(json)];
+
+    test('is most upvoted first, with the student vote', () {
+      expect([for (final i in ideas) (i.id, i.upvotes, i.isUpvotedByMe)], [
+        ('post-3', 43, true),
+        (ideas.last.id, 0, false),
+      ]);
+      expect(ideas.every((i) => i.category == PostCategory.idea), isTrue);
+    });
+
+    test('the mock lists the same ideas after the same actions', () async {
+      final repo = MockForumRepository();
+      await repo.publishIdea(body: _ideaBody, tag: 'Vie de campus');
+      await repo.toggleIdeaUpvote('post-3');
+      final expected = (await repo.getIdeas()).unwrap();
+      expect(
+        [for (final i in expected) _publishedPostFields(i)],
+        [for (final i in ideas) _publishedPostFields(i)],
+      );
+    });
+
+    test('the highlights carry the same vote for Home', () {
+      final highlights = [
+        for (final json in _decode(highlightsAfterVotingResponse)) ForumPostModel.fromJson(json),
+      ];
+      final idea = highlights.singleWhere((p) => p.id == 'post-3');
+      expect(idea.upvote, (upvotes: 43, isUpvotedByMe: true));
+      expect(highlights.where((p) => p.isUpvotedByMe), [idea]);
+      expect(highlights.first.id, ideas.last.id); // the new idea is the latest post
+    });
+  });
+
   group('fromJson', () {
     final post = _decode(highlightsResponse).first;
     final item = _decode(lostItemsResponse).first;
@@ -120,6 +267,9 @@ void main() {
         ..remove('status'));
       expect(minimalPost.upvotes, 0);
       expect(minimalPost.place, isNull);
+
+      final beforeVotes = ForumPostModel.fromJson({...post}..remove('isUpvotedByMe'));
+      expect(beforeVotes.isUpvotedByMe, isFalse);
     });
 
     test('an unknown item category or place shows as "other"', () {

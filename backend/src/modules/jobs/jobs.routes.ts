@@ -8,11 +8,11 @@ export const jobsRouter = Router();
 jobsRouter.use(requireAuth);
 
 jobsRouter.get('/', async (_req, res) => {
-  res.json(await jobs.listJobs());
+  res.json(await jobs.listJobs(currentUserId(res)));
 });
 
 jobsRouter.get('/:id', async (req, res) => {
-  res.json(await jobs.getJob(req.params.id));
+  res.json(await jobs.getJob(req.params.id, currentUserId(res)));
 });
 
 /** No body needed: answers 201 `{ jobId, appliedAt }`. */

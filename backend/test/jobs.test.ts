@@ -61,6 +61,7 @@ describe('GET /api/jobs', () => {
       matchPercent: 76,
       criteria: ['Experience with OpenCV or PyTorch.', 'Interest in robotics.'],
       skills: ['Python', 'OpenCV', 'PyTorch'],
+      hasApplied: false,
     });
   });
 
@@ -175,5 +176,29 @@ describe('seedJobs', () => {
 
     await apply(demo.auth).expect(201);
     await apply(other.auth).expect(409);
+  });
+});
+
+describe('hasApplied', () => {
+  type JobBody = { id: string; hasApplied: boolean };
+
+  test('is per student, in the list and in the detail', async () => {
+    await seed();
+    const a = await createStudent();
+    const b = await createStudent();
+
+    const before = await request(app).get('/api/jobs').set(a.auth).expect(200);
+    expect((before.body as JobBody[]).every((j) => j.hasApplied === false)).toBe(true);
+
+    await apply(a.auth, 'nimbus-backend').expect(201);
+
+    const list = (await request(app).get('/api/jobs').set(a.auth).expect(200)).body as JobBody[];
+    expect(list.find((j) => j.id === 'nimbus-backend')?.hasApplied).toBe(true);
+    expect(list.find((j) => j.id === 'instadeep-ml')?.hasApplied).toBe(false);
+
+    const mine = await request(app).get('/api/jobs/nimbus-backend').set(a.auth).expect(200);
+    expect(mine.body.hasApplied).toBe(true);
+    const theirs = await request(app).get('/api/jobs/nimbus-backend').set(b.auth).expect(200);
+    expect(theirs.body.hasApplied).toBe(false);
   });
 });

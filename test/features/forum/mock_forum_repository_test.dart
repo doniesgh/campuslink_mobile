@@ -1,8 +1,34 @@
 import 'package:campuspulse/core/error/failures.dart';
 import 'package:campuspulse/core/error/result.dart';
 import 'package:campuspulse/features/forum/data/repositories/mock_forum_repository.dart';
+import 'package:campuspulse/features/forum/domain/entities/forum_post.dart';
 import 'package:campuspulse/features/forum/domain/entities/lost_item.dart';
+import 'package:campuspulse/features/forum/domain/entities/lost_item_draft.dart';
 import 'package:flutter_test/flutter_test.dart';
+
+const _keys = LostItemDraft(
+  kind: LostItemKind.lost,
+  title: 'Clés Peugeot',
+  category: LostItemCategory.keys,
+  zone: 'Parking',
+  location: 'Parking Amphi A',
+  place: LostItemPlace.parking,
+  reward: 'Café offert ☕',
+  isUrgent: true,
+);
+
+LostItemDraft _found({String? desk = 'Accueil Bloc C', String title = 'Parapluie noir'}) =>
+    LostItemDraft(
+      kind: LostItemKind.found,
+      title: title,
+      category: LostItemCategory.other,
+      zone: 'Bibliothèque',
+      location: 'Bibliothèque centrale',
+      place: LostItemPlace.library,
+      pickupDesk: desk,
+    );
+
+String _failure(Result<Object?> result) => (result as Err<Object?>).failure.message;
 
 void main() {
   final repo = MockForumRepository();
@@ -37,6 +63,99 @@ void main() {
     test('rejects an unknown item', () async {
       final result = await repo.sendLostItemRequest(itemId: 'nope', proof: 'Autocollant');
       expect((result as Err<void>).failure, isA<ServerFailure>());
+    });
+  });
+
+  group('publishLostItem', () {
+    test('publishes first on the board, with the next LF reference', () async {
+      final repo = MockForumRepository();
+      final keys = (await repo.publishLostItem(_keys)).unwrap();
+      final umbrella = (await repo.publishLostItem(_found())).unwrap();
+
+      expect(keys.reference, 'LF-412');
+      expect(umbrella.reference, 'LF-413');
+      expect(keys.reporterName, 'Dony Mansour');
+      expect(keys.isUrgent, isTrue);
+      expect(umbrella.pickupDesk, 'Accueil Bloc C');
+
+      final board = (await repo.getLostItems()).unwrap();
+      expect([for (final i in board.take(2)) i.id], [umbrella.id, keys.id]);
+      expect(board, hasLength(8));
+    });
+
+    test('a published item can be claimed', () async {
+      final repo = MockForumRepository();
+      final umbrella = (await repo.publishLostItem(_found())).unwrap();
+      final result = await repo.sendLostItemRequest(itemId: umbrella.id, proof: 'Poignée cassée');
+      expect(result, isA<Success<void>>());
+    });
+
+    test('refuses a draft like the API, with its French message', () async {
+      final repo = MockForumRepository();
+      final noDesk = await repo.publishLostItem(_found(desk: '  '));
+      expect((noDesk as Err<LostItem>).failure, isA<ValidationFailure>());
+      expect(_failure(noDesk), "Indiquez où l'objet a été déposé (ex : Accueil Bloc C).");
+      expect(
+        _failure(await repo.publishLostItem(_found(title: ' '))),
+        "Donnez un titre à l'annonce (ex : Calculatrice TI-84).",
+      );
+      expect((await repo.getLostItems()).unwrap(), hasLength(6));
+    });
+  });
+
+  group('ideas', () {
+    test('are most upvoted first, then newest', () async {
+      final repo = MockForumRepository();
+      final idea = (await repo.publishIdea(body: 'Un distributeur au Bloc E ?')).unwrap();
+
+      final ideas = (await repo.getIdeas()).unwrap();
+      expect([for (final i in ideas) i.id], ['post-3', idea.id]);
+      expect(ideas.every((i) => i.category == PostCategory.idea), isTrue);
+    });
+
+    test('a published idea has the student as author and no votes', () async {
+      final idea = (await MockForumRepository().publishIdea(body: '  Plus de prises au foyer. '))
+          .unwrap();
+      expect(idea.authorName, 'Dony Mansour');
+      expect(idea.authorInfo, '4BI - Software Eng.');
+      expect(idea.tag, 'Proposition');
+      expect(idea.body, 'Plus de prises au foyer.');
+      expect(idea.upvote, (upvotes: 0, isUpvotedByMe: false));
+    });
+
+    test('a published idea is also the latest highlight', () async {
+      final repo = MockForumRepository();
+      final idea = (await repo.publishIdea(body: 'Un distributeur au Bloc E ?')).unwrap();
+      final highlights = (await repo.getHighlights()).unwrap();
+      expect(highlights.first.id, idea.id);
+      expect(highlights, hasLength(4));
+    });
+
+    test('refuses an idea that is too short', () async {
+      final result = await MockForumRepository().publishIdea(body: 'Wifi ?');
+      expect((result as Err<ForumPost>).failure, isA<ValidationFailure>());
+      expect(_failure(result), 'Votre idée est trop courte : 10 caractères minimum.');
+    });
+
+    test('the upvote toggles on top of the seeded count, everywhere', () async {
+      final repo = MockForumRepository();
+      expect((await repo.toggleIdeaUpvote('post-3')).unwrap(), (upvotes: 43, isUpvotedByMe: true));
+
+      final idea = (await repo.getIdeas()).unwrap().first;
+      expect(idea.upvote, (upvotes: 43, isUpvotedByMe: true));
+      final highlight = (await repo.getHighlights()).unwrap().singleWhere((p) => p.id == 'post-3');
+      expect(highlight.upvote, (upvotes: 43, isUpvotedByMe: true));
+
+      expect((await repo.toggleIdeaUpvote('post-3')).unwrap(), (upvotes: 42, isUpvotedByMe: false));
+    });
+
+    test('voting for an unknown idea or another post fails', () async {
+      final repo = MockForumRepository();
+      for (final id in ['nope', 'post-1']) {
+        final result = await repo.toggleIdeaUpvote(id);
+        expect((result as Err<IdeaUpvote>).failure, isA<ServerFailure>());
+        expect(_failure(result), "Cette idée n'existe plus.");
+      }
     });
   });
 }

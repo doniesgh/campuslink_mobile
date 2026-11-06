@@ -26,3 +26,23 @@ String lostItemStatusLabel(LostItem item) =>
 /// "Déposé par" (found) / "Signalé par" (lost).
 String lostItemReporterPrefix(LostItem item) =>
     item.isLost ? 'Signalé par' : 'Déposé par';
+
+/// Category chip of the "Publier une annonce" form.
+String lostItemCategoryLabel(LostItemCategory category) => switch (category) {
+      LostItemCategory.calculator => 'Calculatrice',
+      LostItemCategory.keys => 'Clés',
+      LostItemCategory.audio => 'Audio',
+      LostItemCategory.bag => 'Sac',
+      LostItemCategory.card => 'Carte',
+      LostItemCategory.bottle => 'Gourde',
+      LostItemCategory.other => 'Autre',
+    };
+
+/// Place chip of the "Publier une annonce" form.
+String lostItemPlaceLabel(LostItemPlace place) => switch (place) {
+      LostItemPlace.classroom => 'Salle de cours',
+      LostItemPlace.parking => 'Parking',
+      LostItemPlace.library => 'Bibliothèque',
+      LostItemPlace.cafeteria => 'Cafétéria',
+      LostItemPlace.other => 'Autre',
+    };

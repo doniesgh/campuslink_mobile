@@ -273,8 +273,9 @@ class _InfoLine extends StatelessWidget {
   }
 }
 
-/// Extra info under the summary: drop-off desk + reference, hidden serial
-/// number (found items) or reward + distinctive detail (lost items).
+/// Extra info under the summary: drop-off note (or pickup desk) + reference,
+/// hidden serial number (found items) or reward + distinctive detail (lost
+/// items).
 class _DetailStrip extends StatelessWidget {
   const _DetailStrip._(this.item);
 
@@ -284,7 +285,10 @@ class _DetailStrip extends StatelessWidget {
   static _DetailStrip? of(LostItem item) {
     final hasContent = item.isLost
         ? item.reward != null || item.distinctiveDetail != null
-        : item.isSerialHidden || item.dropOffNote != null || item.reference != null;
+        : item.isSerialHidden ||
+            item.dropOffNote != null ||
+            item.pickupDesk != null ||
+            item.reference != null;
     return hasContent ? _DetailStrip._(item) : null;
   }
 
@@ -296,7 +300,9 @@ class _DetailStrip extends StatelessWidget {
     final scheme = theme.colorScheme;
     final label = theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700);
     final success = lostFoundSuccessColor(scheme);
-    final note = item.dropOffNote;
+    // Notices published by students give the pickup desk only.
+    final desk = item.pickupDesk;
+    final note = item.dropOffNote ?? (desk == null ? null : 'Retrait : $desk');
     final reference = item.reference;
 
     final (IconData, Color, String, Color)? lead = item.isSerialHidden

@@ -7,7 +7,8 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../domain/entities/ride.dart';
 
-/// Driver profile, vehicle and ride rules.
+/// Driver profile, vehicle and ride rules. A new driver (no rating yet)
+/// gets a "New driver" badge instead of stars.
 class DriverCard extends StatelessWidget {
   const DriverCard({super.key, required this.driver, required this.amenities});
 
@@ -42,26 +43,30 @@ class DriverCard extends StatelessWidget {
                     Text(driver.name, style: theme.textTheme.titleMedium),
                     Text(driver.profile, style: muted),
                     const SizedBox(height: AppSpacing.xs),
-                    Row(
-                      children: [
-                        Icon(Icons.directions_car_outlined, size: 14, color: scheme.primary),
-                        const SizedBox(width: AppSpacing.xs),
-                        Flexible(
-                          child: Text(
-                            '${driver.ridesCompleted} campus rides completed',
-                            style: muted,
+                    if (driver.isNewDriver)
+                      const AppBadge('New driver', icon: Icons.new_releases_outlined)
+                    else
+                      Row(
+                        children: [
+                          Icon(Icons.directions_car_outlined, size: 14, color: scheme.primary),
+                          const SizedBox(width: AppSpacing.xs),
+                          Flexible(
+                            child: Text(
+                              '${driver.ridesCompleted} campus rides completed',
+                              style: muted,
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
                   ],
                 ),
               ),
-              AppBadge(
-                driver.rating.toStringAsFixed(1),
-                tone: BadgeTone.accent,
-                icon: Icons.star_rounded,
-              ),
+              if (!driver.isNewDriver)
+                AppBadge(
+                  driver.rating.toStringAsFixed(1),
+                  tone: BadgeTone.accent,
+                  icon: Icons.star_rounded,
+                ),
             ],
           ),
           const SizedBox(height: AppSpacing.lg),

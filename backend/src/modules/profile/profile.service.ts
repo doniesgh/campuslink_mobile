@@ -1,6 +1,8 @@
 import { unauthorized } from '../../lib/http-error';
+import { RideModel } from '../carpool/carpool.model';
 import { evaluateSemester, topPercent } from '../grades/grading';
 import { transcriptOf } from '../grades/grades.service';
+import { NotificationModel } from '../notifications/notification.model';
 import { UserModel } from '../users/user.model';
 import { academicYearStartFor, cardValidUntil, semesterFor } from './academic-calendar';
 import { findProfile } from './profile.model';
@@ -49,7 +51,13 @@ const UNRANKED_TOP_PERCENT = 100;
  * from the transcript, so Profile and Grades always agree.
  */
 export async function getProfile(userId: string, now: Date): Promise<StudentProfileJson> {
-  const [user, profile] = await Promise.all([UserModel.findById(userId), findProfile(userId)]);
+  const [user, profile, unreadNotifications, carpoolActivity] = await Promise.all([
+    UserModel.findById(userId),
+    findProfile(userId),
+    // Live counters from the other modules (the "3 new" badge and the coral dot).
+    NotificationModel.countDocuments({ userId, isRead: false }),
+    RideModel.exists({ $or: [{ driverId: userId }, { 'seats.passengerId': userId }] }),
+  ]);
   // A valid token for a deleted account: treat it as an expired session.
   if (!user) throw unauthorized();
 
@@ -82,7 +90,8 @@ export async function getProfile(userId: string, now: Date): Promise<StudentProf
     isVerified: profile.isVerified,
     nfcReady: profile.nfcReady,
     hasEspritKey: profile.hasEspritKey,
-    unreadNotifications: profile.unreadNotifications,
-    hasCarpoolActivity: profile.hasCarpoolActivity,
+    unreadNotifications,
+    // Drives a ride or booked a seat in one.
+    hasCarpoolActivity: carpoolActivity !== null,
   };
 }

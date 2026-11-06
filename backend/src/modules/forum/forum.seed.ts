@@ -1,6 +1,7 @@
 import type { Types } from 'mongoose';
 
 import { ForumPostModel } from './forum-post.model';
+import { IdeaVoteModel } from './idea-vote.model';
 import { LostItemModel } from './lost-item.model';
 import { LostItemRequestModel } from './lost-item-request.model';
 
@@ -175,8 +176,9 @@ function demoLostItems(now: Date) {
 /**
  * Demo data for this module. Called by `npm run seed` with the demo
  * student's id. Idempotent: the demo posts and items are replaced (fresh
- * dates), and the demo student's requests are cleared so the claim flow can
- * be shown again. Other students' requests and other posts are kept.
+ * dates), and the demo student's requests and idea votes are cleared so the
+ * claim and upvote flows can be shown again. Other students' requests and
+ * votes, and the posts and notices published from the app, are kept.
  */
 export async function seedForum(demoUserId: Types.ObjectId, now = new Date()): Promise<void> {
   const posts = demoPosts(now);
@@ -189,4 +191,5 @@ export async function seedForum(demoUserId: Types.ObjectId, now = new Date()): P
   await LostItemModel.insertMany(items);
 
   await LostItemRequestModel.deleteMany({ userId: demoUserId });
+  await IdeaVoteModel.deleteMany({ userId: demoUserId });
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -8,6 +9,7 @@ import '../../../../shared/widgets/app_card.dart';
 import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/user_avatar.dart';
 import '../../../forum/domain/entities/forum_post.dart';
+import '../../../forum/presentation/providers/forum_providers.dart';
 
 /// Forum post in the Home "Campus Highlights" feed.
 class HighlightPostCard extends StatelessWidget {
@@ -70,7 +72,7 @@ class HighlightPostCard extends StatelessWidget {
           if (post.category == PostCategory.idea)
             _IdeaFooter(post: post)
           else
-            _PlaceFooter(post: post),
+            _PlaceFooter(post: post, onOpen: onOpen),
         ],
       ),
     );
@@ -79,9 +81,12 @@ class HighlightPostCard extends StatelessWidget {
 
 /// Route/location chip + quick reply action (covoiturage, lost & found).
 class _PlaceFooter extends StatelessWidget {
-  const _PlaceFooter({required this.post});
+  const _PlaceFooter({required this.post, required this.onOpen});
 
   final ForumPost post;
+
+  /// Opens the post's Forum section (Lost & Found has the real claim flow).
+  final VoidCallback onOpen;
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +108,7 @@ class _PlaceFooter extends StatelessWidget {
                 ),
         ),
         const SizedBox(width: AppSpacing.sm),
-        // TODO: open the conversation / claim flow once messaging exists.
+        // TODO: open a conversation with the driver once messaging exists.
         carpool
             ? _PillButton(
                 icon: Icons.chat_bubble_outline,
@@ -113,7 +118,7 @@ class _PlaceFooter extends StatelessWidget {
             : _PillButton(
                 icon: Icons.check,
                 label: "C'est à moi",
-                onTap: () => showAppSnack(context, 'Claiming items is coming soon.'),
+                onTap: onOpen,
               ),
       ],
     );
@@ -121,31 +126,29 @@ class _PlaceFooter extends StatelessWidget {
 }
 
 /// Upvote button, comment count and moderation status (ideas).
-class _IdeaFooter extends StatefulWidget {
+/// The vote is shared with the Forum's Ideas section (same count on both screens).
+class _IdeaFooter extends ConsumerWidget {
   const _IdeaFooter({required this.post});
 
   final ForumPost post;
 
-  @override
-  State<_IdeaFooter> createState() => _IdeaFooterState();
-}
-
-class _IdeaFooterState extends State<_IdeaFooter> {
-  // TODO: persist through the forum repository once the API exists.
-  bool _upvoted = false;
+  Future<void> _toggle(BuildContext context, WidgetRef ref) async {
+    final failure = await ref.read(ideaUpvotesProvider.notifier).toggle(post);
+    if (failure != null && context.mounted) showAppSnack(context, failure.message);
+  }
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
-    final post = widget.post;
     final status = post.status;
+    final vote = ref.watch(ideaUpvotesProvider)[post.id] ?? post.upvote;
     return Row(
       children: [
         _PillButton(
           icon: Icons.thumb_up,
-          label: '${post.upvotes + (_upvoted ? 1 : 0)}',
-          highlighted: _upvoted,
-          onTap: () => setState(() => _upvoted = !_upvoted),
+          label: '${vote.upvotes}',
+          highlighted: vote.isUpvotedByMe,
+          onTap: () => _toggle(context, ref),
         ),
         const SizedBox(width: AppSpacing.sm),
         Expanded(

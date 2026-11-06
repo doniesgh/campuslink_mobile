@@ -11,12 +11,13 @@ import { hashesMatch, randomCode, randomToken, sha256, signAccessToken } from '.
 
 const BCRYPT_ROUNDS = 10;
 const DAY_MS = 24 * 60 * 60 * 1000;
-const VERIFICATION_TTL_MS = 15 * 60 * 1000;
-const RESET_TTL_MS = 60 * 60 * 1000;
-const MAX_VERIFICATION_ATTEMPTS = 5;
+const CODE_TTL_MS = 15 * 60 * 1000;
+const MAX_CODE_ATTEMPTS = 5;
 
 const INVALID_LOGIN = 'Invalid ENT ID/email or password.';
 const SESSION_EXPIRED = 'Your session has expired. Please sign in again.';
+// One message for every reset failure, so the endpoint can't reveal who has an account.
+const INVALID_RESET = 'Invalid or expired code. Check the email or request a new code.';
 
 // Checked when the account does not exist, so an unknown identifier takes as
 // long as a wrong password (no account discovery by timing).
@@ -53,27 +54,53 @@ async function revokeAllSessions(userId: Types.ObjectId): Promise<void> {
   );
 }
 
-/** Stores a fresh code on [user] (not saved) and returns it in clear for the email. */
-function newVerificationCode(user: UserDocument): string {
+/**
+ * Sends an email without letting a mail-server problem break the request:
+ * the account change is already saved and the student can ask for a new code.
+ */
+async function sendSafely(send: () => Promise<void>): Promise<void> {
+  try {
+    await send();
+  } catch (err) {
+    console.error('[mail] Could not send an email:', err);
+  }
+}
+
+/** A fresh 6-digit code: its hash and expiry to store, and the code in clear for the email. */
+function newCode(): { code: string; hash: string; expiresAt: Date } {
   const code = randomCode();
-  user.verificationCodeHash = sha256(code);
-  user.verificationExpiresAt = new Date(Date.now() + VERIFICATION_TTL_MS);
-  user.verificationAttempts = 0;
-  return code;
+  return { code, hash: sha256(code), expiresAt: new Date(Date.now() + CODE_TTL_MS) };
+}
+
+type CodeCheck = 'ok' | 'expired' | 'wrong';
+
+/** Checks [code] against a stored (hash, expiry, attempts) triple. */
+function checkCode(
+  hash: string | null | undefined,
+  expiresAt: Date | null | undefined,
+  attempts: number,
+  code: string,
+): CodeCheck {
+  if (!hash || !expiresAt || expiresAt <= new Date() || attempts >= MAX_CODE_ATTEMPTS) {
+    return 'expired';
+  }
+  return hashesMatch(hash, sha256(code)) ? 'ok' : 'wrong';
 }
 
 export async function register(input: RegisterInput): Promise<Session> {
   if (await UserModel.exists({ email: input.email })) {
     throw conflict('An account with this email already exists.');
   }
-  const user = new UserModel({
+  const { code, hash, expiresAt } = newCode();
+  const user = await UserModel.create({
     email: input.email,
     displayName: input.displayName,
     passwordHash: await bcrypt.hash(input.password, BCRYPT_ROUNDS),
+    verificationCodeHash: hash,
+    verificationExpiresAt: expiresAt,
+    verificationAttempts: 0,
   });
-  const code = newVerificationCode(user);
-  await user.save();
-  await mailer.sendVerificationCode(user.email, code);
+  await sendSafely(() => mailer.sendVerificationCode(user.email, code));
   return startSession(user);
 }
 
@@ -118,27 +145,39 @@ export async function logout(refreshToken: string): Promise<void> {
   );
 }
 
-/** Emails a reset token. Answers the same way whether the account exists or not. */
+/** Emails a 6-digit reset code. Answers the same way whether the account exists or not. */
 export async function forgotPassword(email: string): Promise<void> {
   const user = await UserModel.findOne({ email });
   if (!user) return;
-  const token = randomToken(32);
-  user.resetTokenHash = sha256(token);
-  user.resetExpiresAt = new Date(Date.now() + RESET_TTL_MS);
+  const { code, hash, expiresAt } = newCode();
+  user.resetCodeHash = hash;
+  user.resetExpiresAt = expiresAt;
+  user.resetAttempts = 0;
   await user.save();
-  await mailer.sendPasswordReset(user.email, token);
+  await sendSafely(() => mailer.sendPasswordResetCode(user.email, code));
 }
 
-/** Sets a new password and signs the user out everywhere. */
-export async function resetPassword({ token, password }: ResetPasswordInput): Promise<void> {
-  const user = await UserModel.findOne({
-    resetTokenHash: sha256(token),
-    resetExpiresAt: { $gt: new Date() },
-  });
-  if (!user) throw badRequest('This reset link is invalid or has expired.');
+/** Sets a new password with the emailed code, then signs the user out everywhere. */
+export async function resetPassword({ email, code, password }: ResetPasswordInput): Promise<void> {
+  const user = await UserModel.findOne({ email }).select(
+    '+resetCodeHash +resetExpiresAt +resetAttempts',
+  );
+  if (!user) throw badRequest(INVALID_RESET);
+
+  const attempts = user.resetAttempts ?? 0;
+  const check = checkCode(user.resetCodeHash, user.resetExpiresAt, attempts, code);
+  if (check !== 'ok') {
+    if (check === 'wrong') {
+      user.resetAttempts = attempts + 1;
+      await user.save();
+    }
+    throw badRequest(INVALID_RESET);
+  }
+
   user.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
-  user.resetTokenHash = undefined;
+  user.resetCodeHash = undefined;
   user.resetExpiresAt = undefined;
+  user.resetAttempts = 0;
   await user.save();
   await revokeAllSessions(user._id);
 }
@@ -150,13 +189,10 @@ export async function verifyEmail(userId: string, code: string): Promise<PublicU
   if (!user) throw unauthorized();
   if (user.isEmailVerified) return toPublicUser(user);
 
-  const codeHash = user.verificationCodeHash;
-  const expiresAt = user.verificationExpiresAt;
   const attempts = user.verificationAttempts ?? 0;
-  if (!codeHash || !expiresAt || expiresAt <= new Date() || attempts >= MAX_VERIFICATION_ATTEMPTS) {
-    throw badRequest('This code has expired. Request a new one.');
-  }
-  if (!hashesMatch(codeHash, sha256(code))) {
+  const check = checkCode(user.verificationCodeHash, user.verificationExpiresAt, attempts, code);
+  if (check === 'expired') throw badRequest('This code has expired. Request a new one.');
+  if (check === 'wrong') {
     user.verificationAttempts = attempts + 1;
     await user.save();
     throw badRequest('Invalid code. Check the email we sent you.');
@@ -174,7 +210,10 @@ export async function resendVerification(userId: string): Promise<void> {
   const user = await UserModel.findById(userId);
   if (!user) throw unauthorized();
   if (user.isEmailVerified) return;
-  const code = newVerificationCode(user);
+  const { code, hash, expiresAt } = newCode();
+  user.verificationCodeHash = hash;
+  user.verificationExpiresAt = expiresAt;
+  user.verificationAttempts = 0;
   await user.save();
-  await mailer.sendVerificationCode(user.email, code);
+  await sendSafely(() => mailer.sendVerificationCode(user.email, code));
 }
