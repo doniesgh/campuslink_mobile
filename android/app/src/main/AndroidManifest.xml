@@ -2,7 +2,7 @@
     <!-- Required in release builds to reach the API (debug/profile add it on their own). -->
     <uses-permission android:name="android.permission.INTERNET"/>
     <application
-        android:label="campuspulse"
+        android:label="CampusPulse"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

@@ -69,6 +69,7 @@ How it all fits together, the patterns used and why: **[docs/architecture.md](do
 |---|---|
 | [How to run](docs/how-to-run.md) | **start here**: the exact steps to run the app (demo data, real API, push notifications) |
 | [Getting started](docs/getting-started.md) | set up your machine, with explanations and the full configuration reference |
+| [Deploying](docs/deploy.md) | run the API online (Render + MongoDB Atlas) and publish an APK on GitHub Releases |
 | [Architecture](docs/architecture.md) | understand the structure, the layers, state, navigation, auth and the backend design |
 | [Features](docs/features.md) | see what each screen does, where its code is and which endpoints it uses |
 | [API reference](docs/api.md) | call the API: every endpoint with request and response examples |

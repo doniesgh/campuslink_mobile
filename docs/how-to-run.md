@@ -2,7 +2,9 @@
 
 The short version: the exact steps and commands to get the app running on your machine. For explanations, see [getting-started.md](getting-started.md). When something breaks, check [troubleshooting.md](troubleshooting.md).
 
-There are three ways to run it. Start with **A**: it takes two minutes and needs no server.
+**Just want the app on your phone?** Download the latest APK from the repository's **Releases** page on GitHub. It uses the online API, so no setup is needed. The install steps are in [deploy.md](deploy.md#installing-it-for-teammates).
+
+To work on the code, there are three ways to run it. Start with **A**: it takes two minutes and needs no server.
 
 | | What you get | Needs |
 |---|---|---|

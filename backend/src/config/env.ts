@@ -15,6 +15,12 @@ const schema = z.object({
   ACCESS_TOKEN_TTL_SECONDS: z.coerce.number().int().positive().default(15 * 60),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(30),
   CORS_ORIGIN: z.string().default('*'),
+  /**
+   * How many proxies sit in front of the API (Render: 1). Their
+   * X-Forwarded-For header then gives the real client IP, for the rate
+   * limits and the audit log. 0 (the default) when the API is reached directly.
+   */
+  TRUST_PROXY: z.coerce.number().int().min(0).default(0),
 
   // Email. Without SMTP_HOST, emails are printed in the console instead.
   SMTP_HOST: z.string().optional(),

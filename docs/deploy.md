@@ -1,0 +1,101 @@
+# Deploying CampusPulse
+
+How the API runs online and how a new APK is published for the team. To run the project on your own machine, see [how-to-run.md](how-to-run.md) instead.
+
+| Part | Where | Cost |
+|---|---|---|
+| API | [Render](https://render.com) web service `campuspulse-api`, Frankfurt, defined by [`render.yaml`](../render.yaml) | free |
+| Database | [MongoDB Atlas](https://www.mongodb.com/atlas) M0 cluster, database `campuspulse` | free |
+| Push notifications | Firebase project `com-example-campuspulse` | free |
+| APK | GitHub Releases of this repository | free |
+
+---
+
+## 1. The database (MongoDB Atlas), once
+
+1. **Create a free cluster:** on cloud.mongodb.com, choose **Create › M0 (free)**, region **Frankfurt** (close to Render's).
+2. **Create a user:** in **Database Access**, add a database user with a password and the role *Read and write to any database*.
+3. **Open the network:** in **Network Access**, add `0.0.0.0/0`. Render's free plan has no fixed IP address, so the user and password are what protect the database.
+4. **Copy the address:** **Connect › Drivers** gives the connection string. Add the database name `campuspulse` before the `?`:
+   ```
+   mongodb+srv://<user>:<password>@<cluster>.mongodb.net/campuspulse?retryWrites=true&w=majority
+   ```
+   This is a secret: it goes into Render, and nowhere in the repository.
+
+## 2. The API (Render), once
+
+1. On dashboard.render.com, choose **New › Blueprint**, connect GitHub and pick **this repository**. Render reads `render.yaml`.
+2. Fill in the values it asks for:
+   - **`MONGO_URL`**: the Atlas address above.
+   - **`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`** (optional): real emails for sign-up codes and password resets. Leave them empty to read the codes in Render's **Logs** instead.
+
+   Click **Apply**. Render generates `JWT_ACCESS_SECRET` itself.
+3. **Push notifications:**
+   - Open the service, then **Environment › Secret Files › Add Secret File**.
+   - Name it **`firebase-service-account.json`**, and paste the content of `backend/firebase-service-account.json`.
+   - Save. Render redeploys.
+4. **Check it:** the **Logs** must show `[push] On: …`, `[push] Class reminders on: …` and `CampusPulse API listening …`. Then open `https://<your-service>.onrender.com/api/health`. It must answer `{"status":"ok"}`.
+
+Every push to `main` redeploys the API (`autoDeploy`).
+
+### Demo data in the cloud database
+
+From your PC, point the backend scripts at Atlas for one command. In **PowerShell**:
+
+```powershell
+cd backend
+$env:MONGO_URL = "<the Atlas address>"
+npm run seed
+npm run create-admin -- admin@campus.test "<a new admin password>"
+Remove-Item Env:MONGO_URL
+```
+
+- **`seed`** creates the demo accounts and the data of every screen. **Running it again resets them**, so everything teammates changed in the demo data is lost.
+- **`create-admin`** gives the demo admin a new password. The default one is written in this repository, so anyone could otherwise manage the users. Share the new one only with the team.
+
+### The free plan sleeps
+
+After 15 minutes without requests, Render stops the API:
+- The next request then takes about a minute.
+- **Class reminders don't go out while it sleeps.**
+
+To keep it awake, have a free monitor call `https://<your-service>.onrender.com/api/health` every 10 minutes, for example [UptimeRobot](https://uptimerobot.com) or [cron-job.org](https://cron-job.org). One service awake all month fits in Render's 750 free hours.
+
+---
+
+## 3. Building the APK
+
+### The signing key
+
+Every APK we give out must be signed with **the same key**, otherwise it can't update the app already installed (teammates would have to uninstall first).
+
+- The key is `android/campuspulse-release.jks`, and its passwords are in `android/key.properties`. Both are gitignored.
+- **Keep a copy of both files** somewhere private, such as your own Drive. If they are lost, the next APK needs a new key and everyone reinstalls.
+- Without `key.properties`, a release build is signed with the debug key. That's fine to try on your own phone, but don't publish it.
+
+### Build
+
+1. Check that **`env/prod.json`** has the Render address: `"API_BASE_URL": "https://<your-service>.onrender.com/api"`.
+2. Put the Firebase file **`android/app/google-services.json`** in place, otherwise push is off in the APK.
+3. Raise **`version`** in `pubspec.yaml` for every new APK: `1.0.0+1`, then `1.0.1+2`, and so on. The number after `+` must always go up, or Android refuses the update.
+4. Build:
+   ```bash
+   flutter build apk --release --dart-define-from-file=env/prod.json
+   ```
+   The APK is `build/app/outputs/flutter-apk/app-release.apk` (about 57 MB, for every phone). Rename it `campuspulse-<version>.apk`.
+5. **Try it** on your own phone, or on the emulator by dragging the file onto it. Sign in with the demo student, and check that the data loads.
+
+## 4. Publishing it (GitHub Release)
+
+1. On the repository's GitHub page, choose **Releases › Draft a new release**.
+2. Create the tag **`v<version>`**, e.g. `v1.0.0`, on `main`, with the title **`CampusPulse <version>`**.
+3. Describe what changed, and add the install steps below.
+4. **Attach** `campuspulse-<version>.apk` and click **Publish release**.
+
+### Installing it (for teammates)
+
+1. On the phone, open the release page and download `campuspulse-<version>.apk`.
+2. Open the downloaded file. Android asks to allow **installing unknown apps** from the browser or the Files app: allow it, then tap **Install**.
+3. Sign in with the demo student or your own account. Tap **Allow** for notifications to get the class reminders.
+
+Later versions install over the old one the same way, and the data is kept.

@@ -162,6 +162,7 @@ Push notifications need a Firebase project (free). Without one, the app works th
 | `ACCESS_TOKEN_TTL_SECONDS` | `900` | Access token lifetime |
 | `REFRESH_TOKEN_TTL_DAYS` | `30` | Session lifetime |
 | `CORS_ORIGIN` | `*` | Allowed web origins (the mobile app doesn't need CORS) |
+| `TRUST_PROXY` | `0` | Proxies in front of the API (`1` on Render). Gives the real client IP to the rate limits and the audit log |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | empty / `587` | Real email sending. Leave `SMTP_HOST` empty to print the emails in the console |
 | `FIREBASE_SERVICE_ACCOUNT_FILE` | empty | The Firebase service-account JSON (path from `backend/`). Empty turns push notifications off |
 
