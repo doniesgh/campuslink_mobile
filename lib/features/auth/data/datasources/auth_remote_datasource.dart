@@ -2,6 +2,7 @@ import 'package:dio/dio.dart';
 
 import '../../../../core/network/api_endpoints.dart';
 import '../../../../core/network/interceptors/auth_interceptor.dart';
+import '../../domain/entities/user.dart';
 import '../models/auth_models.dart';
 
 abstract interface class AuthRemoteDataSource {
@@ -86,10 +87,24 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
 /// Fake implementation (USE_MOCK=true) so the app runs without a backend.
 class MockAuthRemoteDataSource implements AuthRemoteDataSource {
+  /// Id of the demo admin. The mock admin repository knows it too, so the
+  /// "(you)" label and the own-account rules work offline.
+  static const adminId = 'mock-admin';
+
   static const _delay = Duration(milliseconds: 600);
 
-  UserModel _user(String email, {String name = 'Dony Mansour', bool verified = true}) =>
-      UserModel(id: 'mock-1', email: email, displayName: name, isEmailVerified: verified);
+  /// An identifier containing "admin" (e.g. admin@campus.test) signs in as
+  /// the demo admin, so the Administration screens can be tried offline.
+  UserModel _user(String email, {String name = 'Dony Mansour', bool verified = true}) {
+    final admin = email.toLowerCase().contains('admin');
+    return UserModel(
+      id: admin ? adminId : 'mock-1',
+      email: email,
+      displayName: admin ? 'Campus Admin' : name,
+      isEmailVerified: verified,
+      role: admin ? UserRole.admin : UserRole.student,
+    );
+  }
 
   AuthResponseModel _session(UserModel u) =>
       AuthResponseModel(user: u, accessToken: 'mock-access', refreshToken: 'mock-refresh');

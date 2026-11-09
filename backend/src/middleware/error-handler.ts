@@ -19,13 +19,14 @@ function duplicateKeyMessage(err: unknown): string | null {
 }
 
 /**
- * Turns every error into `{ "message": ... }` with the right status.
+ * Turns every error into `{ "message": ... }` with the right status (plus the
+ * extra fields of an HttpError, such as an import's `problems`).
  * Unexpected errors are logged and hidden behind a generic message.
  */
 // Express recognises error handlers by their 4 parameters, so `_next` must stay.
 export const errorHandler: ErrorRequestHandler = (err, _req, res, _next) => {
   if (err instanceof HttpError) {
-    res.status(err.status).json({ message: err.message });
+    res.status(err.status).json({ message: err.message, ...err.details });
     return;
   }
 

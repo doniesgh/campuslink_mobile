@@ -2,6 +2,8 @@ import { Router } from 'express';
 
 import { validateBody } from '../../lib/validate';
 import { currentUserId, requireAuth } from '../../middleware/require-auth';
+import { requireRole } from '../../middleware/require-role';
+import { ROLES_WITH_CLASSES } from '../users/user.model';
 import {
   attendanceSchema,
   submissionSchema,
@@ -10,9 +12,15 @@ import {
 } from './courses.schemas';
 import * as courses from './courses.service';
 
-/** Routes under /api/courses. Every route needs a signed-in student. */
+/**
+ * Routes under /api/courses. Every route needs a signed-in student or
+ * teacher: admins and alumni have no courses (403).
+ */
 export const coursesRouter = Router();
-coursesRouter.use(requireAuth);
+coursesRouter.use(
+  requireAuth,
+  requireRole(ROLES_WITH_CLASSES, 'Only students and teachers have courses.'),
+);
 
 /** The student's courses (sent as a plain array). */
 coursesRouter.get('/', async (_req, res) => {

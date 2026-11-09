@@ -13,7 +13,8 @@ import '../../domain/entities/app_notification.dart';
 /// `attachment` is null or one of the types `place` {place}, `ride`
 /// {driverName, carLabel, isDriverVerified}, `schedule` {} and `pickup`
 /// {availability, ticket}. `link` is null or {destination, id}, with
-/// `destination` a [NotificationDestination] name and `id` the ride or job id.
+/// `destination` a [NotificationDestination] name and `id` the ride, job or
+/// user id.
 ///
 /// Values added by a newer API are tolerated: an unknown category shows as
 /// [NotificationCategory.community], an unknown attachment or destination is

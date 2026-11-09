@@ -1,7 +1,9 @@
 import '../../domain/entities/user.dart';
 
 /// Expected backend user JSON (Mongo `_id` or `id` both accepted):
-/// { "_id": "...", "email": "...", "displayName": "...", "avatarUrl": null, "isEmailVerified": true }
+/// { "_id": "...", "email": "...", "displayName": "...", "avatarUrl": null,
+///   "isEmailVerified": true, "role": "student" }
+/// A missing or unknown `role` reads as student, the least privileged role.
 class UserModel {
   const UserModel({
     required this.id,
@@ -9,6 +11,7 @@ class UserModel {
     required this.displayName,
     this.avatarUrl,
     this.isEmailVerified = false,
+    this.role = UserRole.student,
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
@@ -17,6 +20,7 @@ class UserModel {
         displayName: (json['displayName'] ?? json['name'] ?? '') as String,
         avatarUrl: json['avatarUrl'] as String?,
         isEmailVerified: (json['isEmailVerified'] as bool?) ?? false,
+        role: UserRole.fromName(json['role']) ?? UserRole.student,
       );
 
   final String id;
@@ -24,6 +28,7 @@ class UserModel {
   final String displayName;
   final String? avatarUrl;
   final bool isEmailVerified;
+  final UserRole role;
 
   User toEntity() => User(
         id: id,
@@ -31,6 +36,7 @@ class UserModel {
         displayName: displayName,
         avatarUrl: avatarUrl,
         isEmailVerified: isEmailVerified,
+        role: role,
       );
 }
 

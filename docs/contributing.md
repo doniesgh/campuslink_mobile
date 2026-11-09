@@ -154,4 +154,4 @@ addTearDown(tester.view.reset);
 
 ### Current numbers
 
-**261 backend tests** (13 suites) and **452 app tests** (50 files). Keep them all green.
+**376 backend tests** (16 suites) and **539 app tests** (55 files). Keep them all green.

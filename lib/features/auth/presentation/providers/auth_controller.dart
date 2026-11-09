@@ -91,4 +91,19 @@ class AuthController extends AsyncNotifier<User?> {
 
   /// Called by the Dio interceptor when the refresh token is no longer valid.
   void onSessionExpired() => state = const AsyncData(null);
+
+  /// Shows at once the name and email an admin just saved on their own
+  /// account (from the Users screens), without asking the server again.
+  void updateOwnAccount({required String displayName, required String email}) {
+    final user = state.valueOrNull;
+    if (user == null) return;
+    state = AsyncData(User(
+      id: user.id,
+      email: email,
+      displayName: displayName,
+      avatarUrl: user.avatarUrl,
+      isEmailVerified: user.isEmailVerified,
+      role: user.role,
+    ));
+  }
 }

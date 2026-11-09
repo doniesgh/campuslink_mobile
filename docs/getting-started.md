@@ -34,7 +34,7 @@ cd backend && npm install       # backend dependencies (optional)
    flutter run --dart-define-from-file=env/dev.json
    ```
 
-3. Sign in with **any** ENT ID and password, e.g. `211JMT0428` / `password`.
+3. Sign in with **any** ENT ID and password, e.g. `211JMT0428` / `password`. To try the admin screens, use an identifier containing "admin", e.g. `admin@campus.test`.
 
 In this mode every screen uses its in-memory demo data (`USE_MOCK=true`). The emulator's first boot can take a while, so if VS Code says "Emulator didn't connect within 60 seconds", wait for the Android home screen and press F5 again.
 
@@ -94,11 +94,16 @@ With `npm run dev` running, press **F5** with **"CampusPulse (local backend)"**,
 flutter run --dart-define-from-file=env/local.json
 ```
 
-Sign in with the demo student:
+Sign in with a demo account:
 
-| ENT ID | Email | Password |
-|---|---|---|
-| `211JMT0428` | `dony.mansour@campus.test` | `CampusPulse2026!` |
+| Account | ENT ID | Email | Password |
+|---|---|---|---|
+| Demo student | `211JMT0428` | `dony.mansour@campus.test` | `CampusPulse2026!` |
+| Demo admin | — | `admin@campus.test` | `CampusPulseAdmin2026!` |
+
+The admin finds **Administration** on the Profile tab. The seed also creates nine more accounts (teachers, students, an alumnus) so the user list isn't empty; they all use `CampusPulse2026!`.
+
+**An admin on a real server:** there is no default admin outside the demo seed. Create one with `npm run create-admin -- <email> <password> [display name]`; for an existing account, it promotes it to admin, sets the new password and signs it out everywhere.
 
 **Creating your own account:** Register in the app. The verification code is printed in the backend terminal (`[mail] Verification code for …: 042917`), unless you configured SMTP (see below).
 
@@ -147,6 +152,7 @@ Sign in with the demo student:
 | App checks | `flutter analyze` and `flutter test` |
 | Start the API | `cd backend && npm run dev` |
 | Reset the demo data | `cd backend && npm run seed` |
+| Create or promote an admin | `cd backend && npm run create-admin -- <email> <password>` |
 | Backend checks | `cd backend && npm run typecheck && npm test` |
 | Build a debug APK | `flutter build apk --debug --dart-define-from-file=env/dev.json` |
 

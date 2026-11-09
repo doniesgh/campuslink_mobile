@@ -2,6 +2,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../features/admin/presentation/pages/admin_users_page.dart';
+import '../../features/admin/presentation/pages/audit_log_page.dart';
+import '../../features/admin/presentation/pages/import_users_page.dart';
+import '../../features/admin/presentation/pages/user_form_page.dart';
 import '../../features/auth/domain/entities/user.dart';
 import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
@@ -47,6 +51,14 @@ String? authRedirect(AsyncValue<User?> auth, String location) {
     return location == RoutePaths.verifyEmail ? null : RoutePaths.verifyEmail;
   }
   if (inAuth) return RoutePaths.home;
+  // Administration is for admins only (the API refuses everyone else too).
+  final inAdmin = location == RoutePaths.adminPrefix ||
+      location.startsWith('${RoutePaths.adminPrefix}/');
+  if (inAdmin && !user.isAdmin) return RoutePaths.profile;
+  // Admins and alumni have no timetable or courses (the API refuses them too).
+  final inTimetable = location == RoutePaths.timetable ||
+      location.startsWith('${RoutePaths.timetable}/');
+  if (inTimetable && !user.hasClasses) return RoutePaths.home;
   return null;
 }
 
@@ -127,6 +139,21 @@ final routerProvider = Provider<GoRouter>((ref) {
               builder: (_, __) => const ProfilePage(),
               routes: [
                 GoRoute(path: 'grades', builder: (_, __) => const GradesPage()),
+                GoRoute(
+                  path: 'admin/users',
+                  builder: (_, __) => const AdminUsersPage(),
+                  routes: [
+                    // Before ':userId', or "new" would be read as a user id.
+                    GoRoute(path: 'new', builder: (_, __) => const UserFormPage()),
+                    GoRoute(
+                      path: ':userId',
+                      builder: (_, state) =>
+                          UserFormPage(userId: state.pathParameters['userId']!),
+                    ),
+                  ],
+                ),
+                GoRoute(path: 'admin/import', builder: (_, __) => const ImportUsersPage()),
+                GoRoute(path: 'admin/audit', builder: (_, __) => const AuditLogPage()),
               ],
             ),
           ]),

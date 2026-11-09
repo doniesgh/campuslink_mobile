@@ -23,7 +23,13 @@ const student = {
 };
 
 interface SessionBody {
-  user: { id: string; email: string; studentId: string | null; isEmailVerified: boolean };
+  user: {
+    id: string;
+    email: string;
+    studentId: string | null;
+    isEmailVerified: boolean;
+    role: string;
+  };
   accessToken: string;
   refreshToken: string;
 }
@@ -46,6 +52,7 @@ describe('POST /api/auth/register', () => {
       displayName: 'Sarra Kefi',
       avatarUrl: null,
       isEmailVerified: false,
+      role: 'student',
     });
     expect(body.accessToken).toEqual(expect.any(String));
     expect(body.refreshToken).toEqual(expect.any(String));

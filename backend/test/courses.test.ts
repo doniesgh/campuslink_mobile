@@ -64,6 +64,27 @@ describe('auth', () => {
     const res = await request(app)[method](path).send({}).expect(401);
     expect(res.body).toEqual({ message: expect.any(String) });
   });
+
+  test.each(['admin', 'alumni'] as const)('%s accounts have no courses (403)', async (role) => {
+    const { auth } = await createStudent({ role });
+    await seedCourses((await createStudent()).user._id);
+
+    for (const [method, path] of [
+      ['get', '/api/courses'],
+      ['put', '/api/courses/genie-logiciel/attendance'],
+      ['post', '/api/courses/resources/gl-lesson-7/download'],
+      ['post', '/api/courses/assignments/gl-lab-3/submission'],
+    ] as const) {
+      const res = await request(app)[method](path).set(auth).send({ present: true }).expect(403);
+      expect(res.body).toEqual({ message: 'Only students and teachers have courses.' });
+    }
+  });
+
+  test('teachers have the courses', async () => {
+    const teacher = await createStudent({ role: 'teacher' });
+    await seedCourses(teacher.user._id);
+    expect(await getCourses(teacher.auth)).toHaveLength(DEMO_COURSES.length);
+  });
 });
 
 describe('GET /api/courses', () => {

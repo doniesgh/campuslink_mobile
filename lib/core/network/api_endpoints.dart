@@ -51,4 +51,12 @@ abstract final class ApiEndpoints {
   static const notifications = '/notifications';
   static String notificationRead(String id) => '/notifications/$id/read';
   static const notificationsReadAll = '/notifications/read-all';
+
+  // Admin (admins only: the API answers 403 to everyone else)
+  static const adminUsers = '/admin/users';
+  static const adminUserStats = '/admin/users/stats';
+  static const adminUserImport = '/admin/users/import';
+  static String adminUser(String id) => '/admin/users/$id';
+  static const adminAudit = '/admin/audit';
+  static const adminAuditActions = '/admin/audit/actions';
 }

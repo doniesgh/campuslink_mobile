@@ -29,7 +29,9 @@ class ProfileHero extends StatelessWidget {
   final String? campusStatus;
 
   final VoidCallback onEdit;
-  final VoidCallback onNfcPass;
+
+  /// Null hides the button (teachers, admins and alumni have no student pass).
+  final VoidCallback? onNfcPass;
 
   @override
   Widget build(BuildContext context) {
@@ -55,7 +57,10 @@ class ProfileHero extends StatelessWidget {
         ),
         Padding(
           padding: const EdgeInsets.fromLTRB(
-            AppSpacing.page, _bannerHeight - _avatarOverlap, AppSpacing.page, 0,
+            AppSpacing.page,
+            _bannerHeight - _avatarOverlap,
+            AppSpacing.page,
+            0,
           ),
           child: Column(
             children: [
@@ -82,25 +87,28 @@ class ProfileHero extends StatelessWidget {
                   ),
                 ),
               ],
-              const SizedBox(height: AppSpacing.lg),
-              FilledButton.icon(
-                onPressed: onNfcPass,
-                icon: const Icon(Icons.contactless_outlined, size: 18),
-                label: const Text('NFC Student Pass'),
-                style: FilledButton.styleFrom(
-                  backgroundColor: scheme.secondary,
-                  foregroundColor: scheme.onSecondary,
-                  // The theme's Size.fromHeight(52) would stretch it full width.
-                  minimumSize: const Size(0, 44),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: AppSpacing.xl, vertical: AppSpacing.sm + 2,
+              if (onNfcPass != null) ...[
+                const SizedBox(height: AppSpacing.lg),
+                FilledButton.icon(
+                  onPressed: onNfcPass,
+                  icon: const Icon(Icons.contactless_outlined, size: 18),
+                  label: const Text('NFC Student Pass'),
+                  style: FilledButton.styleFrom(
+                    backgroundColor: scheme.secondary,
+                    foregroundColor: scheme.onSecondary,
+                    // The theme's Size.fromHeight(52) would stretch it full width.
+                    minimumSize: const Size(0, 44),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppSpacing.xl,
+                      vertical: AppSpacing.sm + 2,
+                    ),
+                    shape: const StadiumBorder(),
+                    elevation: 3,
+                    shadowColor: scheme.secondary.withValues(alpha: 0.5),
+                    textStyle: theme.textTheme.labelLarge?.copyWith(letterSpacing: 0.4),
                   ),
-                  shape: const StadiumBorder(),
-                  elevation: 3,
-                  shadowColor: scheme.secondary.withValues(alpha: 0.5),
-                  textStyle: theme.textTheme.labelLarge?.copyWith(letterSpacing: 0.4),
                 ),
-              ),
+              ],
             ],
           ),
         ),

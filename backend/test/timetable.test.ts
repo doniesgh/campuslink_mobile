@@ -38,6 +38,24 @@ describe('auth', () => {
     const res = await request(app).get(path).query({ date: '2026-11-05' }).expect(401);
     expect(res.body).toEqual({ message: expect.any(String) });
   });
+
+  test.each(['admin', 'alumni'] as const)('%s accounts have no timetable (403)', async (role) => {
+    const { auth } = await createStudent({ role });
+    for (const path of ['/api/timetable/day', '/api/timetable/week']) {
+      const res = await request(app).get(path).query({ date: '2026-11-05' }).set(auth).expect(403);
+      expect(res.body).toEqual({ message: 'Only students and teachers have a timetable.' });
+    }
+  });
+
+  test('teachers have the class group timetable', async () => {
+    const teacher = await createStudent({ role: 'teacher' });
+    await seedTimetable(teacher.user._id);
+
+    const week = await getWeek(teacher.auth, '2026-11-05');
+
+    expect(week.classGroup).toBe('Tech Track 4BI');
+    expect(week.days.flatMap((d) => d.sessions).length).toBeGreaterThan(0);
+  });
 });
 
 describe('date validation', () => {

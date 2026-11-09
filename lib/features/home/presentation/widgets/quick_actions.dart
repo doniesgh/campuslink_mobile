@@ -7,6 +7,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_badge.dart';
 import '../../../../shared/widgets/app_card.dart';
+import '../../../auth/domain/entities/user.dart';
 import '../../../forum/presentation/pages/forum_page.dart';
 
 class _QuickAction {
@@ -21,27 +22,43 @@ class _QuickAction {
   final ForumSection? forumSection;
 }
 
-const _actions = [
-  _QuickAction('Covoiturage', Icons.directions_car, BadgeTone.accent, RoutePaths.forum,
-      ForumSection.carpooling),
-  _QuickAction('Objets Perdus', Icons.manage_search, BadgeTone.primary, RoutePaths.forum,
-      ForumSection.lostFound),
-  _QuickAction('Planning', Icons.calendar_month, BadgeTone.accent, RoutePaths.timetable),
-  _QuickAction('Idées', Icons.lightbulb_outline, BadgeTone.primary, RoutePaths.forum,
-      ForumSection.ideas),
-];
+const _carpool = _QuickAction('Covoiturage', Icons.directions_car, BadgeTone.accent,
+    RoutePaths.forum, ForumSection.carpooling);
+const _lostFound = _QuickAction('Objets Perdus', Icons.manage_search, BadgeTone.primary,
+    RoutePaths.forum, ForumSection.lostFound);
+const _planning =
+    _QuickAction('Planning', Icons.calendar_month, BadgeTone.accent, RoutePaths.timetable);
+const _accounts = _QuickAction(
+    'Comptes', Icons.manage_accounts_outlined, BadgeTone.accent, RoutePaths.adminUsers);
+const _offers = _QuickAction('Offres', Icons.work_outline, BadgeTone.accent, RoutePaths.jobs);
+const _ideas = _QuickAction('Idées', Icons.lightbulb_outline, BadgeTone.primary,
+    RoutePaths.forum, ForumSection.ideas);
 
-/// Row of 4 shortcut tiles under the "Up next" card.
+/// Row of 4 shortcut tiles under the "Up next" card. Without a timetable,
+/// "Planning" becomes the accounts (admins) or the job offers (alumni).
 class QuickActions extends StatelessWidget {
-  const QuickActions({super.key});
+  const QuickActions({super.key, this.role = UserRole.student});
+
+  final UserRole role;
 
   @override
   Widget build(BuildContext context) {
+    final actions = [
+      _carpool,
+      _lostFound,
+      if (role.hasClasses)
+        _planning
+      else if (role == UserRole.admin)
+        _accounts
+      else
+        _offers,
+      _ideas,
+    ];
     return Row(
       children: [
-        for (var i = 0; i < _actions.length; i++) ...[
+        for (var i = 0; i < actions.length; i++) ...[
           if (i > 0) const SizedBox(width: AppSpacing.md),
-          Expanded(child: _QuickActionTile(action: _actions[i])),
+          Expanded(child: _QuickActionTile(action: actions[i])),
         ],
       ],
     );

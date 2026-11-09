@@ -14,6 +14,7 @@ The **exact JSON** of every response is pinned by the app's contract tests. They
 - [Conventions](#conventions)
 - [Auth](#auth) · [Users](#users) · [Timetable](#timetable) · [Courses](#courses) · [Carpool](#carpool)
 - [Jobs](#jobs) · [Forum](#forum) · [Grades](#grades) · [Profile](#profile) · [Notifications](#notifications)
+- [Admin](#admin): user management and the audit log
 
 ---
 
@@ -37,6 +38,7 @@ Access tokens last 15 minutes. On a `401`, call `POST /auth/refresh` with the re
 |---|---|
 | 400 | Bad request: wrong or expired code, malformed JSON |
 | 401 | Not signed in, wrong credentials, or expired session |
+| 403 | Signed in, but not allowed: an `/admin` route used by someone who isn't an admin, or the timetable or courses used by an admin or alumni |
 | 404 | Unknown id (`"Job not found."`), or a route that doesn't exist |
 | 409 | Conflict: seat taken, already applied, booking your own ride… |
 | 422 | Invalid data. The message names the first problem (`"Use at least 8 characters"`) |
@@ -83,12 +85,15 @@ Access tokens last 15 minutes. On a `401`, call `POST /auth/refresh` with the re
     "studentId": "211JMT0428",
     "displayName": "Dony Mansour",
     "avatarUrl": null,
-    "isEmailVerified": true
+    "isEmailVerified": true,
+    "role": "student"
   },
   "accessToken": "eyJhbGciOiJIUzI1NiIs…",
   "refreshToken": "1C95PsLEqH…"
 }
 ```
+
+`role` is `student`, `teacher`, `admin` or `alumni`. Sign-up always creates a `student`; only an admin can change a role (see [Admin](#admin)).
 
 **Codes** have 6 digits, are valid for 15 minutes and are locked after 5 wrong tries. Without SMTP configured, the server prints them in its console (`[mail] Verification code for …: 042917`).
 
@@ -99,6 +104,8 @@ Access tokens last 15 minutes. On a `401`, call `POST /auth/refresh` with the re
 | `GET /users/me` | `200 user` (the same `user` object as above, not wrapped) |
 
 ## Timetable
+
+Only students and teachers have a timetable. Admins and alumni get `403 { "message": "Only students and teachers have a timetable." }`.
 
 | Method & path | Success |
 |---|---|
@@ -127,6 +134,8 @@ Missing or invalid date → `422 "Pass the date as YYYY-MM-DD"`. A session:
 `kind` is one of `lecture`, `lab`, `exam`, `workshop`. Exams carry a `coefficient` and `notes`.
 
 ## Courses
+
+Only students and teachers have courses. Admins and alumni get `403 { "message": "Only students and teachers have courses." }` on every route below.
 
 | Method & path | Body | Success | Errors |
 |---|---|---|---|
@@ -335,13 +344,157 @@ A student without a profile document gets a default 1st-year profile.
 | `POST /notifications/read-all` | `204` | |
 
 An `AppNotification` has these fields:
-- `id`, `category`, `label`, `title`, `body`
+- `id`, `category` (`academic`, `covoiturage`, `lostFound`, `career`, `community` or `account`), `label`, `title`, `body`
 - `receivedAt`, `isRead`, `isUrgent`
 - `attachment`: `null` or one of these:
   - `{ type: "place", place }`
   - `{ type: "ride", driverName, carLabel, isDriverVerified }`
   - `{ type: "schedule" }`
   - `{ type: "pickup", availability, ticket }`
-- `link`: `null` or `{ destination: "home" | "timetable" | "courses" | "grades" | "forum" | "ride" | "job", id }`
+- `link`: `null` or `{ destination, id }`. `destination` is one of `home`, `timetable`, `courses`, `grades`, `forum`, `ride`, `job`, `profile` or `adminUsers`. `id` is the ride, job or user id for `ride`, `job` and `adminUsers`, otherwise `null`.
 
 A new student's first `GET` creates a "Welcome to CampusPulse" notification.
+
+**Account notifications** (category `account`, label `"Account"`):
+
+| When | Who gets it | Title | Link |
+|---|---|---|---|
+| An admin changes someone's role, email or password | that user (never the admin acting on their own account) | `"Your account was updated"`; the body has one line per change, e.g. `"Your role is now: **Teacher**."` Urgent when the password changed | `profile` |
+| Someone signs up in the app | every admin | `"New account: <name>"`, body `"**<email>** just signed up."` | `adminUsers` + the new user's id |
+
+---
+
+## Admin
+
+Every `/admin/*` route needs a signed-in user whose `role` is `admin`. Others get `403 { "message": "Only administrators can do this." }`. The role is read from the database on every request, so a demoted admin loses access at once.
+
+**Bootstrap:** `npm run seed` creates the demo admin (`admin@campus.test` / `CampusPulseAdmin2026!`). On a real server, use `npm run create-admin -- <email> <password> [display name]` instead; it creates the account, or promotes an existing one (new password, every session signed out).
+
+### Users
+
+| Method & path | Body / query | Success | Errors |
+|---|---|---|---|
+| `GET /admin/users` | `?q=&role=&page=&limit=` | `200 { items: ManagedUser[], total, page, limit }` | 422 bad query |
+| `GET /admin/users/stats` | — | `200 { total, byRole: { student, teacher, admin, alumni } }` (all four keys, 0 when none) | |
+| `GET /admin/users/:id` | — | `200 ManagedUser` | 404 `"User not found."` |
+| `POST /admin/users` | `{ displayName, email, password, studentId?, role? }` | `201 ManagedUser` | 409 email or ENT ID taken · 422 |
+| `PATCH /admin/users/:id` | any of `{ displayName, email, studentId, role, password, isEmailVerified }` | `200 ManagedUser` | 400 · 404 · 409 · 422 |
+| `DELETE /admin/users/:id` | — | `204` | 400 own account · 404 |
+| `POST /admin/users/import` | `{ dryRun, users: ImportRow[] }` | see [Import](#import) | 422 |
+
+A `ManagedUser`:
+
+```json
+{
+  "id": "6aee283c10aef9a35cb4bcc6",
+  "email": "dony.mansour@campus.test",
+  "studentId": "211JMT0428",
+  "displayName": "Dony Mansour",
+  "role": "student",
+  "isEmailVerified": true,
+  "createdAt": "2026-11-05T09:15:00.000Z"
+}
+```
+
+**Listing (`GET /admin/users`):**
+- `q`: every word must appear in the name, email or ENT ID. Case and accents are ignored (`"helene"` finds `"Hélène"`).
+- `role`: one of the four roles.
+- `page` ≥ 1 (default 1), `limit` 1–100 (default 20).
+- Sorted by name (case and accents ignored), then by id.
+
+**Creating (`POST /admin/users`):**
+- `displayName` 1–80 characters, `email` valid, `password` 8–128 characters.
+- `studentId`: optional ENT ID, 3–20 letters or digits, stored in capitals.
+- `role` defaults to `student`.
+- The account is created with its email already verified (the admin vouches for it). No email is sent.
+
+**Editing (`PATCH /admin/users/:id`):**
+- Send only the fields to change. `studentId: null` (or `""`) removes the ENT ID. An empty body gives `422 "There's nothing to save."`.
+- A field sent with its current value isn't a change. When nothing really changes, the answer is `200` with the account, and nothing is recorded.
+- A new `password` signs the user out on every device.
+- The user gets an `account` notification when their role, email or password changes.
+- **Your own account:** only `displayName`, `email` and `studentId` can be changed (your current `role` or `isEmailVerified` sent unchanged is fine; a `password` never is). Anything else gives `400 "On your own account, you can only change your name, email and ENT ID."`, so an admin can't demote themselves or lock themselves out. (That also means the last admin can never be removed.)
+
+**Deleting (`DELETE /admin/users/:id`):**
+- Your own account gives `400 "You can't delete your own account."`.
+- Removed with the account: its sessions, notifications, attendance, lab submissions, job applications, idea votes, lost & found requests, transcript and profile. The rides it drives are deleted, and the seats it booked on other rides become free again.
+- Kept: the forum posts and lost & found notices it published, under their author name, with no link to the account.
+
+### Import
+
+`POST /admin/users/import` creates many accounts at once, **all or nothing**.
+
+```json
+{
+  "dryRun": true,
+  "users": [
+    { "row": 2, "displayName": "Sarra Mansouri", "email": "sarra.mansouri@campus.test",
+      "password": "Kp7m-x2Qa-9zTb", "studentId": "221JMT0101", "role": "student" }
+  ]
+}
+```
+
+- `dryRun` is required (`true` or `false`).
+- `row` is the line number in the admin's file, echoed back in the problems. Without it, the position in `users` (from 1) is used.
+- `password` is required (the app generates one when the file has none).
+- `studentId` and `role` are optional. `role` ignores case and defaults to `student`.
+- An empty `users` gives `422 "The file has no accounts."`. This route accepts bodies up to 1 MB (100 kB elsewhere).
+- At most **1000** rows with `dryRun: true`, at most **50** to import. More gives `422 "At most 50 accounts per import."` (or `"At most 1000 lines per check."`).
+
+Every row is checked. A problem is `{ row, field, code, message }`:
+
+| `code` | `field` | `message` |
+|---|---|---|
+| `REQUIRED` | `displayName`, `email` or `password` | `"Name: missing"`, `"Email: missing"`, `"Password: missing"` |
+| `TOO_LONG` | `displayName` | `"Name: too long (at most 80 characters)"` |
+| `INVALID_EMAIL` | `email` | `"Email: not a valid address"` |
+| `DUPLICATE_EMAIL` | `email` | `"Email: already on another line of the file"` |
+| `EMAIL_TAKEN` | `email` | `"Email: an account already uses it"` |
+| `INVALID_STUDENT_ID` | `studentId` | `"ENT ID: 3 to 20 letters or digits"` |
+| `DUPLICATE_STUDENT_ID` | `studentId` | `"ENT ID: already on another line of the file"` |
+| `STUDENT_ID_TAKEN` | `studentId` | `"ENT ID: an account already uses it"` |
+| `INVALID_ROLE` | `role` | `"Role: not recognised (student, teacher, admin or alumni)"` |
+| `PASSWORD_TOO_SHORT` | `password` | `"Password: at least 8 characters"` |
+| `TOO_LONG` | `password` | `"Password: too long (at most 128 characters)"` |
+
+A line gets at most one problem per field. For a duplicate, the first line is fine and the later ones are flagged.
+
+Answers:
+- **Dry run:** `200 { "dryRun": true, "valid": 48, "problems": [ … ] }`. `valid` counts the rows without problems. Nothing is created.
+- **Import, no problems:** `201 { "dryRun": false, "created": [ ManagedUser, … ] }`. The accounts are verified, and no email is sent.
+- **Import with problems:** `422 { "message": "The file has errors, so nothing was imported.", "problems": [ … ] }`.
+
+### Audit log
+
+Every change an admin makes is recorded.
+
+| Method & path | Query | Success |
+|---|---|---|
+| `GET /admin/audit` | `?action=&page=&limit=` | `200 { items: AuditEntry[], total, page, limit }`, newest first |
+| `GET /admin/audit/actions` | — | `200 ["user.create", "user.delete", …]`, the actions recorded so far |
+
+- `action` is exact (`user.update`) or a prefix with `*` (`user.*`; a lone `*` is everything).
+- `page` ≥ 1, `limit` 1–100 (default 30).
+
+```json
+{
+  "id": "6aee2d5a10aef9a35cb4bd01",
+  "action": "user.update",
+  "summary": "Changed the role of Sarra Mansouri to Teacher",
+  "actor": { "id": "6aee283c10aef9a35cb4bcc0", "displayName": "Campus Admin", "email": "admin@campus.test" },
+  "targetId": "6aee283c10aef9a35cb4bcc9",
+  "metadata": { "changes": ["role"], "role": { "from": "student", "to": "teacher" } },
+  "ip": "127.0.0.1",
+  "createdAt": "2026-11-09T10:42:00.000Z"
+}
+```
+
+- `actor` is a copy taken when the action happened, so it survives the actor's deletion.
+- `metadata` never contains a password.
+
+| Action | Summary example | Metadata |
+|---|---|---|
+| `user.create` | `"Created the teacher account amira.bensalah@campus.test"` | `{ role }` |
+| `user.update` | `"Changed the role of Sarra Mansouri to Teacher"`, `"Updated Sarra Mansouri (name, password)"` (the name before the change) | `{ changes, role?: { from, to } }`; `changes` lists field names (`displayName`, `email`, `studentId`, `role`, `password`, `isEmailVerified`) |
+| `user.delete` | `"Deleted the account of Sarra Mansouri (sarra.mansouri@campus.test)"` | `{ email, role }` |
+| `user.import` | `"Imported 12 accounts"` | `{ count, emails }` (the first 20) |

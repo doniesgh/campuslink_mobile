@@ -3,6 +3,7 @@ import type { Types } from 'mongoose';
 
 import { env } from '../../config/env';
 import { badRequest, conflict, unauthorized } from '../../lib/http-error';
+import { notifyAdminsOfSignup } from '../notifications/account-notifications';
 import { toPublicUser, UserModel, type PublicUser, type UserDocument } from '../users/user.model';
 import type { LoginInput, RegisterInput, ResetPasswordInput } from './auth.schemas';
 import { mailer } from './mailer';
@@ -47,7 +48,12 @@ async function startSession(user: UserDocument): Promise<Session> {
   return { user: toPublicUser(user), ...(await issueTokens(user._id)) };
 }
 
-async function revokeAllSessions(userId: Types.ObjectId): Promise<void> {
+/** A bcrypt hash of [password], at the cost every account uses. */
+export const hashPassword = (password: string): Promise<string> =>
+  bcrypt.hash(password, BCRYPT_ROUNDS);
+
+/** Signs [userId] out on every device: their refresh tokens stop working. */
+export async function revokeAllSessions(userId: Types.ObjectId): Promise<void> {
   await RefreshTokenModel.updateMany(
     { userId, revokedAt: null },
     { $set: { revokedAt: new Date() } },
@@ -87,6 +93,10 @@ function checkCode(
   return hashesMatch(hash, sha256(code)) ? 'ok' : 'wrong';
 }
 
+/**
+ * Creates a student account (sign-up never gives another role), emails its
+ * verification code and tells the admins someone signed up.
+ */
 export async function register(input: RegisterInput): Promise<Session> {
   if (await UserModel.exists({ email: input.email })) {
     throw conflict('An account with this email already exists.');
@@ -95,12 +105,19 @@ export async function register(input: RegisterInput): Promise<Session> {
   const user = await UserModel.create({
     email: input.email,
     displayName: input.displayName,
-    passwordHash: await bcrypt.hash(input.password, BCRYPT_ROUNDS),
+    role: 'student',
+    passwordHash: await hashPassword(input.password),
     verificationCodeHash: hash,
     verificationExpiresAt: expiresAt,
     verificationAttempts: 0,
   });
   await sendSafely(() => mailer.sendVerificationCode(user.email, code));
+  // The account exists: a notification problem must not fail the sign-up.
+  try {
+    await notifyAdminsOfSignup(user);
+  } catch (err) {
+    console.error('[notifications] Could not tell the admins about a sign-up:', err);
+  }
   return startSession(user);
 }
 
@@ -174,7 +191,7 @@ export async function resetPassword({ email, code, password }: ResetPasswordInpu
     throw badRequest(INVALID_RESET);
   }
 
-  user.passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
+  user.passwordHash = await hashPassword(password);
   user.resetCodeHash = undefined;
   user.resetExpiresAt = undefined;
   user.resetAttempts = 0;

@@ -19,6 +19,9 @@ String? notificationRoute(NotificationLink link) {
     NotificationDestination.forum => RoutePaths.forum,
     NotificationDestination.ride => id == null ? null : RoutePaths.ride(id),
     NotificationDestination.job => id == null ? null : RoutePaths.job(id),
+    NotificationDestination.profile => RoutePaths.profile,
+    NotificationDestination.adminUsers =>
+      id == null ? RoutePaths.adminUsers : RoutePaths.adminUser(id),
   };
 }
 

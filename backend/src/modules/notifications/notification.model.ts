@@ -7,6 +7,7 @@ export const notificationCategories = [
   'lostFound',
   'career',
   'community',
+  'account',
 ] as const;
 
 export const notificationDestinations = [
@@ -17,6 +18,8 @@ export const notificationDestinations = [
   'forum',
   'ride',
   'job',
+  'profile',
+  'adminUsers',
 ] as const;
 
 export const attachmentTypes = ['place', 'ride', 'schedule', 'pickup'] as const;
@@ -38,7 +41,7 @@ const attachmentSchema = new Schema(
   { _id: false },
 );
 
-/** Screen the notification opens. `id` is the ride or job id for detail screens. */
+/** Screen the notification opens. `id` is the ride, job or user id for detail screens. */
 const linkSchema = new Schema(
   {
     destination: { type: String, enum: notificationDestinations, required: true },

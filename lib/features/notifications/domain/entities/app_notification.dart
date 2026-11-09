@@ -1,16 +1,30 @@
 /// What a notification is about. Drives the icon and the filter chips.
-enum NotificationCategory { academic, covoiturage, lostFound, career, community }
+enum NotificationCategory { academic, covoiturage, lostFound, career, community, account }
 
 /// Screen a notification opens when tapped. Mapped to a route by the
 /// presentation layer, so the domain stays free of router types.
-enum NotificationDestination { home, timetable, courses, grades, forum, ride, job }
+enum NotificationDestination {
+  home,
+  timetable,
+  courses,
+  grades,
+  forum,
+  ride,
+  job,
+
+  /// The Profile tab ("Your account was updated").
+  profile,
+
+  /// Administration › Users, on the account in [NotificationLink.id] (admins only).
+  adminUsers,
+}
 
 class NotificationLink {
   const NotificationLink(this.destination, {this.id});
 
   final NotificationDestination destination;
 
-  /// Ride or job id for detail destinations.
+  /// Ride, job or user id for detail destinations.
   final String? id;
 }
 

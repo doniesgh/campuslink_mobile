@@ -32,9 +32,30 @@ Problems we actually hit while building CampusPulse, and how to fix them.
 - **This is expected.** The token saved in demo mode isn't valid on the real server, so the app signs you out.
 - **Fix:** sign in with `211JMT0428` / `CampusPulse2026!`.
 
+**I don't see Administration on the Profile tab**
+- **Cause:** only admins see it, and the app reads your role when you sign in (or when it starts).
+- **Fix:** sign in as `admin@campus.test` / `CampusPulseAdmin2026!` (after `npm run seed`). If an admin has just promoted you, sign out and in again.
+
+**There's no Timetable tab**
+- **This is expected for admins and alumni.** They follow no classes, so they get four tabs and no class sections on Home. The API refuses them the timetable and courses (403).
+- **Fix:** if the account should have classes, an admin changes its role to Student or Teacher. The user then signs out and in again.
+
+**An admin screen says "Only administrators can do this."**
+- **Cause:** the API checks the role on every request. Your account isn't an admin any more (another admin changed it), or the app is pointed at a different database.
+- **Fix:** sign out and in again; ask another admin, or run `npm run create-admin`.
+
 **Hot reload doesn't show my new screen or route**
 - **Cause:** route and provider changes need a **hot restart**.
 - **Fix:** press Ctrl+Shift+F5 in VS Code, or `R` in the terminal.
+
+**After adding a package, the app crashes with `MissingPluginException`**
+- **Cause:** the package has native code, and a hot restart doesn't rebuild it.
+- **Fix:** stop the app and run it again.
+
+**"WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): file_picker"**
+- **This is expected and harmless.** Flutter flags `file_picker` because its build file mentions Kotlin.
+- **Background:** `file_picker` 11 doesn't compile its Kotlin code on Android Gradle Plugin 9 when `android.builtInKotlin=false`. The build then failed with *"cannot find symbol FilePickerPlugin"*. `android/build.gradle.kts` applies Kotlin to it, so it builds.
+- **Why not upgrade:** `file_picker` 13 needs `win32` 6, and `flutter_secure_storage` 9 still needs `win32` 5. Upgrade both together, then remove the block from `android/build.gradle.kts`.
 
 ## Connecting the app to the API
 

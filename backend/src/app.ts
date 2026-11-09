@@ -5,6 +5,7 @@ import morgan from 'morgan';
 
 import { env, isProd, isTest } from './config/env';
 import { errorHandler, notFoundHandler } from './middleware/error-handler';
+import { adminRouter } from './modules/admin/admin.routes';
 import { authRouter } from './modules/auth/auth.routes';
 import { carpoolRouter } from './modules/carpool/carpool.routes';
 import { coursesRouter } from './modules/courses/courses.routes';
@@ -22,6 +23,8 @@ export function createApp() {
 
   app.use(helmet());
   app.use(cors({ origin: env.CORS_ORIGIN === '*' ? true : env.CORS_ORIGIN.split(',') }));
+  // A user import (up to 1000 lines) is the only request bigger than 100 kB.
+  app.use('/api/admin/users/import', express.json({ limit: '1mb' }));
   app.use(express.json({ limit: '100kb' }));
   if (!isTest) app.use(morgan(isProd ? 'combined' : 'dev'));
 
@@ -39,6 +42,7 @@ export function createApp() {
   api.use('/grades', gradesRouter);
   api.use('/profile', profileRouter);
   api.use('/notifications', notificationsRouter);
+  api.use('/admin', adminRouter);
   app.use('/api', api);
 
   app.use(notFoundHandler);

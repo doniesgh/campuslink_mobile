@@ -77,5 +77,79 @@ void main() {
         expect(authRedirect(_signedIn, RoutePaths.ride('es-4091')), isNull);
       });
     });
+
+    group('administration', () {
+      const admin = AsyncData<User?>(User(
+        id: 'a1',
+        email: 'admin@campus.test',
+        displayName: 'Campus Admin',
+        isEmailVerified: true,
+        role: UserRole.admin,
+      ));
+      const teacher = AsyncData<User?>(User(
+        id: 't1',
+        email: 'teacher@campus.test',
+        displayName: 'Teacher',
+        isEmailVerified: true,
+        role: UserRole.teacher,
+      ));
+      final adminPages = [
+        RoutePaths.adminUsers,
+        RoutePaths.newUser,
+        RoutePaths.adminUser('u1'),
+        RoutePaths.importUsers,
+        RoutePaths.auditLog,
+      ];
+
+      test('is open to admins', () {
+        for (final page in adminPages) {
+          expect(authRedirect(admin, page), isNull, reason: page);
+        }
+      });
+
+      test('sends students and teachers back to Profile', () {
+        for (final page in adminPages) {
+          expect(authRedirect(_signedIn, page), RoutePaths.profile, reason: page);
+          expect(authRedirect(teacher, page), RoutePaths.profile, reason: page);
+        }
+      });
+
+      test('leaves the rest of the Profile tab alone', () {
+        expect(authRedirect(_signedIn, RoutePaths.profile), isNull);
+        expect(authRedirect(_signedIn, RoutePaths.grades), isNull);
+      });
+
+      test('signed-out users still go to login first', () {
+        expect(authRedirect(_signedOut, RoutePaths.adminUsers), RoutePaths.login);
+      });
+    });
+
+    group('timetable', () {
+      AsyncValue<User?> signedInAs(UserRole role) => AsyncData<User?>(User(
+            id: 'u1',
+            email: 'someone@campus.test',
+            displayName: 'Someone',
+            isEmailVerified: true,
+            role: role,
+          ));
+      final timetablePages = [RoutePaths.timetable, RoutePaths.courses];
+
+      test('is open to students and teachers', () {
+        for (final role in [UserRole.student, UserRole.teacher]) {
+          for (final page in timetablePages) {
+            expect(authRedirect(signedInAs(role), page), isNull, reason: '$role $page');
+          }
+        }
+      });
+
+      test('sends admins and alumni home: they have no timetable', () {
+        for (final role in [UserRole.admin, UserRole.alumni]) {
+          for (final page in timetablePages) {
+            expect(authRedirect(signedInAs(role), page), RoutePaths.home, reason: '$role $page');
+          }
+          expect(authRedirect(signedInAs(role), RoutePaths.jobs), isNull);
+        }
+      });
+    });
   });
 }

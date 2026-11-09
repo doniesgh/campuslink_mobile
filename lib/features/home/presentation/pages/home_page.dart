@@ -10,6 +10,9 @@ import '../../../../shared/widgets/app_badge.dart';
 import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/campus_header.dart';
 import '../../../../shared/widgets/state_views.dart';
+import '../../../admin/presentation/providers/admin_providers.dart';
+import '../../../admin/presentation/widgets/admin_overview_card.dart';
+import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../../forum/domain/entities/forum_post.dart';
 import '../../../forum/presentation/pages/forum_page.dart';
@@ -32,15 +35,22 @@ ForumSection _forumSectionFor(PostCategory category) => switch (category) {
     };
 
 /// Stitch "02. Home & Today Hub".
+///
+/// Admins and alumni have no timetable: no "Up next" or "Today's Schedule"
+/// for them. Admins get the [AdminOverviewCard] instead.
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
 
-  Future<void> _refresh(WidgetRef ref) async {
-    ref.invalidate(todayTimetableProvider);
+  Future<void> _refresh(WidgetRef ref, User? user) async {
+    final hasClasses = user?.hasClasses ?? true;
+    final isAdmin = user?.isAdmin ?? false;
+    if (hasClasses) ref.invalidate(todayTimetableProvider);
+    if (isAdmin) ref.invalidate(userStatsProvider);
     ref.invalidate(highlightsProvider);
     try {
       await Future.wait([
-        ref.read(todayTimetableProvider.future),
+        if (hasClasses) ref.read(todayTimetableProvider.future),
+        if (isAdmin) ref.read(userStatsProvider.future),
         ref.read(highlightsProvider.future),
       ]);
     } catch (_) {
@@ -52,10 +62,12 @@ class HomePage extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final scheme = Theme.of(context).colorScheme;
     final now = ref.watch(clockProvider).valueOrNull ?? DateTime.now();
-    final name = ref.watch(authControllerProvider).valueOrNull?.displayName ?? '';
-    final timetable = ref.watch(todayTimetableProvider);
+    final user = ref.watch(authControllerProvider).valueOrNull;
+    final name = user?.displayName ?? '';
+    final hasClasses = user?.hasClasses ?? true;
+    final timetable = hasClasses ? ref.watch(todayTimetableProvider) : null;
     final highlights = ref.watch(highlightsProvider);
-    final courseCount = timetable.valueOrNull?.sessions.length;
+    final courseCount = timetable?.valueOrNull?.sessions.length;
     final unreadNotifications = ref.watch(unreadNotificationCountProvider);
 
     return Scaffold(
@@ -66,7 +78,7 @@ class HomePage extends ConsumerWidget {
             const CampusHeader(section: 'Home'),
             Expanded(
               child: RefreshIndicator(
-                onRefresh: () => _refresh(ref),
+                onRefresh: () => _refresh(ref, user),
                 child: SingleChildScrollView(
                   physics: const AlwaysScrollableScrollPhysics(),
                   padding: const EdgeInsets.only(top: AppSpacing.sm, bottom: AppSpacing.xxl),
@@ -78,55 +90,65 @@ class HomePage extends ConsumerWidget {
                         child: HomeGreeting(
                           name: name,
                           now: now,
-                          semesterWeek: timetable.valueOrNull?.semesterWeek,
+                          semesterWeek: timetable?.valueOrNull?.semesterWeek,
                           hasUnreadNotifications: unreadNotifications > 0,
                           onSearch: () => showAppSnack(context, 'Search is coming soon.'),
                           onNotifications: () => context.push(RoutePaths.notifications),
                         ),
                       ),
                       const SizedBox(height: AppSpacing.xl),
+                      if (timetable != null) ...[
+                        Padding(
+                          padding: _page,
+                          child: timetable.when(
+                            skipLoadingOnReload: true,
+                            loading: () => const _SectionLoading(height: 170),
+                            error: (e, _) => _SectionError(
+                              message: failureMessage(e),
+                              onRetry: () => ref.invalidate(todayTimetableProvider),
+                            ),
+                            data: (day) => UpNextCard(
+                              sessions: day.sessions,
+                              now: now,
+                              onTap: () => context.go(RoutePaths.timetable),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.xl),
+                      ] else if (user?.isAdmin ?? false) ...[
+                        const Padding(padding: _page, child: AdminOverviewCard()),
+                        const SizedBox(height: AppSpacing.xl),
+                      ],
                       Padding(
                         padding: _page,
-                        child: timetable.when(
+                        child: QuickActions(role: user?.role ?? UserRole.student),
+                      ),
+                      const SizedBox(height: AppSpacing.xl),
+                      if (timetable != null) ...[
+                        Padding(
+                          padding: _page,
+                          child: HomeSectionHeader(
+                            title: "Today's Schedule",
+                            badge: courseCount == null || courseCount == 0
+                                ? null
+                                : AppBadge(
+                                    '$courseCount course${courseCount == 1 ? '' : 's'}',
+                                    tone: BadgeTone.neutral,
+                                  ),
+                            actionLabel: 'View all',
+                            onAction: () => context.go(RoutePaths.timetable),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpacing.sm),
+                        timetable.when(
                           skipLoadingOnReload: true,
-                          loading: () => const _SectionLoading(height: 170),
-                          error: (e, _) => _SectionError(
-                            message: failureMessage(e),
-                            onRetry: () => ref.invalidate(todayTimetableProvider),
-                          ),
-                          data: (day) => UpNextCard(
-                            sessions: day.sessions,
-                            now: now,
-                            onTap: () => context.go(RoutePaths.timetable),
-                          ),
+                          loading: () => const _SectionLoading(height: 150),
+                          // The error is already shown in place of the "Up next" card.
+                          error: (_, __) => const SizedBox.shrink(),
+                          data: (day) => TodaySchedule(sessions: day.sessions, now: now),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
-                      const Padding(padding: _page, child: QuickActions()),
-                      const SizedBox(height: AppSpacing.xl),
-                      Padding(
-                        padding: _page,
-                        child: HomeSectionHeader(
-                          title: "Today's Schedule",
-                          badge: courseCount == null || courseCount == 0
-                              ? null
-                              : AppBadge(
-                                  '$courseCount course${courseCount == 1 ? '' : 's'}',
-                                  tone: BadgeTone.neutral,
-                                ),
-                          actionLabel: 'View all',
-                          onAction: () => context.go(RoutePaths.timetable),
-                        ),
-                      ),
-                      const SizedBox(height: AppSpacing.sm),
-                      timetable.when(
-                        skipLoadingOnReload: true,
-                        loading: () => const _SectionLoading(height: 150),
-                        // The error is already shown in place of the "Up next" card.
-                        error: (_, __) => const SizedBox.shrink(),
-                        data: (day) => TodaySchedule(sessions: day.sessions, now: now),
-                      ),
-                      const SizedBox(height: AppSpacing.xl),
+                        const SizedBox(height: AppSpacing.xl),
+                      ],
                       Padding(
                         padding: _page,
                         child: HomeSectionHeader(

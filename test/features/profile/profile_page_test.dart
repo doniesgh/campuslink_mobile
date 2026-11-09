@@ -3,6 +3,8 @@ import 'package:campuspulse/core/error/result.dart';
 import 'package:campuspulse/core/providers/theme_provider.dart';
 import 'package:campuspulse/core/router/route_names.dart';
 import 'package:campuspulse/core/theme/app_colors.dart';
+import 'package:campuspulse/features/admin/data/repositories/mock_admin_repository.dart';
+import 'package:campuspulse/features/admin/presentation/providers/admin_providers.dart';
 import 'package:campuspulse/features/auth/domain/entities/user.dart';
 import 'package:campuspulse/features/auth/presentation/providers/auth_controller.dart';
 import 'package:campuspulse/features/profile/data/repositories/mock_profile_repository.dart';
@@ -16,14 +18,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
 class _FakeAuthController extends AuthController {
+  _FakeAuthController({this.role = UserRole.student});
+
+  final UserRole role;
   bool loggedOut = false;
 
   @override
-  Future<User?> build() async => const User(
+  Future<User?> build() async => User(
         id: 'u1',
         email: 'dony.bensalem@esprit.tn',
         displayName: 'Dony Ben Salem',
         isEmailVerified: true,
+        role: role,
       );
 
   @override
@@ -53,6 +59,7 @@ Future<_FakeAuthController> _pumpProfile(
   ProfileRepository? repository,
   double width = 375,
   double textScale = 1,
+  UserRole role = UserRole.student,
 }) async {
   // 375 dp by default: the test font is much wider than the real ones, and the
   // shared CampusHeader overflows below that width with it.
@@ -60,7 +67,7 @@ Future<_FakeAuthController> _pumpProfile(
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
 
-  final auth = _FakeAuthController();
+  final auth = _FakeAuthController(role: role);
   Widget screen(String label) =>
       Scaffold(appBar: AppBar(), body: Center(child: Text(label)));
   final router = GoRouter(
@@ -69,7 +76,11 @@ Future<_FakeAuthController> _pumpProfile(
       GoRoute(
         path: RoutePaths.profile,
         builder: (_, __) => const ProfilePage(),
-        routes: [GoRoute(path: 'grades', builder: (_, __) => screen('Grades screen'))],
+        routes: [
+          GoRoute(path: 'grades', builder: (_, __) => screen('Grades screen')),
+          GoRoute(path: 'admin/users', builder: (_, __) => screen('Users screen')),
+          GoRoute(path: 'admin/audit', builder: (_, __) => screen('Audit screen')),
+        ],
       ),
       GoRoute(path: RoutePaths.notifications, builder: (_, __) => screen('Notifications screen')),
       GoRoute(path: RoutePaths.forum, builder: (_, __) => screen('Forum screen')),
@@ -82,6 +93,7 @@ Future<_FakeAuthController> _pumpProfile(
       overrides: [
         authControllerProvider.overrideWith(() => auth),
         themeModeProvider.overrideWith(_FakeThemeModeNotifier.new),
+        adminRepositoryProvider.overrideWithValue(MockAdminRepository(delay: Duration.zero)),
         profileRepositoryProvider.overrideWithValue(
           repository ??
               MockProfileRepository(
@@ -212,5 +224,51 @@ void main() {
     await tester.tap(find.widgetWithText(TextButton, 'Sign Out'));
     await tester.pumpAndSettle();
     expect(auth.loggedOut, isTrue);
+  });
+
+  group('roles', () {
+    testWidgets('a student sees no Administration section', (tester) async {
+      await _pumpProfile(tester);
+      expect(find.text('Administration'), findsNothing);
+    });
+
+    for (final brightness in Brightness.values) {
+      testWidgets('an admin gets Administration instead of the student card ($brightness)',
+          (tester) async {
+        await _pumpProfile(
+          tester,
+          role: UserRole.admin,
+          brightness: brightness,
+          width: 360,
+          textScale: 1.3,
+        );
+
+        expect(find.text('Admin · CampusPulse'), findsOneWidget);
+        expect(find.text('Administration'), findsOneWidget);
+        // The 12 demo accounts of the mock repository.
+        expect(find.text('12'), findsOneWidget);
+        expect(find.text('211JMT0428'), findsNothing);
+        expect(find.text('NFC Student Pass'), findsNothing);
+        expect(find.text('Sign Out'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
+
+    testWidgets('Administration rows open the users and the audit log', (tester) async {
+      await _pumpProfile(tester, role: UserRole.admin);
+      await _tapVisible(tester, find.text('Users'));
+      expect(find.text('Users screen'), findsOneWidget);
+
+      await _pumpProfile(tester, role: UserRole.admin);
+      await _tapVisible(tester, find.text('Audit log'));
+      expect(find.text('Audit screen'), findsOneWidget);
+    });
+
+    testWidgets('a teacher sees neither the student card nor Administration', (tester) async {
+      await _pumpProfile(tester, role: UserRole.teacher);
+      expect(find.text('Teacher · CampusPulse'), findsOneWidget);
+      expect(find.text('211JMT0428'), findsNothing);
+      expect(find.text('Administration'), findsNothing);
+    });
   });
 }

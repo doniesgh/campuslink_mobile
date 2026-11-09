@@ -15,6 +15,7 @@ What every screen does, where its code lives and which endpoints it uses. The nu
 | [Profile & Digital ID](#profile--digital-id) | 10 | `profile/` | `profile/` |
 | [Grades](#grades) | 11 | `grades/` | `grades/` |
 | [Notifications](#notifications) | 12 | `notifications/` | `notifications/` |
+| [Administration](#administration) (admins only) | — | `admin/` | `admin/` |
 
 ---
 
@@ -50,11 +51,17 @@ All of them share the `AuthScaffold` layout.
   - "C'est à moi" opens Lost & Found.
   - "Répondre" (messaging) is coming soon.
 
-**Data:** Home has no repository of its own. It reads `todayTimetableProvider`, `highlightsProvider`, `ideaUpvotesProvider` and `unreadNotificationCountProvider`.
+**Admins and alumni** have no timetable, so their Home has no "Up next" and no "Today's schedule".
+- **Admins** get an **Administration** card instead: the number of accounts per role, and links to Users, Import and Audit log (`AdminOverviewCard`). Their Planning shortcut becomes **Comptes** (the users).
+- **Alumni:** Planning becomes **Offres** (Jobs).
+
+**Data:** Home has no repository of its own. It reads `todayTimetableProvider` (students and teachers only), `highlightsProvider`, `ideaUpvotesProvider`, `unreadNotificationCountProvider` and, for admins, `userStatsProvider`.
 
 ## Timetable
 
 **Screen:** `TimetablePage`, the second tab.
+
+**Who:** students and teachers. Admins and alumni follow no classes. They don't get the tab, `authRedirect` sends them home from `/app/timetable*`, and the API answers 403. The same goes for **Courses**.
 
 - **Navigation:** previous/next week, and a Monday–Saturday day strip with dots for days that have classes or exams.
 - **Day summary:** the number of sessions, exams and hours.
@@ -157,6 +164,10 @@ The *Experiences* section is still "coming soon".
   - SSO and privacy (coming soon)
   - **Sign Out**
 
+**Roles:**
+- Admins also get an **Administration** section: Users, Import accounts, Audit log (see [Administration](#administration)).
+- Teachers, admins and alumni don't see the student card, the stats or the NFC pass: the hero shows their role instead ("Admin · CampusPulse").
+
 **API:** `GET /profile`. Credits, rank and honours come from the transcript; the unread count and the carpool dot come from their modules.
 
 ## Grades
@@ -184,7 +195,50 @@ These rules also exist in `backend/src/modules/grades/grading.ts`, for the Profi
 - **Tapping a notification** marks it read and opens its target: a ride, a job, the timetable, courses, grades or the forum.
 - **Coming soon:** the extra actions (map, calendar, SMS, preferences).
 
+**Account notifications** (category `account`):
+- "Your account was updated" when an admin changes your role, email or password (urgent for a password). It opens Profile.
+- "New account: <name>" to every admin when someone signs up. It opens that account in Administration.
+
 **API:** `GET /notifications`, `POST /notifications/:id/read`, `POST /notifications/read-all`.
+
+## Administration
+
+**Who:** accounts whose role is `admin`. The demo admin is `admin@campus.test` / `CampusPulseAdmin2026!` (created by `npm run seed`). In demo mode, any identifier containing "admin" signs in as the admin.
+
+**Where:** Profile › Administration, or the Administration card on Home. The routes are under `/app/profile/admin/`, inside the Profile tab. `authRedirect` sends non-admins back to Profile, and the API answers 403 to them anyway.
+
+**Screens** (no Stitch design: they reuse the look of the Jobs and ride form screens):
+
+- **Users** (`AdminUsersPage`):
+  - search by name, email or ENT ID (accents ignored)
+  - role chips with counts
+  - 20 accounts at a time, more load as you scroll
+  - "(you)" on your own account, an "Email not verified" badge
+  - **Add user**, and buttons to Import and the Audit log
+- **Add / edit user** (`UserFormPage`):
+  - name, email, optional ENT ID, role (four cards) and password, with **Generate**
+  - when editing: the password is optional (empty keeps it), and an "Email verified" switch
+  - after creating an account or setting a password, a dialog shows the **sign-in details** once, with **Copy**
+  - **Delete this account**, after a confirmation
+  - **Your own account:** only the name, email and ENT ID. You can't change your role or password, or delete yourself, so there is always an admin left
+- **Import accounts** (`ImportUsersPage`):
+  1. Choose a **CSV file**, or **paste cells** copied from Excel or Google Sheets.
+  2. The app reads the titles in English or French (`Nom`, `Prénom`, `Courriel`, `Rôle`, `Mot de passe`…). Required: a name (or first and last name) and an email. Optional: ENT ID, role, password; an empty password is generated.
+  3. **Check the lines:** the app checks every line, then the server does a dry run ("an account already uses this email"). Lines with problems can be left out.
+  4. **Import:** batches of 25, all or nothing per batch.
+  5. **Copy the sign-in details** (a tab-separated sheet). Leaving without copying generated passwords asks first.
+- **Audit log** (`AuditLogPage`): every change made by an admin, newest first, filtered by action (Created, Updated, Deleted, Imported). Tapping an entry opens the account.
+
+**What deleting an account removes:** its sessions, notifications, attendance, submissions, applications, votes, lost & found requests, transcript and profile; the rides it drives; its seats on other rides (freed). Its forum posts and notices stay, without a link to the account.
+
+**Not built** (they exist in the PWA `campuslink_v1`): reading Excel files directly, the AI import assistant (it needs an OpenRouter key), and groups and programs.
+
+**API:** `/admin/users` (list, stats, get, create, edit, delete, import) and `/admin/audit`. See [api.md](api.md#admin).
+
+**Code:**
+- The import rules are in `admin/domain/user_import_parser.dart`, unit-tested: CSV/TSV reading, title aliases, role synonyms, password generation, the line checks.
+- The page-by-page lists are `userListProvider` and `auditListProvider` (`PagedState`, `loadMore()`).
+- `MockAdminRepository` follows the API's rules and messages, so the screens work the same in demo mode.
 
 ---
 

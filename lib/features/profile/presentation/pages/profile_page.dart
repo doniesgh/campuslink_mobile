@@ -9,6 +9,8 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/campus_header.dart';
+import '../../../admin/presentation/widgets/administration_section.dart';
+import '../../../auth/domain/entities/user.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../providers/profile_providers.dart';
 import '../widgets/academic_stats.dart';
@@ -70,6 +72,9 @@ class ProfilePage extends ConsumerWidget {
     final profile = profileAsync.valueOrNull;
     final displayName = user?.displayName.trim() ?? '';
     final name = displayName.isEmpty ? 'Student' : displayName;
+    // Teachers, admins and alumni have no student card or grades.
+    final role = user?.role ?? UserRole.student;
+    final isStudent = role == UserRole.student;
 
     return Scaffold(
       body: SafeArea(
@@ -88,39 +93,47 @@ class ProfilePage extends ConsumerWidget {
                     children: [
                       ProfileHero(
                         name: name,
-                        programLine: profile?.programLine,
-                        campusStatus: profile != null && profile.isOnCampus
+                        programLine: isStudent ? profile?.programLine : '${role.label} · CampusPulse',
+                        campusStatus: isStudent && profile != null && profile.isOnCampus
                             ? 'On Campus: ${profile.campusLocation}'
                             : null,
                         // TODO: profile editing (photo, contact details).
                         onEdit: () => _comingSoon(context, 'Profile editing'),
                         // TODO: NFC pass emulation (HCE) once the campus readers API exists.
-                        onNfcPass: () => _comingSoon(context, 'NFC Student Pass'),
+                        onNfcPass: isStudent
+                            ? () => _comingSoon(context, 'NFC Student Pass')
+                            : null,
                       ),
                       const SizedBox(height: AppSpacing.xl),
-                      Padding(
-                        padding: _page,
-                        child: profileAsync.when(
-                          skipLoadingOnReload: true,
-                          loading: () => const _SectionLoading(height: 360),
-                          error: (e, _) => _SectionError(
-                            message: failureMessage(e),
-                            onRetry: () => ref.invalidate(studentProfileProvider),
-                          ),
-                          data: (p) => Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              AcademicStats(
-                                profile: p,
-                                onTap: () => context.push(RoutePaths.grades),
-                              ),
-                              const SizedBox(height: AppSpacing.xxl),
-                              DigitalIdSection(profile: p, name: name, now: DateTime.now()),
-                            ],
+                      if (role == UserRole.admin) ...[
+                        const Padding(padding: _page, child: AdministrationSection()),
+                        const SizedBox(height: AppSpacing.xxl),
+                      ],
+                      if (isStudent) ...[
+                        Padding(
+                          padding: _page,
+                          child: profileAsync.when(
+                            skipLoadingOnReload: true,
+                            loading: () => const _SectionLoading(height: 360),
+                            error: (e, _) => _SectionError(
+                              message: failureMessage(e),
+                              onRetry: () => ref.invalidate(studentProfileProvider),
+                            ),
+                            data: (p) => Column(
+                              crossAxisAlignment: CrossAxisAlignment.stretch,
+                              children: [
+                                AcademicStats(
+                                  profile: p,
+                                  onTap: () => context.push(RoutePaths.grades),
+                                ),
+                                const SizedBox(height: AppSpacing.xxl),
+                                DigitalIdSection(profile: p, name: name, now: DateTime.now()),
+                              ],
+                            ),
                           ),
                         ),
-                      ),
-                      const SizedBox(height: AppSpacing.xxl),
+                        const SizedBox(height: AppSpacing.xxl),
+                      ],
                       Padding(
                         padding: _page,
                         child: ServicesSettingsList(

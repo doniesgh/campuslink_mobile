@@ -110,7 +110,8 @@ lib/
     ├── jobs/                 Internship / job offers
     ├── grades/               Grades & academic transcript
     ├── profile/              Student profile & digital ID
-    └── notifications/        Notifications & alerts
+    ├── notifications/        Notifications & alerts
+    └── admin/                Administration (admins only): users, CSV import, audit log
 ```
 
 **Inside a feature** (the example is `jobs/`, and every feature follows the same shape):
@@ -277,6 +278,10 @@ sequenceDiagram
 | `/app/profile` · tab | `ProfilePage` | 10 |
 | `/app/profile/grades` | `GradesPage` | 11 |
 | `/app/notifications` | `NotificationsPage` (over the tabs, no bottom bar) | 12 |
+| `/app/profile/admin/users` | `AdminUsersPage` (admins only) | — |
+| `/app/profile/admin/users/new` · `/:userId` | `UserFormPage` (add / edit an account) | — |
+| `/app/profile/admin/import` | `ImportUsersPage` (CSV or pasted cells) | — |
+| `/app/profile/admin/audit` | `AuditLogPage` | — |
 
 **Redirect rules.** They live in `authRedirect()` in `app_router.dart` and are unit-tested:
 
@@ -284,6 +289,8 @@ sequenceDiagram
 - Signed out on an `/app/*` page or on verify-email → **login**.
 - Signed in with an unverified email → **verify-email**.
 - Signed in on an `/auth/*` page → **home**.
+- Signed in, not an admin, on an `/app/profile/admin/*` page → **profile**. (The API refuses them anyway: this only keeps the screens out of reach.)
+- Signed in as an admin or alumni on an `/app/timetable*` page → **home**. They have no timetable or courses: `User.hasClasses` is true only for students and teachers. `ShellScaffold` hides their Timetable tab, so they see four tabs.
 
 ### 3.8 UI system
 
@@ -332,15 +339,19 @@ backend/
 │   ├── db/mongo.ts          connectMongo / disconnectMongo
 │   ├── lib/
 │   │   ├── http-error.ts        HttpError(status, message) + helpers (badRequest, unauthorized…)
-│   │   └── validate.ts          validateBody(zodSchema) middleware → 422 { message }
+│   │   └── validate.ts          validateBody(zodSchema) middleware and parseQuery() → 422 { message }
 │   ├── middleware/
 │   │   ├── require-auth.ts      Checks the Bearer token, sets the current user id
+│   │   ├── require-role.ts      requireRole(['admin']): reads the role from the database, 403 otherwise
 │   │   ├── rate-limit.ts        Limits attempts on the auth routes
 │   │   └── error-handler.ts     Every error → { message } with the right status; JSON 404s
 │   ├── modules/             One folder per feature (see 4.3)
 │   │   ├── auth/  users/  timetable/  courses/  carpool/
-│   │   └── jobs/  forum/  grades/  profile/  notifications/
-│   └── scripts/seed.ts      `npm run seed`: demo student + every module's demo data
+│   │   ├── jobs/  forum/  grades/  profile/  notifications/
+│   │   └── admin/           User management, CSV import and the audit log (admins only)
+│   └── scripts/
+│       ├── seed.ts          `npm run seed`: demo student, demo admin + every module's demo data
+│       └── create-admin.ts  `npm run create-admin -- <email> <password>`: creates or promotes an admin
 ├── test/                    Jest + Supertest tests (one file per module, plus helpers)
 ├── .env.example             Every setting, documented. Copy to .env
 ├── docker-compose.yml       Optional MongoDB for teammates without one
@@ -397,8 +408,9 @@ Routers are mounted in `app.ts`:
 | `/api/grades` | grades | `transcripts` |
 | `/api/profile` | profile | `studentprofiles` (and it reads grades, notifications and carpool) |
 | `/api/notifications` | notifications | `notifications` |
+| `/api/admin` | admin | `auditlogs` (and it manages `users`, deleting an account's data in every module) |
 
-Every route except `/auth/*` and `/health` needs a signed-in student. Personal data (attendance, bookings, applications, votes, read states, grades, profile) is always filtered by the signed-in student's id, so one student can never read or change another's.
+Every route except `/auth/*` and `/health` needs a signed-in user, and `/api/admin/*` needs an **admin** (`requireRole(['admin'])` on the whole router). `/api/timetable` and `/api/courses` need a **student or teacher** (`ROLES_WITH_CLASSES`): admins and alumni have no classes. Personal data (attendance, bookings, applications, votes, read states, grades, profile) is always filtered by the signed-in student's id, so one student can never read or change another's.
 
 ### 4.4 Authentication design
 
@@ -409,6 +421,7 @@ Every route except `/auth/*` and `/health` needs a signed-in student. Personal d
 | Refresh token | Random 48 bytes, stored as a SHA-256 hash, 30 days, **rotated on every refresh**. Reusing an old one ends all of that student's sessions (theft detection) |
 | Email verification and password reset | 6-digit codes, hashed, 15 minutes, locked after 5 wrong attempts |
 | Account discovery | Login errors and reset failures give the same message (and similar timing) whether the account exists or not |
+| Roles | `student` (every sign-up), `teacher`, `admin`, `alumni`. Only an admin changes a role. The role is **not** in the token: `requireRole` reads it from the database on each request, so a demoted admin loses access at once. An admin can't change their own role or password, or delete themselves, so there is always at least one admin |
 | Brute force | Rate limit on the auth routes (strict in production) |
 | Emails | SMTP via nodemailer when `SMTP_HOST` is set, printed in the console otherwise. A failing mail server never breaks the request |
 
@@ -427,6 +440,7 @@ Every route except `/auth/*` and `/health` needs a signed-in student. Personal d
   |---|---|
   | 400 | Bad request (e.g. a wrong code) |
   | 401 | Not signed in or session expired |
+  | 403 | Signed in but not allowed (`/admin` for a non-admin) |
   | 404 | Unknown id |
   | 409 | Business conflict (seat taken, already applied…) |
   | 422 | Invalid data |
@@ -437,7 +451,7 @@ The full list of endpoints with examples is in [api.md](api.md).
 
 ### 4.6 Demo data (seeding)
 
-`npm run seed` creates the demo student `211JMT0428` / `CampusPulse2026!`, then calls each module's `seed<Name>()` with that student's id. The seeded content is the same as the app's mock data.
+`npm run seed` creates the demo student `211JMT0428` / `CampusPulse2026!`, the demo admin `admin@campus.test` / `CampusPulseAdmin2026!` and nine demo accounts (teachers, students, an alumnus) for the admin's user list. Then it calls each module's `seed<Name>()` with that student's id. The seeded content is the same as the app's mock data.
 
 Every seed is **idempotent**: running it again resets the demo student's own actions (bookings, applications, requests, votes, read states) and refreshes relative dates such as "today 13:15" and "15 min ago". Other students' data is left alone.
 

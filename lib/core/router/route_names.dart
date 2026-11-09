@@ -31,6 +31,15 @@ abstract final class RoutePaths {
   static String ride(String id) => '$forum/rides/$id';
   static String job(String id) => '$jobs/$id';
 
+  /// Administration, inside the Profile tab. Admins only: [authRedirect]
+  /// sends everyone else back to Profile (and the API refuses them anyway).
+  static const adminPrefix = '$profile/admin';
+  static const adminUsers = '$adminPrefix/users';
+  static const newUser = '$adminUsers/new';
+  static String adminUser(String id) => '$adminUsers/$id';
+  static const importUsers = '$adminPrefix/import';
+  static const auditLog = '$adminPrefix/audit';
+
   static const authPrefix = '/auth';
   static const appPrefix = '/app';
 }

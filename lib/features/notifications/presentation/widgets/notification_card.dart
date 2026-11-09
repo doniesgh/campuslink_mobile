@@ -30,6 +30,7 @@ class NotificationCard extends StatelessWidget {
         NotificationCategory.lostFound => Icons.search,
         NotificationCategory.career => Icons.work,
         NotificationCategory.community => Icons.forum,
+        NotificationCategory.account => Icons.manage_accounts,
       };
 
   @override

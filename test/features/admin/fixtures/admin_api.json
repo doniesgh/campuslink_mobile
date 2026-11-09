@@ -1,0 +1,245 @@
+{
+  "sessionUser": {
+    "id": "6af1b02812b4298dadccaebb",
+    "email": "admin@campus.test",
+    "studentId": null,
+    "displayName": "Campus Admin",
+    "avatarUrl": null,
+    "isEmailVerified": true,
+    "role": "admin"
+  },
+  "usersPage": {
+    "items": [
+      {
+        "id": "6af1b02812b4298dadccaebd",
+        "email": "amira.bensalah@campus.test",
+        "studentId": null,
+        "displayName": "Amira Ben Salah",
+        "role": "teacher",
+        "isEmailVerified": true,
+        "createdAt": "2026-11-09T11:36:08.580Z"
+      },
+      {
+        "id": "6af1b02812b4298dadccaebb",
+        "email": "admin@campus.test",
+        "studentId": null,
+        "displayName": "Campus Admin",
+        "role": "admin",
+        "isEmailVerified": true,
+        "createdAt": "2026-11-09T11:36:08.183Z"
+      },
+      {
+        "id": "6af1b02812b4298dadccaebf",
+        "email": "sarra.mansouri@campus.test",
+        "studentId": "221JMT0101",
+        "displayName": "Sarra Mansouri",
+        "role": "student",
+        "isEmailVerified": true,
+        "createdAt": "2026-11-09T11:36:08.796Z"
+      }
+    ],
+    "total": 4,
+    "page": 1,
+    "limit": 3
+  },
+  "stats": {
+    "total": 4,
+    "byRole": {
+      "student": 1,
+      "teacher": 1,
+      "admin": 1,
+      "alumni": 1
+    }
+  },
+  "managedUser": {
+    "id": "6af1b02812b4298dadccaebf",
+    "email": "sarra.mansouri@campus.test",
+    "studentId": "221JMT0101",
+    "displayName": "Sarra Mansouri",
+    "role": "student",
+    "isEmailVerified": true,
+    "createdAt": "2026-11-09T11:36:08.796Z"
+  },
+  "importDryRun": {
+    "dryRun": true,
+    "valid": 1,
+    "problems": [
+      {
+        "row": 3,
+        "field": "email",
+        "code": "EMAIL_TAKEN",
+        "message": "Email: an account already uses it"
+      },
+      {
+        "row": 4,
+        "field": "displayName",
+        "code": "REQUIRED",
+        "message": "Name: missing"
+      },
+      {
+        "row": 4,
+        "field": "email",
+        "code": "INVALID_EMAIL",
+        "message": "Email: not a valid address"
+      },
+      {
+        "row": 4,
+        "field": "password",
+        "code": "PASSWORD_TOO_SHORT",
+        "message": "Password: at least 8 characters"
+      },
+      {
+        "row": 4,
+        "field": "role",
+        "code": "INVALID_ROLE",
+        "message": "Role: not recognised (student, teacher, admin or alumni)"
+      },
+      {
+        "row": 5,
+        "field": "studentId",
+        "code": "DUPLICATE_STUDENT_ID",
+        "message": "ENT ID: already on another line of the file"
+      }
+    ]
+  },
+  "importCreated": {
+    "dryRun": false,
+    "created": [
+      {
+        "id": "6af1b02912b4298dadccaec7",
+        "email": "omar.ferchichi@campus.test",
+        "studentId": "221JMT0102",
+        "displayName": "Omar Ferchichi",
+        "role": "student",
+        "isEmailVerified": true,
+        "createdAt": "2026-11-09T11:36:09.479Z"
+      },
+      {
+        "id": "6af1b02912b4298dadccaec8",
+        "email": "karim.trabelsi@campus.test",
+        "studentId": null,
+        "displayName": "Karim Trabelsi",
+        "role": "teacher",
+        "isEmailVerified": true,
+        "createdAt": "2026-11-09T11:36:09.479Z"
+      }
+    ]
+  },
+  "importInvalid": {
+    "message": "The file has errors, so nothing was imported.",
+    "problems": [
+      {
+        "row": 3,
+        "field": "email",
+        "code": "EMAIL_TAKEN",
+        "message": "Email: an account already uses it"
+      },
+      {
+        "row": 3,
+        "field": "studentId",
+        "code": "DUPLICATE_STUDENT_ID",
+        "message": "ENT ID: already on another line of the file"
+      }
+    ]
+  },
+  "auditPage": {
+    "items": [
+      {
+        "id": "6af1b02912b4298dadccaecb",
+        "action": "user.import",
+        "summary": "Imported 2 accounts",
+        "actor": {
+          "id": "6af1b02812b4298dadccaebb",
+          "displayName": "Campus Admin",
+          "email": "admin@campus.test"
+        },
+        "targetId": null,
+        "metadata": {
+          "count": 2,
+          "emails": [
+            "omar.ferchichi@campus.test",
+            "karim.trabelsi@campus.test"
+          ]
+        },
+        "ip": "127.0.0.1",
+        "createdAt": "2026-11-09T11:36:09.486Z"
+      },
+      {
+        "id": "6af1b02912b4298dadccaec3",
+        "action": "user.update",
+        "summary": "Changed the role of Sarra Mansouri to Teacher",
+        "actor": {
+          "id": "6af1b02812b4298dadccaebb",
+          "displayName": "Campus Admin",
+          "email": "admin@campus.test"
+        },
+        "targetId": "6af1b02812b4298dadccaebf",
+        "metadata": {
+          "changes": [
+            "role"
+          ],
+          "role": {
+            "from": "student",
+            "to": "teacher"
+          }
+        },
+        "ip": "127.0.0.1",
+        "createdAt": "2026-11-09T11:36:09.062Z"
+      },
+      {
+        "id": "6af1b02812b4298dadccaec2",
+        "action": "user.create",
+        "summary": "Created the alumni account selim.rekik@campus.test",
+        "actor": {
+          "id": "6af1b02812b4298dadccaebb",
+          "displayName": "Campus Admin",
+          "email": "admin@campus.test"
+        },
+        "targetId": "6af1b02812b4298dadccaec1",
+        "metadata": {
+          "role": "alumni"
+        },
+        "ip": "127.0.0.1",
+        "createdAt": "2026-11-09T11:36:08.961Z"
+      }
+    ],
+    "total": 5,
+    "page": 1,
+    "limit": 3
+  },
+  "auditActions": [
+    "user.create",
+    "user.import",
+    "user.update"
+  ],
+  "accountNotification": {
+    "id": "6af1b02912b4298dadccaec5",
+    "category": "account",
+    "label": "Account",
+    "title": "Your account was updated",
+    "body": "Your role is now: **Teacher**.",
+    "receivedAt": "2026-11-09T11:36:09.068Z",
+    "isRead": false,
+    "isUrgent": false,
+    "attachment": null,
+    "link": {
+      "destination": "profile",
+      "id": null
+    }
+  },
+  "signupNotification": {
+    "id": "6af1b02912b4298dadccaece",
+    "category": "account",
+    "label": "Account",
+    "title": "New account: Yasmine Haddad",
+    "body": "**yasmine.haddad@campus.test** just signed up.",
+    "receivedAt": "2026-11-09T11:36:09.642Z",
+    "isRead": false,
+    "isUrgent": false,
+    "attachment": null,
+    "link": {
+      "destination": "adminUsers",
+      "id": "6af1b02912b4298dadccaecc"
+    }
+  }
+}

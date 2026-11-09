@@ -8,6 +8,7 @@ A campus companion app for ESPRIT students:
 - grades
 - a digital student ID
 - notifications
+- administration, for admins: user accounts, roles, CSV import and an audit log
 
 The **Flutter app** works on demo data out of the box. With the **Node.js API** in [`backend/`](backend/), it works on real data stored in MongoDB.
 
@@ -16,7 +17,7 @@ The **Flutter app** works on demo data out of the box. With the **Node.js API** 
 | **App** | Flutter 3.27+ · Riverpod · go_router · Dio · feature-first Clean Architecture |
 | **API** | Node.js 20+ · Express 5 · TypeScript · MongoDB (Mongoose) · Zod · JWT |
 | **Design** | Google Stitch ("CampusPulse Student Companion Mobile App"), 12 screens |
-| **Tests** | 452 app tests · 261 API tests |
+| **Tests** | 539 app tests · 376 API tests |
 
 ## Quick start (5 minutes, no server)
 
@@ -39,7 +40,7 @@ npm run seed                  # demo student + demo data (needs MongoDB on local
 npm run dev                   # http://127.0.0.1:3000/api
 ```
 
-Then run the app with `env/local.json` (VS Code: **"CampusPulse (local backend)"**) and sign in as the demo student, **`211JMT0428`** / **`CampusPulse2026!`**.
+Then run the app with `env/local.json` (VS Code: **"CampusPulse (local backend)"**) and sign in as the demo student, **`211JMT0428`** / **`CampusPulse2026!`**, or as the demo admin, **`admin@campus.test`** / **`CampusPulseAdmin2026!`** (Profile › Administration).
 
 Full setup, including the Android emulator on Windows and MongoDB: **[docs/getting-started.md](docs/getting-started.md)**.
 
