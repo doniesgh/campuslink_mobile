@@ -4,7 +4,7 @@ How the API runs online and how a new APK is published for the team. To run the 
 
 | Part | Where | Cost |
 |---|---|---|
-| API | [Render](https://render.com) web service `campuspulse-api`, Frankfurt, defined by [`render.yaml`](../render.yaml) | free |
+| API | [Render](https://render.com) web service `campuspulse-api`, Frankfurt, defined by [`render.yaml`](../render.yaml): **https://campuspulse-api-fmbf.onrender.com/api** | free |
 | Database | [MongoDB Atlas](https://www.mongodb.com/atlas) M0 cluster, database `campuspulse` | free |
 | Push notifications | Firebase project `com-example-campuspulse` | free |
 | APK | GitHub Releases of this repository | free |
