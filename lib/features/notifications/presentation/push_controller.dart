@@ -139,7 +139,8 @@ class PushController {
   }
 
   void _onForegroundMessage(PushMessage message) {
-    _ref.invalidate(notificationsControllerProvider);
+    // A notification of the feed (a class reminder has no id and isn't one).
+    if (message.notificationId != null) _ref.invalidate(notificationsControllerProvider);
     final messenger = _ref.read(scaffoldMessengerKeyProvider).currentState;
     if (messenger == null) return;
     messenger

@@ -24,9 +24,23 @@ export interface PushMessage {
   token: string;
   notification: { title: string; body: string };
   data: PushData;
-  /** `tag`: a newer push of the same notification replaces the older one on Android. */
-  android: { priority: 'high'; notification: { tag: string } };
+  /**
+   * `tag`: a newer push of the same notification replaces the older one on
+   * Android. `channelId`: the Android channel (created by the app), when not
+   * the app's default one.
+   */
+  android: { priority: 'high'; notification: { tag: string; channelId?: string } };
   apns: { payload: { aps: { sound: string } } };
+}
+
+/** What a push shows, before it is addressed to a phone. */
+export interface PushContent {
+  title: string;
+  /** Plain text. */
+  body: string;
+  data: PushData;
+  tag: string;
+  channelId?: string;
 }
 
 /** FCM's answer for one message: handed off, or refused with an error code. */
@@ -82,20 +96,37 @@ export function plainText(body: string): string {
   );
 }
 
-/** The FCM message that shows [notification] on the phone [token]. */
-export function toPushMessage(notification: NotificationJson, token: string): PushMessage {
+/** The FCM message that shows [content] on the phone [token]. */
+function toMessage(content: PushContent, token: string): PushMessage {
+  const { title, body, data, tag, channelId } = content;
   return {
     token,
-    notification: { title: notification.title, body: plainText(notification.body) },
-    data: {
-      notificationId: notification.id,
-      category: notification.category,
-      destination: notification.link?.destination ?? '',
-      targetId: notification.link?.id ?? '',
+    notification: { title, body },
+    data,
+    android: {
+      priority: 'high',
+      notification: channelId === undefined ? { tag } : { tag, channelId },
     },
-    android: { priority: 'high', notification: { tag: notification.id } },
     apns: { payload: { aps: { sound: 'default' } } },
   };
+}
+
+/** The FCM message that shows [notification] on the phone [token]. */
+export function toPushMessage(notification: NotificationJson, token: string): PushMessage {
+  return toMessage(
+    {
+      title: notification.title,
+      body: plainText(notification.body),
+      data: {
+        notificationId: notification.id,
+        category: notification.category,
+        destination: notification.link?.destination ?? '',
+        targetId: notification.link?.id ?? '',
+      },
+      tag: notification.id,
+    },
+    token,
+  );
 }
 
 /** One message per notification and phone of its user. */
@@ -166,6 +197,31 @@ export async function pushNotifications(
   if (!current || notifications.length === 0) return noPush();
   try {
     return await deliver(current, await messagesFor(notifications));
+  } catch (err) {
+    console.error('[push] Could not find the phones to notify:', err);
+    return noPush();
+  }
+}
+
+/**
+ * Pushes [content], which is not one of the users' notifications (a class
+ * reminder: nothing to keep in the feed), to every phone of [userIds], and
+ * waits for FCM's answers. Never throws. Does nothing when push is off.
+ */
+export async function pushToUsers(
+  userIds: readonly string[],
+  content: PushContent,
+): Promise<PushReport> {
+  const current = sender;
+  if (!current || userIds.length === 0) return noPush();
+  try {
+    const devices = await PushDeviceModel.find({ userId: { $in: userIds } })
+      .select('token')
+      .lean();
+    return await deliver(
+      current,
+      devices.map(({ token }) => toMessage(content, token)),
+    );
   } catch (err) {
     console.error('[push] Could not find the phones to notify:', err);
     return noPush();

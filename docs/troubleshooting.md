@@ -90,6 +90,12 @@ Problems we actually hit while building CampusPulse, and how to fix them.
 4. **Test:** run `npm run push:test -- <your email or ENT ID>`. "No registered device" means the phone never registered: sign out and in again, and watch the debug console for `[push]` lines.
 5. **On an emulator**, the system image must include Google APIs (ours, `google_apis`, does).
 
+**No class reminder arrives.**
+- **Check the account:** reminders go to students and teachers only, never to admins or alumni.
+- **Check the timing:** they go out 15 minutes before a session of today's timetable (campus time, UTC+1), only while the API runs with push on. At start it logs `[push] Class reminders on`.
+- **Check the channel:** you may have muted **Class reminders** in Android's settings for CampusPulse.
+- **Test now:** `npm run push:test -- <you> --class` sends the next one.
+
 **The app is open and no notification pops up.** This is expected. Android doesn't show pushes for the app on screen, so CampusPulse shows a banner with **View** instead.
 
 **`flutter run` fails with "File google-services.json is missing".** The plugin is applied only when the file exists, so this means an old build. Run `flutter clean`, then run again.

@@ -341,6 +341,7 @@ sequenceDiagram
   - **App in the background or closed:** Android shows the push on its own, in the "Campus updates" channel created in `MainActivity.kt`, with the `ic_stat_campuspulse` icon.
   - **App open:** the controller refreshes the notifications and shows a snackbar through `scaffoldMessengerKeyProvider`.
   - **Tapped:** the push opens the same route as in the list (`notificationRoute`) and is marked read.
+- **Class reminders** are pushed by a job of the API (`timetable/class-reminders.ts`, started by `server.ts` when push is on). They carry no notification id and open the Timetable. Android shows them in a second channel, "Class reminders".
 - **Tests** fake `PushMessaging` and `PushDeviceRepository` (`test/features/notifications/push_controller_test.dart`). Nothing touches Firebase.
 
 ---
@@ -383,7 +384,8 @@ backend/
 │   │   ├── auth/  users/  timetable/  courses/  carpool/
 │   │   ├── jobs/  forum/  grades/  profile/  notifications/
 │   │   ├── admin/           User management, CSV import and the audit log (admins only)
-│   │   └── push/            Push notifications: the phones (`/push/devices`) and FCM sending (fcm.ts)
+│   │   └── push/            Push notifications: the phones (`/push/devices`) and FCM sending (fcm.ts).
+│   │                        The class reminders job is timetable/class-reminders.ts
 │   └── scripts/
 │       ├── seed.ts          `npm run seed`: demo student, demo admin + every module's demo data
 │       ├── create-admin.ts  `npm run create-admin -- <email> <password>`: creates or promotes an admin

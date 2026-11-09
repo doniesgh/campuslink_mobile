@@ -388,7 +388,9 @@ Push notifications go through Firebase Cloud Messaging (FCM). The app registers 
 - **The account is deleted** by an admin.
 - **FCM no longer knows the token** (app uninstalled, token replaced): that phone is removed on the next push.
 
-**What is pushed:** every [account notification](#notifications), when it is created. Sending never delays or fails the request. When an admin sets a new password, the push goes out before the phones are signed out, so the user learns why.
+**What is pushed:**
+- Every [account notification](#notifications), when it is created. Sending never delays or fails the request. When an admin sets a new password, the push goes out before the phones are signed out, so the user learns why.
+- **Class reminders**, 15 minutes before each session of the timetable, to every student and teacher with a phone (never to admins or alumni). See below.
 
 Without `FIREBASE_SERVICE_ACCOUNT_FILE` on the server, push is off: the routes above still store the phones, but nothing is sent. To test a phone, run `npm run push:test -- <email or ENT ID>` (see [backend/README.md](../backend/README.md#scripts)).
 
@@ -414,7 +416,31 @@ Without `FIREBASE_SERVICE_ACCOUNT_FILE` on the server, push is off: the routes a
   - `category`: as in an `AppNotification`.
   - `destination` and `targetId`: the notification's `link` (`destination` and `id`). Each is `""` when there is no link, or no id.
 - `android.notification.tag` is the notification id, so on Android a new push of the same notification replaces the old one.
-- No Android `channelId` is sent: Android shows the push in the app's default notification channel.
+- No Android `channelId` is sent: Android shows the push in the app's default notification channel ("Campus updates").
+
+**Class reminders** come from a job the API runs every minute while push is on:
+- **When:** for each session of today (campus time) starting in the next 15 minutes. A session is reminded **once**: a `classreminders` record with a unique key (the session id) is kept for 2 days, so several API instances never send it twice. If the API was down, the reminder still goes out with the time left ("in 6 min"), but never once the session has started.
+- **Not a notification of the feed:** nothing is added to `GET /notifications`.
+- **Preview:** `npm run push:test -- <email or ENT ID> --class` sends the reminder of the next class now, without using up the real one.
+
+```json
+{
+  "notification": {
+    "title": "Algorithmes & Complexité",
+    "body": "Lecture in 15 min · 08:30–10:00 · Amphi A"
+  },
+  "data": { "notificationId": "", "category": "academic", "destination": "timetable", "targetId": "" },
+  "android": {
+    "priority": "high",
+    "notification": { "tag": "class-algo-cm-2026-11-9", "channelId": "class_reminders" }
+  },
+  "apns": { "payload": { "aps": { "sound": "default" } } }
+}
+```
+
+- The body starts with the kind: `Lecture`, `Lab`, `Workshop` or `Exam`.
+- `notificationId` is `""`: there is nothing to mark as read. The app opens the timetable.
+- `channelId` is `class_reminders`, the app's "Class reminders" channel, so people can mute reminders in Android's settings and keep the other pushes.
 
 ---
 

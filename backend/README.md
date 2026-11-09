@@ -31,6 +31,7 @@ Run the app with `env/local.json` (VS Code: **CampusPulse (local backend)**) to 
 | `npm run seed` | Create or reset the demo student and every module's demo data, the demo admin and a few demo accounts (idempotent). Re-run it to refresh dates like "today 13:15" |
 | `npm run create-admin -- <email> <password> [display name]` | On a real server: create an admin, or promote an existing account (new password, signed out everywhere) |
 | `npm run push:test -- <email or ENT ID>` | Add a "Push test" notification to that account and push it to its phones. Prints how many phones got it, and says so when push is off or the account has no registered phone |
+| `npm run push:test -- <email or ENT ID> --class` | Push that account the reminder of the next class of the timetable, now (a preview: the real reminder still goes out 15 min before) |
 | `npm test` | Jest + Supertest on a throwaway `campuspulse_test_<n>` database. Set `TEST_DB_PREFIX` to keep simultaneous runs apart |
 | `npm run typecheck` | Type-check src and tests |
 | `npm run build` / `npm start` | Compile to `dist/` and run it |

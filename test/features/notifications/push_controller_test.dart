@@ -27,6 +27,7 @@ import 'package:campuspulse/features/profile/presentation/providers/profile_prov
 import 'package:campuspulse/features/timetable/domain/entities/class_session.dart';
 import 'package:campuspulse/features/timetable/domain/entities/timetable_week.dart';
 import 'package:campuspulse/features/timetable/domain/repositories/timetable_repository.dart';
+import 'package:campuspulse/features/timetable/presentation/pages/timetable_page.dart';
 import 'package:campuspulse/features/timetable/presentation/providers/timetable_providers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -161,7 +162,13 @@ class _EmptyTimetable implements TimetableRepository {
       Success(TimetableDay(date: day, sessions: const []));
 
   @override
-  Future<Result<TimetableWeek>> getWeek(DateTime day) => throw UnimplementedError();
+  Future<Result<TimetableWeek>> getWeek(DateTime day) async => Success(TimetableWeek(
+        start: day,
+        days: [
+          for (var i = 0; i < 7; i++)
+            TimetableDay(date: day.add(Duration(days: i)), sessions: const []),
+        ],
+      ));
 }
 
 class _QuietForum implements ForumRepository {
@@ -233,6 +240,13 @@ Future<(_Harness, _CountingNotifications)> _pumpApp(
   await tester.pumpAndSettle();
   return (harness, notifications);
 }
+
+/// A class reminder as the API sends it: no notification id, opens the timetable.
+const _classReminder = PushMessage(
+  title: 'Algorithmes & Complexité',
+  body: 'Lecture in 15 min · 08:30–10:00 · Amphi A',
+  link: NotificationLink(NotificationDestination.timetable),
+);
 
 const _accountPush = PushMessage(
   title: 'Your account was updated',
@@ -360,7 +374,9 @@ void main() {
       final (h, notifications) = await _pumpApp(tester);
       final loadsBefore = notifications.loads;
 
-      h.push.foreground.add(const PushMessage(title: 'Push test', body: 'It works.'));
+      h.push.foreground.add(
+        const PushMessage(title: 'Push test', body: 'It works.', notificationId: 'n-test'),
+      );
       await tester.pumpAndSettle();
 
       expect(find.text('Push test'), findsOneWidget);
@@ -393,6 +409,30 @@ void main() {
 
       expect(find.byType(ProfilePage), findsOneWidget);
       expect(notifications.marked, ['room-change-gl']);
+    });
+
+    testWidgets('a class reminder opens the timetable and marks nothing as read', (tester) async {
+      final (h, notifications) = await _pumpApp(tester);
+
+      h.push.opened.add(_classReminder);
+      // Not pumpAndSettle: the timetable keeps a live indicator running.
+      await tester.pump();
+      await tester.pump(const Duration(milliseconds: 500));
+
+      expect(find.byType(TimetablePage), findsOneWidget);
+      expect(notifications.marked, isEmpty);
+    });
+
+    testWidgets('a class reminder received in the app shows its banner, the list stays',
+        (tester) async {
+      final (h, notifications) = await _pumpApp(tester);
+      final loadsBefore = notifications.loads;
+
+      h.push.foreground.add(_classReminder);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Algorithmes & Complexité'), findsOneWidget);
+      expect(notifications.loads, loadsBefore);
     });
 
     testWidgets('the push that started the app opens once the user is signed in',

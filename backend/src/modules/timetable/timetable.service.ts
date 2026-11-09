@@ -117,7 +117,15 @@ function buildDay(slots: TimetableSlot[], date: Date): TimetableDayJson {
 
 /** The student's sessions on [date]. */
 export async function getDay(userId: string, date: Date): Promise<TimetableDayJson> {
-  return buildDay(await slotsOf(classGroupOf(userId)), date);
+  return getClassGroupDay(classGroupOf(userId), date);
+}
+
+/** The sessions of [classGroup] on [date] (used by the class reminders). */
+export async function getClassGroupDay(
+  classGroup: string,
+  date: Date,
+): Promise<TimetableDayJson> {
+  return buildDay(await slotsOf(classGroup), date);
 }
 
 /** The week (Monday to Sunday) containing [date]. */

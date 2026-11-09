@@ -9,4 +9,10 @@
     <string name="campus_updates_channel_id" translatable="false">campus_updates</string>
     <string name="campus_updates_channel_name">Campus updates</string>
     <string name="campus_updates_channel_description">Account changes, sign-ups and campus news from CampusPulse.</string>
+
+    <!-- 15 min before each class or exam. The API sends these to this
+         channel (CLASS_REMINDERS_CHANNEL in backend class-reminders.ts). -->
+    <string name="class_reminders_channel_id" translatable="false">class_reminders</string>
+    <string name="class_reminders_channel_name">Class reminders</string>
+    <string name="class_reminders_channel_description">A reminder 15 minutes before each class or exam of your timetable.</string>
 </resources>

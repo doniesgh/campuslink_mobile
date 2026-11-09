@@ -61,6 +61,8 @@ All of them share the `AuthScaffold` layout.
 
 **Screen:** `TimetablePage`, the second tab.
 
+**Class reminders:** a push 15 minutes before each session (see Notifications › Push notifications).
+
 **Who:** students and teachers. Admins and alumni follow no classes. They don't get the tab, `authRedirect` sends them home from `/app/timetable*`, and the API answers 403. The same goes for **Courses**.
 
 - **Navigation:** previous/next week, and a Monday–Saturday day strip with dots for days that have classes or exams.
@@ -200,7 +202,9 @@ These rules also exist in `backend/src/modules/grades/grading.ts`, for the Profi
 - "New account: <name>" to every admin when someone signs up. It opens that account in Administration.
 
 **Push notifications** (Firebase Cloud Messaging):
-- **What's sent:** every notification the API creates also goes to its user's phones. Today that means the account notifications above. Run `npm run push:test -- <email or ENT ID>` to send a test one.
+- **What's sent:**
+  - Every notification the API creates also goes to its user's phones. Today that means the account notifications above. Run `npm run push:test -- <email or ENT ID>` to send a test one.
+  - **Class reminders:** 15 minutes before each class or exam, for example "Algorithmes & Complexité" / "Lecture in 15 min · 08:30–10:00 · Amphi A". They go to students and teachers, open the Timetable, and don't appear in the notifications list. They have their own Android channel, so you can mute them alone. Preview one with `--class`.
 - **App in the background or closed:** the phone shows the notification. Tapping it opens the same screen as in the list and marks it read.
 - **App open:** a banner with **View** appears, and the bell updates.
 - **Registration:**

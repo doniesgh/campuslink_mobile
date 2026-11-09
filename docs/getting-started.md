@@ -2,6 +2,8 @@
 
 From a fresh machine to the app running on an emulator, first with demo data and then against the real API. If something goes wrong, check [troubleshooting.md](troubleshooting.md).
 
+Just want the commands? [how-to-run.md](how-to-run.md) is the step-by-step version.
+
 ## 1. What you need
 
 | Tool | Version | Needed for |
@@ -118,6 +120,8 @@ The admin finds **Administration** on the Profile tab. The seed also creates nin
 
 Push notifications need a Firebase project (free). Without one, the app works the same with push off. One person creates the project and shares its two files with the team **privately**. Both files are gitignored because they hold keys.
 
+**Our project already exists** (`com-example-campuspulse`): ask Raed for `google-services.json` and `firebase-service-account.json`, then follow the "C" part of [how-to-run.md](how-to-run.md#c-turn-on-push-notifications). The steps below are for creating a project from scratch.
+
 1. **Create the project** on [console.firebase.google.com](https://console.firebase.google.com) with **Add project**. Analytics isn't needed.
 2. **The app's file:**
    - Choose **Add app › Android** with the package name **`com.example.campuspulse`**.
@@ -178,6 +182,7 @@ Push notifications need a Firebase project (free). Without one, the app works th
 | Reset the demo data | `cd backend && npm run seed` |
 | Create or promote an admin | `cd backend && npm run create-admin -- <email> <password>` |
 | Send a test push notification | `cd backend && npm run push:test -- <email or ENT ID>` |
+| Preview a class reminder | `cd backend && npm run push:test -- <email or ENT ID> --class` |
 | Backend checks | `cd backend && npm run typecheck && npm test` |
 | Build a debug APK | `flutter build apk --debug --dart-define-from-file=env/dev.json` |
 
