@@ -13,7 +13,7 @@ The **exact JSON** of every response is pinned by the app's contract tests. They
 
 - [Conventions](#conventions)
 - [Auth](#auth) · [Users](#users) · [Timetable](#timetable) · [Courses](#courses) · [Carpool](#carpool)
-- [Jobs](#jobs) · [Forum](#forum) · [Grades](#grades) · [Profile](#profile) · [Notifications](#notifications)
+- [Jobs](#jobs) · [Forum](#forum) · [Grades](#grades) · [Profile](#profile) · [Notifications](#notifications) · [Push](#push)
 - [Admin](#admin): user management and the audit log
 
 ---
@@ -67,7 +67,7 @@ Access tokens last 15 minutes. On a `401`, call `POST /auth/refresh` with the re
 | `POST /auth/register` | `{ displayName, email, password }` (password ≥ 8) | `201` session (below) + emails a 6-digit code | 409 email taken · 422 |
 | `POST /auth/login` | `{ identifier, password }` | `200` session | 401 `"Invalid ENT ID/email or password."` |
 | `POST /auth/refresh` | `{ refreshToken }` | `200 { accessToken, refreshToken }` (the old one is revoked) | 401 |
-| `POST /auth/logout` | `{ refreshToken }` | `204` | — |
+| `POST /auth/logout` | `{ refreshToken, pushToken? }` | `204`. With `pushToken`, that phone stops getting [pushes](#push) | 422 (missing `refreshToken`, `pushToken` not text or too long) |
 | `POST /auth/forgot-password` | `{ email }` | `200 { message }` + emails a 6-digit code | — (same answer for unknown emails) |
 | `POST /auth/reset-password` | `{ email, code, password }` | `200 { message }`, signs out everywhere | 400 `"Invalid or expired code…"` · 422 |
 | `POST /auth/verify-email` 🔒 | `{ code }` | `200 { user }` | 400 wrong / expired code · 401 · 422 |
@@ -362,6 +362,60 @@ A new student's first `GET` creates a "Welcome to CampusPulse" notification.
 | An admin changes someone's role, email or password | that user (never the admin acting on their own account) | `"Your account was updated"`; the body has one line per change, e.g. `"Your role is now: **Teacher**."` Urgent when the password changed | `profile` |
 | Someone signs up in the app | every admin | `"New account: <name>"`, body `"**<email>** just signed up."` | `adminUsers` + the new user's id |
 
+Account notifications are also sent to the user's phones as [push notifications](#push).
+
+## Push
+
+Push notifications go through Firebase Cloud Messaging (FCM). The app registers the FCM token of each phone, and the server pushes to every registered phone of the user.
+
+| Method & path | Body | Success | Errors |
+|---|---|---|---|
+| `PUT /push/devices` | `{ token, platform }` | `204` | 401 · 422 |
+| `DELETE /push/devices` | `{ token }` | `204`, also when the phone isn't registered | 401 · 422 |
+
+**Registering (`PUT /push/devices`):**
+- `token` is the FCM registration token: 1 to 4096 characters, trimmed. `platform` is `android` or `ios`.
+- Call it after every sign-in, and whenever FCM gives the app a new token. Registering a known token again only refreshes it.
+- A token registered by another account moves to the caller. On a shared phone, the last account signed in gets the pushes.
+- An account keeps at most 10 phones. Registering an 11th forgets the one seen least recently.
+- The 422 messages are `"Send the push token of this device"`, `"The push token is too long (at most 4096 characters)"` and `"Platform: android or ios"`.
+
+**Unregistering (`DELETE /push/devices`):** the phone stops getting pushes, only if it is registered to the caller. Another account's phone is left alone (still `204`). Use it when the user turns notifications off.
+
+**When a phone stops getting pushes:**
+- **Sign-out:** send `pushToken` with [`POST /auth/logout`](#auth). The phone is removed if it is registered to the account of the refresh token.
+- **Every session ends:** password reset, a new password set by an admin, `create-admin`, or a reused refresh token. All the user's phones are removed; the app registers again at the next sign-in.
+- **The account is deleted** by an admin.
+- **FCM no longer knows the token** (app uninstalled, token replaced): that phone is removed on the next push.
+
+**What is pushed:** every [account notification](#notifications), when it is created. Sending never delays or fails the request. When an admin sets a new password, the push goes out before the phones are signed out, so the user learns why.
+
+Without `FIREBASE_SERVICE_ACCOUNT_FILE` on the server, push is off: the routes above still store the phones, but nothing is sent. To test a phone, run `npm run push:test -- <email or ENT ID>` (see [backend/README.md](../backend/README.md#scripts)).
+
+**The FCM message** (one per phone):
+
+```json
+{
+  "notification": { "title": "Your account was updated", "body": "Your role is now: Teacher." },
+  "data": {
+    "notificationId": "6aee2d5a10aef9a35cb4bd01",
+    "category": "account",
+    "destination": "profile",
+    "targetId": ""
+  },
+  "android": { "priority": "high", "notification": { "tag": "6aee2d5a10aef9a35cb4bd01" } },
+  "apns": { "payload": { "aps": { "sound": "default" } } }
+}
+```
+
+- `notification.body` is the notification's `body` as plain text: the markup (`**…**`, `~~…~~`, `==…==`) is removed, and the text and line breaks are kept.
+- The `data` values are always strings. The app reads:
+  - `notificationId`: the `id` of the notification in `GET /notifications` (mark it read with `POST /notifications/:id/read`).
+  - `category`: as in an `AppNotification`.
+  - `destination` and `targetId`: the notification's `link` (`destination` and `id`). Each is `""` when there is no link, or no id.
+- `android.notification.tag` is the notification id, so on Android a new push of the same notification replaces the old one.
+- No Android `channelId` is sent: Android shows the push in the app's default notification channel.
+
 ---
 
 ## Admin
@@ -417,7 +471,7 @@ A `ManagedUser`:
 
 **Deleting (`DELETE /admin/users/:id`):**
 - Your own account gives `400 "You can't delete your own account."`.
-- Removed with the account: its sessions, notifications, attendance, lab submissions, job applications, idea votes, lost & found requests, transcript and profile. The rides it drives are deleted, and the seats it booked on other rides become free again.
+- Removed with the account: its sessions, push phones, notifications, attendance, lab submissions, job applications, idea votes, lost & found requests, transcript and profile. The rides it drives are deleted, and the seats it booked on other rides become free again.
 - Kept: the forum posts and lost & found notices it published, under their author name, with no link to the account.
 
 ### Import

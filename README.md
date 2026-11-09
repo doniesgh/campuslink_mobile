@@ -7,7 +7,7 @@ A campus companion app for ESPRIT students:
 - internships and jobs
 - grades
 - a digital student ID
-- notifications
+- notifications, also as push notifications on the phone (Firebase, optional)
 - administration, for admins: user accounts, roles, CSV import and an audit log
 
 The **Flutter app** works on demo data out of the box. With the **Node.js API** in [`backend/`](backend/), it works on real data stored in MongoDB.
@@ -17,7 +17,7 @@ The **Flutter app** works on demo data out of the box. With the **Node.js API** 
 | **App** | Flutter 3.27+ · Riverpod · go_router · Dio · feature-first Clean Architecture |
 | **API** | Node.js 20+ · Express 5 · TypeScript · MongoDB (Mongoose) · Zod · JWT |
 | **Design** | Google Stitch ("CampusPulse Student Companion Mobile App"), 12 screens |
-| **Tests** | 539 app tests · 376 API tests |
+| **Tests** | 553 app tests · 406 API tests |
 
 ## Quick start (5 minutes, no server)
 

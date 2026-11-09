@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { optionalPushToken } from '../push/push.schemas';
+
 // Messages are shown as-is in the app, so they are written for students.
 
 const email = z
@@ -35,6 +37,9 @@ export const refreshSchema = z.object({
   refreshToken: z.string({ error: 'Missing refresh token' }).min(1, 'Missing refresh token'),
 });
 
+/** Logout: the refresh token, plus this phone's push token so it stops getting the pushes. */
+export const logoutSchema = refreshSchema.extend({ pushToken: optionalPushToken });
+
 export const forgotPasswordSchema = z.object({ email });
 
 const sixDigitCode = z
@@ -52,4 +57,5 @@ export const verifyEmailSchema = z.object({ code: sixDigitCode });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type LogoutInput = z.infer<typeof logoutSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;

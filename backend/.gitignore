@@ -3,3 +3,7 @@ dist/
 coverage/
 .env
 *.log
+# Firebase service account keys (FIREBASE_SERVICE_ACCOUNT_FILE): the name the
+# console gives it, and the one docs/getting-started.md suggests.
+*firebase-adminsdk*.json
+firebase-service-account.json

@@ -4,6 +4,13 @@ plugins {
     id("dev.flutter.flutter-gradle-plugin")
 }
 
+// Push notifications (FCM) need the Firebase project's google-services.json
+// in this folder (Firebase console > Project settings > Your apps). Without
+// it the app still builds and runs, with push notifications off.
+if (file("google-services.json").exists()) {
+    apply(plugin = "com.google.gms.google-services")
+}
+
 android {
     namespace = "com.example.campuspulse"
     compileSdk = flutter.compileSdkVersion

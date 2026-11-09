@@ -7,11 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 /// Records logout calls; every other member is unused here.
 class _FakeRemote implements AuthRemoteDataSource {
   final logouts = <String>[];
+  final pushTokens = <String?>[];
   bool offline = false;
 
   @override
-  Future<void> logout(String refreshToken) async {
+  Future<void> logout(String refreshToken, {String? pushToken}) async {
     logouts.add(refreshToken);
+    pushTokens.add(pushToken);
     if (offline) throw Exception('no network');
   }
 
@@ -45,6 +47,15 @@ void main() {
     expect(await storage.readAccessToken(), isNull);
     expect(await storage.readRefreshToken(), isNull);
     expect(remote.logouts, ['refresh-1']);
+    expect(remote.pushTokens, [null]);
+  });
+
+  test("sends the phone's push token, so the server stops pushing to it", () async {
+    signedInAs('access-1', 'refresh-1');
+    await repo.logout(pushToken: 'fcm-token-1');
+    await pumpEventQueue();
+
+    expect(remote.pushTokens, ['fcm-token-1']);
   });
 
   test('offline: still signs out locally and does not throw', () async {

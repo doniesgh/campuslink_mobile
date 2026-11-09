@@ -309,6 +309,40 @@ sequenceDiagram
   - `LoadingView`, `ErrorView` and `EmptyView`.
   - `showAppSnack()`.
 
+### 3.9 Push notifications
+
+Firebase Cloud Messaging (FCM) delivers the API's notifications to the phone. Push is **optional**: without a Firebase config, everything else works the same.
+
+```mermaid
+sequenceDiagram
+  participant P as PushController (app)
+  participant F as FCM
+  participant API as API
+  Note over P: a verified user is signed in
+  P->>F: permission, then getToken()
+  F-->>P: token
+  P->>API: PUT /push/devices { token, platform }
+  Note over API: an admin changes the user's role
+  API->>API: creates the notification
+  API->>F: push to the user's tokens (firebase-admin)
+  F-->>P: system notification, or onMessage if the app is open
+  Note over P: sign-out
+  P->>API: POST /auth/logout { refreshToken, pushToken }
+  P->>F: deleteToken()
+```
+
+- **Startup:** `bootstrap.dart` calls `startPushMessaging()`. It returns `null` (push off) in demo mode, on desktop or web, or when `Firebase.initializeApp()` finds no config.
+  - The config is `android/app/google-services.json` or `ios/Runner/GoogleService-Info.plist`. Both are gitignored, and `app/build.gradle.kts` applies the Google Services plugin only when the Android file exists.
+  - `pushMessagingProvider` then holds a `PushMessaging`, or `null`.
+- **`PushController`** (`features/notifications/presentation/push_controller.dart`) lives as long as the app, because `CampusPulseApp` watches it. It listens to `authControllerProvider`:
+  - **Signed in:** it registers the phone and keeps the token in `pushTokenProvider`.
+  - **Signing out:** `AuthController.logout` sends that token with the logout request, so the API stops pushing to the phone. Then the token is deleted.
+- **Receiving:**
+  - **App in the background or closed:** Android shows the push on its own, in the "Campus updates" channel created in `MainActivity.kt`, with the `ic_stat_campuspulse` icon.
+  - **App open:** the controller refreshes the notifications and shows a snackbar through `scaffoldMessengerKeyProvider`.
+  - **Tapped:** the push opens the same route as in the list (`notificationRoute`) and is marked read.
+- **Tests** fake `PushMessaging` and `PushDeviceRepository` (`test/features/notifications/push_controller_test.dart`). Nothing touches Firebase.
+
 ---
 
 ## 4. The backend API
@@ -348,10 +382,12 @@ backend/
 │   ├── modules/             One folder per feature (see 4.3)
 │   │   ├── auth/  users/  timetable/  courses/  carpool/
 │   │   ├── jobs/  forum/  grades/  profile/  notifications/
-│   │   └── admin/           User management, CSV import and the audit log (admins only)
+│   │   ├── admin/           User management, CSV import and the audit log (admins only)
+│   │   └── push/            Push notifications: the phones (`/push/devices`) and FCM sending (fcm.ts)
 │   └── scripts/
 │       ├── seed.ts          `npm run seed`: demo student, demo admin + every module's demo data
-│       └── create-admin.ts  `npm run create-admin -- <email> <password>`: creates or promotes an admin
+│       ├── create-admin.ts  `npm run create-admin -- <email> <password>`: creates or promotes an admin
+│       └── push-test.ts     `npm run push:test -- <email or ENT ID>`: sends a test push notification
 ├── test/                    Jest + Supertest tests (one file per module, plus helpers)
 ├── .env.example             Every setting, documented. Copy to .env
 ├── docker-compose.yml       Optional MongoDB for teammates without one
@@ -409,6 +445,7 @@ Routers are mounted in `app.ts`:
 | `/api/profile` | profile | `studentprofiles` (and it reads grades, notifications and carpool) |
 | `/api/notifications` | notifications | `notifications` |
 | `/api/admin` | admin | `auditlogs` (and it manages `users`, deleting an account's data in every module) |
+| `/api/push` | push | `pushdevices` (the notifications module pushes every notification it creates) |
 
 Every route except `/auth/*` and `/health` needs a signed-in user, and `/api/admin/*` needs an **admin** (`requireRole(['admin'])` on the whole router). `/api/timetable` and `/api/courses` need a **student or teacher** (`ROLES_WITH_CLASSES`): admins and alumni have no classes. Personal data (attendance, bookings, applications, votes, read states, grades, profile) is always filtered by the signed-in student's id, so one student can never read or change another's.
 

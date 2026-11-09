@@ -114,6 +114,29 @@ The admin finds **Administration** on the Profile tab. The seed also creates nin
 
 **Resetting the demo:** `npm run seed` resets the demo student's actions and refreshes dates such as "today 13:15" or "15 min ago". Run it again on another day so the rides and notifications look current.
 
+### Push notifications (optional)
+
+Push notifications need a Firebase project (free). Without one, the app works the same with push off. One person creates the project and shares its two files with the team **privately**. Both files are gitignored because they hold keys.
+
+1. **Create the project** on [console.firebase.google.com](https://console.firebase.google.com) with **Add project**. Analytics isn't needed.
+2. **The app's file:**
+   - Choose **Add app › Android** with the package name **`com.example.campuspulse`**.
+   - Download **`google-services.json`** and put it in **`android/app/`**.
+3. **The API's key:**
+   - Go to **Project settings › Service accounts › Generate new private key**.
+   - Save the file as `backend/firebase-service-account.json`, and add this line to `backend/.env`:
+     ```
+     FIREBASE_SERVICE_ACCOUNT_FILE=firebase-service-account.json
+     ```
+   - Restart the API. It no longer logs `[push] Off`.
+4. **Stop and run the app again.** A hot restart isn't enough, because the Android build changes. Sign in and **allow notifications**.
+5. **Test:** put the app in the background and run `cd backend && npm run push:test -- 211JMT0428`. The notification appears on the phone.
+
+**iPhone (on a Mac):**
+- Add an iOS app to the same project with the bundle ID `com.example.campuspulse`, and put its `GoogleService-Info.plist` in `ios/Runner/`.
+- Upload an APNs key in **Project settings › Cloud Messaging**.
+- In Xcode, add the **Push Notifications** capability and **Background Modes › Remote notifications**.
+
 ## 6. Configuration reference
 
 ### App: `env/*.json`
@@ -136,6 +159,7 @@ The admin finds **Administration** on the Profile tab. The seed also creates nin
 | `REFRESH_TOKEN_TTL_DAYS` | `30` | Session lifetime |
 | `CORS_ORIGIN` | `*` | Allowed web origins (the mobile app doesn't need CORS) |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | empty / `587` | Real email sending. Leave `SMTP_HOST` empty to print the emails in the console |
+| `FIREBASE_SERVICE_ACCOUNT_FILE` | empty | The Firebase service-account JSON (path from `backend/`). Empty turns push notifications off |
 
 **Sending real emails:** fill in the `SMTP_*` keys and restart. Any provider works:
 - Gmail with an *app password*
@@ -153,6 +177,7 @@ The admin finds **Administration** on the Profile tab. The seed also creates nin
 | Start the API | `cd backend && npm run dev` |
 | Reset the demo data | `cd backend && npm run seed` |
 | Create or promote an admin | `cd backend && npm run create-admin -- <email> <password>` |
+| Send a test push notification | `cd backend && npm run push:test -- <email or ENT ID>` |
 | Backend checks | `cd backend && npm run typecheck && npm test` |
 | Build a debug APK | `flutter build apk --debug --dart-define-from-file=env/dev.json` |
 

@@ -1,7 +1,11 @@
 import type { Types } from 'mongoose';
 
+import { pushInBackground } from '../push/push.service';
 import { ROLE_LABELS, UserModel, type UserRole } from '../users/user.model';
 import { NotificationModel } from './notification.model';
+
+// Every notification created here is also pushed to the user's phones. FCM is
+// called in the background: a push problem never delays or fails the request.
 
 /** Category and badge of the notifications about accounts. */
 const ACCOUNT = { category: 'account', label: 'Account' } as const;
@@ -30,7 +34,7 @@ export async function notifyAccountUpdated(
   }
   if (lines.length === 0) return;
 
-  await NotificationModel.create({
+  const notification = await NotificationModel.create({
     userId,
     ...ACCOUNT,
     title: 'Your account was updated',
@@ -38,6 +42,7 @@ export async function notifyAccountUpdated(
     isUrgent: changes.password === true,
     link: { destination: 'profile', id: null },
   });
+  await pushInBackground([notification]);
 }
 
 /**
@@ -53,7 +58,7 @@ export async function notifyAdminsOfSignup(user: {
   if (admins.length === 0) return;
 
   const receivedAt = new Date();
-  await NotificationModel.insertMany(
+  const notifications = await NotificationModel.insertMany(
     admins.map((admin) => ({
       userId: admin._id,
       ...ACCOUNT,
@@ -64,4 +69,5 @@ export async function notifyAdminsOfSignup(user: {
       link: { destination: 'adminUsers', id: user._id.toHexString() },
     })),
   );
+  await pushInBackground(notifications);
 }

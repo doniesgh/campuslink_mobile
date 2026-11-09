@@ -6,11 +6,13 @@ import { currentUserId, requireAuth } from '../../middleware/require-auth';
 import {
   forgotPasswordSchema,
   loginSchema,
+  logoutSchema,
   refreshSchema,
   registerSchema,
   resetPasswordSchema,
   verifyEmailSchema,
   type LoginInput,
+  type LogoutInput,
   type RegisterInput,
   type ResetPasswordInput,
 } from './auth.schemas';
@@ -31,8 +33,9 @@ authRouter.post('/refresh', validateBody(refreshSchema), async (req, res) => {
   res.json(await auth.refresh((req.body as { refreshToken: string }).refreshToken));
 });
 
-authRouter.post('/logout', validateBody(refreshSchema), async (req, res) => {
-  await auth.logout((req.body as { refreshToken: string }).refreshToken);
+authRouter.post('/logout', validateBody(logoutSchema), async (req, res) => {
+  const { refreshToken, pushToken } = req.body as LogoutInput;
+  await auth.logout(refreshToken, pushToken);
   res.status(204).end();
 });
 

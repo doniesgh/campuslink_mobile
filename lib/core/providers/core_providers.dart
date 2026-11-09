@@ -1,4 +1,5 @@
 import 'package:dio/dio.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -19,6 +20,16 @@ final localPrefsProvider =
 final secureStorageProvider = Provider<SecureStorage>(
   (_) => const SecureStorage(FlutterSecureStorage()),
 );
+
+/// The app's root ScaffoldMessenger, for snackbars shown from outside the
+/// widget tree (e.g. a push notification that arrives while the app is open).
+final scaffoldMessengerKeyProvider =
+    Provider<GlobalKey<ScaffoldMessengerState>>((_) => GlobalKey<ScaffoldMessengerState>());
+
+/// The push token this phone registered for the signed-in user, or null (push
+/// off, permission refused, signed out). Sent with logout so the server stops
+/// pushing to this phone.
+final pushTokenProvider = StateProvider<String?>((_) => null);
 
 final dioProvider = Provider<Dio>((ref) {
   return DioClient.create(

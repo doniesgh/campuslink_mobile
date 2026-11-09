@@ -22,6 +22,9 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('CampusPulse <no-reply@campuspulse.test>'),
+
+  // Push notifications. Without FIREBASE_SERVICE_ACCOUNT_FILE, push is off.
+  FIREBASE_SERVICE_ACCOUNT_FILE: z.string().trim().optional(),
 });
 
 const parsed = schema.safeParse(process.env);

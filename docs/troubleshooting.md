@@ -52,8 +52,8 @@ Problems we actually hit while building CampusPulse, and how to fix them.
 - **Cause:** the package has native code, and a hot restart doesn't rebuild it.
 - **Fix:** stop the app and run it again.
 
-**"WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): file_picker"**
-- **This is expected and harmless.** Flutter flags `file_picker` because its build file mentions Kotlin.
+**"WARNING: Your app uses the following plugins that apply Kotlin Gradle Plugin (KGP): file_picker, firebase_core"**
+- **This is expected and harmless.** Flutter flags these plugins because their build files mention Kotlin. `firebase_core` applies Kotlin itself when `android.builtInKotlin=false`.
 - **Background:** `file_picker` 11 doesn't compile its Kotlin code on Android Gradle Plugin 9 when `android.builtInKotlin=false`. The build then failed with *"cannot find symbol FilePickerPlugin"*. `android/build.gradle.kts` applies Kotlin to it, so it builds.
 - **Why not upgrade:** `file_picker` 13 needs `win32` 6, and `flutter_secure_storage` 9 still needs `win32` 5. Upgrade both together, then remove the block from `android/build.gradle.kts`.
 
@@ -81,6 +81,19 @@ Problems we actually hit while building CampusPulse, and how to fix them.
 - **Cause:** without `SMTP_HOST`, emails are not sent. The code is printed in the backend terminal: `[mail] Verification code for …: 123456`.
 - **Fix:** read the code there, or configure SMTP in `backend/.env`.
 
+## Push notifications
+
+**No push arrives on the phone.** Check in this order:
+1. **The app:** does the debug console say `[push] Off: no Firebase configuration`? Then `android/app/google-services.json` is missing. Add it, then **stop and run the app again**: a hot restart doesn't rebuild the Android part.
+2. **The API:** does it log `[push] Off: set FIREBASE_SERVICE_ACCOUNT_FILE…` at start? Then set that key in `backend/.env` and restart the API.
+3. **The permission:** you may have refused it. Turn it on in **Settings › Apps › CampusPulse › Notifications**, then sign out and in again.
+4. **Test:** run `npm run push:test -- <your email or ENT ID>`. "No registered device" means the phone never registered: sign out and in again, and watch the debug console for `[push]` lines.
+5. **On an emulator**, the system image must include Google APIs (ours, `google_apis`, does).
+
+**The app is open and no notification pops up.** This is expected. Android doesn't show pushes for the app on screen, so CampusPulse shows a banner with **View** instead.
+
+**`flutter run` fails with "File google-services.json is missing".** The plugin is applied only when the file exists, so this means an old build. Run `flutter clean`, then run again.
+
 ## Backend
 
 **The server exits at start with "Invalid environment variables"**
@@ -106,6 +119,10 @@ Problems we actually hit while building CampusPulse, and how to fix them.
 **Two test runs interfere with each other**
 - **Cause:** test runs at the same moment share a test database.
 - **Fix:** give each a different `TEST_DB_PREFIX`, e.g. `TEST_DB_PREFIX=cp_me npx jest`.
+
+**Many suites fail at once with a timeout in `beforeAll(connectTestDb)`**
+- **Cause:** the PC is busy (a `flutter test` or a build at the same time), and connecting to MongoDB takes longer than the hook allows.
+- **Fix:** run with fewer workers, `npx jest --maxWorkers=4`, or wait until the other job ends.
 
 ## Tests (app)
 

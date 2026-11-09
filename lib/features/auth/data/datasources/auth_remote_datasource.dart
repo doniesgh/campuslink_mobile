@@ -17,8 +17,9 @@ abstract interface class AuthRemoteDataSource {
   Future<UserModel> verifyEmail(String code);
   Future<UserModel> me();
 
-  /// Ends this device's session on the server (revokes [refreshToken]).
-  Future<void> logout(String refreshToken);
+  /// Ends this device's session on the server (revokes [refreshToken]) and
+  /// stops its push notifications ([pushToken]).
+  Future<void> logout(String refreshToken, {String? pushToken});
 }
 
 /// Real implementation talking to the Node.js API.
@@ -76,10 +77,13 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   Future<UserModel> me() async => UserModel.fromJson(_map(await _dio.get(ApiEndpoints.me)));
 
   @override
-  Future<void> logout(String refreshToken) async {
+  Future<void> logout(String refreshToken, {String? pushToken}) async {
     await _dio.post(
       ApiEndpoints.logout,
-      data: {'refreshToken': refreshToken},
+      data: {
+        'refreshToken': refreshToken,
+        if (pushToken != null) 'pushToken': pushToken,
+      },
       options: AuthInterceptor.skipAuth,
     );
   }
@@ -141,5 +145,5 @@ class MockAuthRemoteDataSource implements AuthRemoteDataSource {
   }
 
   @override
-  Future<void> logout(String refreshToken) async {}
+  Future<void> logout(String refreshToken, {String? pushToken}) async {}
 }

@@ -64,9 +64,11 @@ class AuthRepositoryImpl implements AuthRepository {
   /// Signs out locally right away, then revokes the session on the server in
   /// the background: the user never waits on (or is blocked by) the network.
   @override
-  Future<void> logout() async {
+  Future<void> logout({String? pushToken}) async {
     final refreshToken = await storage.readRefreshToken();
     await storage.clear();
-    if (refreshToken != null) unawaited(guard(() => remote.logout(refreshToken)));
+    if (refreshToken != null) {
+      unawaited(guard(() => remote.logout(refreshToken, pushToken: pushToken)));
+    }
   }
 }

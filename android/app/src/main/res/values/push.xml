@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Push notifications (FCM). -->
+<resources>
+    <!-- AppColors.primary. Tints the small icon in the notification shade. -->
+    <color name="campuspulse_primary">#6949A8</color>
+
+    <!-- The channel every push goes to (created in MainActivity). Users see
+         its name in Settings > Apps > CampusPulse > Notifications. -->
+    <string name="campus_updates_channel_id" translatable="false">campus_updates</string>
+    <string name="campus_updates_channel_name">Campus updates</string>
+    <string name="campus_updates_channel_description">Account changes, sign-ups and campus news from CampusPulse.</string>
+</resources>

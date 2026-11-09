@@ -4,6 +4,7 @@ import type { Types } from 'mongoose';
 import { env } from '../../config/env';
 import { badRequest, conflict, unauthorized } from '../../lib/http-error';
 import { notifyAdminsOfSignup } from '../notifications/account-notifications';
+import { removeAllDevices, unregisterDevice } from '../push/push-devices.service';
 import { toPublicUser, UserModel, type PublicUser, type UserDocument } from '../users/user.model';
 import type { LoginInput, RegisterInput, ResetPasswordInput } from './auth.schemas';
 import { mailer } from './mailer';
@@ -52,12 +53,16 @@ async function startSession(user: UserDocument): Promise<Session> {
 export const hashPassword = (password: string): Promise<string> =>
   bcrypt.hash(password, BCRYPT_ROUNDS);
 
-/** Signs [userId] out on every device: their refresh tokens stop working. */
+/**
+ * Signs [userId] out on every device: their refresh tokens stop working and
+ * their phones stop receiving push notifications (the app registers its
+ * phone again at the next sign-in).
+ */
 export async function revokeAllSessions(userId: Types.ObjectId): Promise<void> {
-  await RefreshTokenModel.updateMany(
-    { userId, revokedAt: null },
-    { $set: { revokedAt: new Date() } },
-  );
+  await Promise.all([
+    RefreshTokenModel.updateMany({ userId, revokedAt: null }, { $set: { revokedAt: new Date() } }),
+    removeAllDevices(userId),
+  ]);
 }
 
 /**
@@ -154,12 +159,21 @@ export async function refresh(refreshToken: string): Promise<TokenPair> {
   return issueTokens(current.userId);
 }
 
-/** Ends one session (the device signing out). Unknown tokens are ignored. */
-export async function logout(refreshToken: string): Promise<void> {
+/**
+ * Ends one session (the device signing out). Unknown tokens are ignored.
+ * With [pushToken], that phone also stops receiving the account's push
+ * notifications (only if it is registered to the same account).
+ */
+export async function logout(refreshToken: string, pushToken?: string | null): Promise<void> {
+  const tokenHash = sha256(refreshToken);
   await RefreshTokenModel.updateOne(
-    { tokenHash: sha256(refreshToken), revokedAt: null },
+    { tokenHash, revokedAt: null },
     { $set: { revokedAt: new Date() } },
   );
+  if (!pushToken) return;
+  // An already revoked token still tells whose phone this is.
+  const session = await RefreshTokenModel.findOne({ tokenHash }).select('userId').lean();
+  if (session) await unregisterDevice(session.userId, pushToken);
 }
 
 /** Emails a 6-digit reset code. Answers the same way whether the account exists or not. */

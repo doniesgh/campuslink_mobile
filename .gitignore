@@ -49,3 +49,8 @@ app.*.map.json
 
 # MCP server config (contains an API key)
 .mcp.json
+
+# Firebase config of the push notifications (holds the project's API key):
+# download your own from the Firebase console, see docs/getting-started.md.
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist

@@ -20,5 +20,8 @@ abstract interface class AuthRepository {
 
   /// Returns the current user if a valid session exists, otherwise null.
   Future<Result<User?>> restoreSession();
-  Future<void> logout();
+
+  /// Signs out. [pushToken] is this phone's push token, if it registered one:
+  /// the server then stops sending push notifications to it.
+  Future<void> logout({String? pushToken});
 }

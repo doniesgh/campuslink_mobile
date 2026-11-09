@@ -3,6 +3,11 @@ import mongoose from 'mongoose';
 import { connectMongo, disconnectMongo } from '../src/db/mongo';
 import { setMailer } from '../src/modules/auth/mailer';
 import { signAccessToken } from '../src/modules/auth/tokens';
+import {
+  setPushSender,
+  settlePushes,
+  type PushMessage,
+} from '../src/modules/push/push.service';
 import { UserModel, type UserDocument, type UserRole } from '../src/modules/users/user.model';
 
 let studentCount = 0;
@@ -86,4 +91,50 @@ export function captureMail(sent: SentMail = { codes: [], resets: [] }): SentMai
     },
   });
   return sent;
+}
+
+export interface CapturedPush {
+  /** Every message handed to the fake FCM, in order (refused ones included). */
+  messages: PushMessage[];
+  /**
+   * The FCM error code to answer for a token, e.g.
+   * `push.errors['old-phone'] = 'messaging/registration-token-not-registered'`.
+   * Tokens not listed are sent.
+   */
+  errors: Record<string, string>;
+  /**
+   * Waits until every push started in the background has been answered.
+   * Account notifications push without making the request wait, so await this
+   * after the request and before checking [messages] or the devices.
+   */
+  settle(): Promise<void>;
+  /** Forgets the messages and the errors (call it in beforeEach). */
+  reset(): void;
+}
+
+/**
+ * Turns push on with a fake FCM that records the messages (into [captured],
+ * or a new record) instead of sending them. Without it, push is off in the
+ * tests, as on a server without FIREBASE_SERVICE_ACCOUNT_FILE.
+ */
+export function capturePush(captured?: CapturedPush): CapturedPush {
+  const record: CapturedPush = captured ?? {
+    messages: [],
+    errors: {},
+    settle: settlePushes,
+    reset() {
+      record.messages.length = 0;
+      for (const token of Object.keys(record.errors)) delete record.errors[token];
+    },
+  };
+  setPushSender({
+    async send(messages) {
+      record.messages.push(...messages);
+      return messages.map((message) => {
+        const code = record.errors[message.token];
+        return code ? { ok: false, code, message: `Fake FCM error: ${code}` } : { ok: true };
+      });
+    },
+  });
+  return record;
 }

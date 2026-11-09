@@ -199,7 +199,20 @@ These rules also exist in `backend/src/modules/grades/grading.ts`, for the Profi
 - "Your account was updated" when an admin changes your role, email or password (urgent for a password). It opens Profile.
 - "New account: <name>" to every admin when someone signs up. It opens that account in Administration.
 
-**API:** `GET /notifications`, `POST /notifications/:id/read`, `POST /notifications/read-all`.
+**Push notifications** (Firebase Cloud Messaging):
+- **What's sent:** every notification the API creates also goes to its user's phones. Today that means the account notifications above. Run `npm run push:test -- <email or ENT ID>` to send a test one.
+- **App in the background or closed:** the phone shows the notification. Tapping it opens the same screen as in the list and marks it read.
+- **App open:** a banner with **View** appears, and the bell updates.
+- **Registration:**
+  - The phone registers after sign-in. The app asks for the permission on Android 13+ and iOS.
+  - It's removed at sign-out, and when the password changes or the account is deleted.
+- **Off** in demo mode and until the Firebase project is set up ([getting-started.md](getting-started.md#push-notifications-optional)). Nothing else changes.
+
+**API:** `GET /notifications`, `POST /notifications/:id/read`, `POST /notifications/read-all`; for push, `PUT /push/devices` and the `pushToken` of `POST /auth/logout`.
+
+**Code:**
+- App: `notifications/presentation/push_controller.dart` and `notifications/data/push/firebase_push_messaging.dart`.
+- Backend: `modules/push/`.
 
 ## Administration
 

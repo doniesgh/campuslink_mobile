@@ -14,6 +14,7 @@ import { gradesRouter } from './modules/grades/grades.routes';
 import { jobsRouter } from './modules/jobs/jobs.routes';
 import { notificationsRouter } from './modules/notifications/notifications.routes';
 import { profileRouter } from './modules/profile/profile.routes';
+import { pushRouter } from './modules/push/push.routes';
 import { timetableRouter } from './modules/timetable/timetable.routes';
 import { usersRouter } from './modules/users/users.routes';
 
@@ -42,6 +43,7 @@ export function createApp() {
   api.use('/grades', gradesRouter);
   api.use('/profile', profileRouter);
   api.use('/notifications', notificationsRouter);
+  api.use('/push', pushRouter);
   api.use('/admin', adminRouter);
   app.use('/api', api);
 

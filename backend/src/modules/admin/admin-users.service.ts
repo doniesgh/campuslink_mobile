@@ -14,6 +14,7 @@ import { JobApplicationModel } from '../jobs/jobs.model';
 import { notifyAccountUpdated } from '../notifications/account-notifications';
 import { NotificationModel } from '../notifications/notification.model';
 import { StudentProfileModel } from '../profile/profile.model';
+import { PushDeviceModel } from '../push/push-device.model';
 import {
   ROLE_LABELS,
   USER_ROLES,
@@ -239,6 +240,21 @@ export async function updateUser(
   if (input.isEmailVerified !== undefined) user.isEmailVerified = input.isEmailVerified;
   if (input.password !== undefined) user.passwordHash = await hashPassword(input.password);
   await user.save();
+
+  // Before the sign-out below: the push still reaches the phones it removes,
+  // so the user learns why the app signed them out.
+  if (!isOwnAccount) {
+    try {
+      await notifyAccountUpdated(user._id, {
+        role: has('role') ? user.role : undefined,
+        email: has('email') ? user.email : undefined,
+        password: has('password'),
+      });
+    } catch (err) {
+      // The account is already changed: a notification problem must not fail the request.
+      console.error('[notifications] Could not tell a user about an account change:', err);
+    }
+  }
   if (has('password')) await revokeAllSessions(user._id);
 
   await recordAudit({
@@ -254,25 +270,12 @@ export async function updateUser(
       ...(has('role') ? { role: { from: previous.role, to: user.role } } : {}),
     },
   });
-
-  if (!isOwnAccount) {
-    try {
-      await notifyAccountUpdated(user._id, {
-        role: has('role') ? user.role : undefined,
-        email: has('email') ? user.email : undefined,
-        password: has('password'),
-      });
-    } catch (err) {
-      // The account is already changed: a notification problem must not fail the request.
-      console.error('[notifications] Could not tell a user about an account change:', err);
-    }
-  }
   return toManagedUserJson(user);
 }
 
 /**
- * Removes everything that belongs to the account [userId]: sessions,
- * notifications, attendance, lab submissions, job applications, idea votes,
+ * Removes everything that belongs to the account [userId]: sessions, push
+ * phones, notifications, attendance, lab submissions, job applications, idea votes,
  * lost & found requests, transcript and profile. The rides it drives are
  * deleted and the seats it booked on other rides become free again. Its
  * forum posts and lost & found notices stay, under their author name, with
@@ -281,6 +284,7 @@ export async function updateUser(
 async function deleteAccountData(userId: Types.ObjectId): Promise<void> {
   await Promise.all([
     RefreshTokenModel.deleteMany({ userId }),
+    PushDeviceModel.deleteMany({ userId }),
     NotificationModel.deleteMany({ userId }),
     CourseAttendanceModel.deleteMany({ userId }),
     AssignmentSubmissionModel.deleteMany({ userId }),

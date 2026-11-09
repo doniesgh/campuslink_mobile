@@ -85,7 +85,7 @@ class AuthController extends AsyncNotifier<User?> {
   }
 
   Future<void> logout() async {
-    await _repo.logout();
+    await _repo.logout(pushToken: ref.read(pushTokenProvider));
     state = const AsyncData(null);
   }
 
