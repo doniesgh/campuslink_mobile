@@ -15,7 +15,8 @@
     "test": "jest",
     "seed": "tsx src/scripts/seed.ts",
     "create-admin": "tsx src/scripts/create-admin.ts",
-    "push:test": "tsx src/scripts/push-test.ts"
+    "push:test": "tsx src/scripts/push-test.ts",
+    "db:check": "tsx src/scripts/db-check.ts"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",
