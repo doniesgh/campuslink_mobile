@@ -13,6 +13,19 @@ How the API runs online and how a new APK is published for the team. To run the 
 
 ## 1. The database (MongoDB Atlas), once
 
+**Already have a cluster for another app?** Reuse it: one cluster holds several databases. Atlas allows only one free cluster per project anyway.
+- **Use the database `campuspulse`.** MongoDB creates it on the first write. The other app keeps its own database, and our `seed` only touches `campuspulse`.
+- **Give CampusPulse its own database user,** limited to its database:
+  - In **Database Access**, choose **Add New Database User** and set a password.
+  - Under **Database User Privileges**, choose **Grant specific privileges** and add **`readWrite`** on database **`campuspulse`**.
+  - Then neither app can read or break the other's data, even with a wrong address or a leaked password.
+- **Network Access** probably already has `0.0.0.0/0` if the other app runs on Render. Add it otherwise.
+- **Limits:** both apps share the free cluster's 512 MB and its connection limit. CampusPulse's data is tiny.
+
+Then go straight to step 4 below, with the new user.
+
+To start from nothing instead:
+
 1. **Create a free cluster:** on cloud.mongodb.com, choose **Create › M0 (free)**, region **Frankfurt** (close to Render's).
 2. **Create a user:** in **Database Access**, add a database user with a password and the role *Read and write to any database*.
 3. **Open the network:** in **Network Access**, add `0.0.0.0/0`. Render's free plan has no fixed IP address, so the user and password are what protect the database.

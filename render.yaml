@@ -14,7 +14,10 @@ services:
     plan: free
     region: frankfurt
     rootDir: backend
-    buildCommand: npm ci && npm run build
+    # NODE_ENV=production makes `npm ci` skip the dev dependencies, but the
+    # build needs them (TypeScript and the @types packages): install them for
+    # the build, then remove them so the running API only has what it needs.
+    buildCommand: npm ci --include=dev && npm run build && npm prune --omit=dev
     startCommand: npm start
     healthCheckPath: /api/health
     autoDeploy: true
