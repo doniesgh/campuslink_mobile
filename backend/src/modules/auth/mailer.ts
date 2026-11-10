@@ -76,6 +76,12 @@ export function smtpTransportFromEnv(): Transporter | null {
     port: env.SMTP_PORT,
     secure: env.SMTP_PORT === 465,
     auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS ?? '' } : undefined,
+    // Sign-up and password reset wait for the email, and the app gives up
+    // after 20 s. Nodemailer's defaults are minutes: a blocked port (e.g. 587
+    // on Render's free plan) would make those requests fail in the app.
+    connectionTimeout: 8_000,
+    greetingTimeout: 8_000,
+    socketTimeout: 12_000,
   });
 }
 

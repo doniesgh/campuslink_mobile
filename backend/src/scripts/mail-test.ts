@@ -6,6 +6,7 @@ import { smtpTransportFromEnv } from '../modules/auth/mailer';
  * sends the sign-up and password-reset codes:
  *
  *   npm run mail:test -- <your email address>
+ *   npm run mail:test                (sends it to the address of SMTP_FROM)
  *
  * Says what is wrong in plain words, and never prints the password.
  */
@@ -71,9 +72,13 @@ async function mailTest(to: string): Promise<void> {
   }
 }
 
-const to = process.argv[2]?.trim();
-if (!to || !to.includes('@')) {
-  console.error(USAGE);
+/** The address of SMTP_FROM ("CampusPulse <me@gmail.com>" gives "me@gmail.com"). */
+const fromAddress = (): string => (/<([^>]+)>/.exec(env.SMTP_FROM)?.[1] ?? env.SMTP_FROM).trim();
+
+// Without an argument, the test goes to the sender's own mailbox.
+const to = process.argv[2]?.trim() || fromAddress();
+if (!to.includes('@') || to.endsWith('@campuspulse.test')) {
+  console.error(`${USAGE}\n(Or set SMTP_FROM to your address: the test then goes there.)`);
   process.exitCode = 1;
 } else {
   void mailTest(to);
