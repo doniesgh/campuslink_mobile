@@ -164,11 +164,12 @@ Push notifications need a Firebase project (free). Without one, the app works th
 | `CORS_ORIGIN` | `*` | Allowed web origins (the mobile app doesn't need CORS) |
 | `TRUST_PROXY` | `0` | Proxies in front of the API (`1` on Render). Gives the real client IP to the rate limits and the audit log |
 | `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM` | empty / `587` | Real email sending. Leave `SMTP_HOST` empty to print the emails in the console |
+| `MAIL_RELAY_URL`, `MAIL_RELAY_SECRET` | empty | Gmail through the Apps Script relay (HTTPS), for Render. Used instead of SMTP when set |
 | `FIREBASE_SERVICE_ACCOUNT_FILE` | empty | The Firebase service-account JSON (path from `backend/`). Empty turns push notifications off |
 
 **Sending real emails:** fill in the `SMTP_*` keys and restart, then check them with `npm run mail:test -- <your address>`. Any provider works locally:
-- Brevo (`smtp-relay.brevo.com`, port 2525). This is the one to use on Render, whose free plan blocks ports 25, 465 and 587. See [deploy.md](deploy.md#emails-sign-up-codes-and-password-resets-brevo).
-- Gmail with an *app password* (`smtp.gmail.com`, port 587), on your PC only
+- Gmail with an *app password* (`smtp.gmail.com`, port 587). It works on your PC. On Render, whose free plan blocks ports 25, 465 and 587, the same Gmail sends through the Apps Script relay (`MAIL_RELAY_URL`) instead: see [deploy.md](deploy.md#emails-sign-up-codes-and-password-resets).
+- Brevo (`smtp-relay.brevo.com`, port 2525), which also works on Render
 - Mailtrap, to catch test emails without delivering them
 
 ## 7. Everyday commands

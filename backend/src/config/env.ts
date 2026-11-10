@@ -28,10 +28,24 @@ const schema = z.object({
   SMTP_USER: z.string().optional(),
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().default('CampusPulse <no-reply@campuspulse.test>'),
+  /**
+   * Gmail through Google Apps Script (backend/mail-relay/gmail-relay.gs): the
+   * web app's URL and the secret it checks. Sends over HTTPS, so it works where
+   * SMTP ports are blocked (Render's free plan). Takes precedence over SMTP.
+   */
+  MAIL_RELAY_URL: z
+    .string()
+    .trim()
+    .refine((url) => url === '' || url.startsWith('https://'), 'MAIL_RELAY_URL must start with https://')
+    .optional(),
+  MAIL_RELAY_SECRET: z.string().trim().optional(),
 
   // Push notifications. Without FIREBASE_SERVICE_ACCOUNT_FILE, push is off.
   FIREBASE_SERVICE_ACCOUNT_FILE: z.string().trim().optional(),
-});
+}).refine(
+  (vars) => !vars.MAIL_RELAY_URL || (vars.MAIL_RELAY_SECRET ?? '').length >= 16,
+  { path: ['MAIL_RELAY_SECRET'], message: 'MAIL_RELAY_SECRET (at least 16 characters) is required with MAIL_RELAY_URL' },
+);
 
 const parsed = schema.safeParse(process.env);
 if (!parsed.success) {

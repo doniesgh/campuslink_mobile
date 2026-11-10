@@ -30,7 +30,7 @@ Run the app with `env/local.json` (VS Code: **CampusPulse (local backend)**) to 
 | `npm run dev` | Start in watch mode (tsx) |
 | `npm run seed` | Create or reset the demo student and every module's demo data, the demo admin and a few demo accounts (idempotent). Re-run it to refresh dates like "today 13:15" |
 | `npm run create-admin -- <email> <password> [display name]` | On a real server: create an admin, or promote an existing account (new password, signed out everywhere) |
-| `npm run mail:test -- <your address>` | Send a test email with the `SMTP_*` settings, and say what is wrong (login, port blocked, sender not verified) without printing the password |
+| `npm run mail:test -- [address]` | Send a test email the way the API does (Gmail relay if `MAIL_RELAY_URL` is set, else SMTP), by default to the `SMTP_FROM` address, and say what is wrong without printing secrets |
 | `npm run db:check` | Check the database address in `MONGO_URL` (e.g. the Atlas one): connects, writes and deletes one document, and says what is wrong (password, network access, host) without printing the password |
 | `npm run push:test -- <email or ENT ID>` | Add a "Push test" notification to that account and push it to its phones. Prints how many phones got it, and says so when push is off or the account has no registered phone |
 | `npm run push:test -- <email or ENT ID> --class` | Push that account the reminder of the next class of the timetable, now (a preview: the real reminder still goes out 15 min before) |

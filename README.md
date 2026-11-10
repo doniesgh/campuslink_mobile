@@ -17,7 +17,7 @@ The **Flutter app** works on demo data out of the box. With the **Node.js API** 
 | **App** | Flutter 3.27+ · Riverpod · go_router · Dio · feature-first Clean Architecture |
 | **API** | Node.js 20+ · Express 5 · TypeScript · MongoDB (Mongoose) · Zod · JWT |
 | **Design** | Google Stitch ("CampusPulse Student Companion Mobile App"), 12 screens |
-| **Tests** | 555 app tests · 413 API tests |
+| **Tests** | 555 app tests · 418 API tests |
 
 ## Quick start (5 minutes, no server)
 

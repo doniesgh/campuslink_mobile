@@ -57,7 +57,7 @@ To start from nothing instead:
 1. On dashboard.render.com, choose **New › Blueprint**, connect GitHub and pick **this repository**. Render reads `render.yaml`.
 2. Fill in the values it asks for:
    - **`MONGO_URL`**: the Atlas address above.
-   - **`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`** (optional): real emails for sign-up codes and password resets. Leave them empty for now (see [Emails](#emails-sign-up-codes-and-password-resets-brevo) below): the codes are then printed in Render's **Logs**.
+   - **`MAIL_RELAY_URL`, `MAIL_RELAY_SECRET`, `SMTP_*`** (optional): real emails for sign-up codes and password resets. Leave them empty for now (see [Emails](#emails-sign-up-codes-and-password-resets) below): the codes are then printed in Render's **Logs**.
 
    Click **Apply**. Render generates `JWT_ACCESS_SECRET` itself.
 3. **Push notifications:**
@@ -83,11 +83,42 @@ Remove-Item Env:MONGO_URL
 - **`seed`** creates the demo accounts and the data of every screen. **Running it again resets them**, so everything teammates changed in the demo data is lost.
 - **`create-admin`** gives the demo admin a new password. The default one is written in this repository, so anyone could otherwise manage the users. Share the new one only with the team.
 
-### Emails: sign-up codes and password resets (Brevo)
+### Emails: sign-up codes and password resets
 
 Without email settings, the API prints the codes in Render's **Logs**. Teammates then can't verify a new account themselves, and an admin has to create their accounts.
 
-**Render's free plan blocks the usual email ports** (25, 465, 587), so Gmail's SMTP can't work there. [Brevo](https://www.brevo.com) is free for 300 emails a day and also accepts port **2525**, which isn't blocked.
+**Render's free plan blocks the usual email ports** (25, 465, 587), so Gmail's SMTP can't work there. Instead, the API sends through **Gmail with a small Google Apps Script**, which it calls over HTTPS. The emails come from your Gmail address, up to **100 a day**.
+
+1. **Make a secret** (any 16+ characters, shared by the API and the script):
+   ```bash
+   node -e "console.log(require('crypto').randomBytes(24).toString('base64url'))"
+   ```
+2. **Create the script:**
+   - Go to [script.google.com](https://script.google.com), signed in with the Gmail that will send.
+   - Click **New project**, name it `CampusPulse mail relay`, and replace the content of `Code.gs` with [`backend/mail-relay/gmail-relay.gs`](../backend/mail-relay/gmail-relay.gs). Save.
+3. **Give it the secret:** in **Project Settings** (the gear icon) › **Script Properties**, choose **Add script property**, with property `SECRET` and value the secret. Save.
+4. **Deploy it:**
+   - Choose **Deploy › New deployment**, then the gear next to *Select type* › **Web app**.
+   - Set **Execute as: Me** and **Who has access: Anyone**, then click **Deploy**.
+   - **Authorize access:** pick your account. Google warns that the app isn't verified, because it's your own script: choose **Advanced › Go to CampusPulse mail relay**, then **Allow** (it asks to send email as you).
+   - Copy the **Web app URL**, which ends with `/exec`. Opening it in a browser shows `{"ok":true,"service":"CampusPulse mail relay",…}`.
+5. **Test from your PC first.** Add to `backend/.env`:
+   ```
+   MAIL_RELAY_URL=<the Web app URL>
+   MAIL_RELAY_SECRET=<the secret>
+   SMTP_FROM=CampusPulse <your Gmail address>
+   ```
+   Then run `cd backend && npm run mail:test`. It must end with `Sent to … through the Gmail relay`, and the email arrives from your Gmail (check the spam folder). Otherwise it says what to fix.
+   - The relay replaces SMTP when both are set.
+   - `SMTP_FROM` only gives the sender name and the test's default recipient.
+6. **Put them on Render:** in the service's **Environment**, set `MAIL_RELAY_URL`, `MAIL_RELAY_SECRET` and `SMTP_FROM` to the same values, then **Save, rebuild and deploy**.
+7. **Check it** by registering in the app with a real address: the code arrives by email.
+
+If you change the script later, choose **Deploy › Manage deployments ›** ✏️ **› Version: New version › Deploy**. The URL stays the same.
+
+#### Or: Brevo
+
+[Brevo](https://www.brevo.com) is free for 300 emails a day and accepts SMTP on port **2525**, which Render doesn't block. It needs no script, but you need a Brevo account.
 
 1. **Sign up** on brevo.com, free plan.
 2. **Verify a sender:** in **Settings › Senders, Domains & Dedicated IPs › Senders › Add a sender**, enter the name `CampusPulse` and the address the emails come from (e.g. your Gmail). Confirm with the code Brevo emails you.
