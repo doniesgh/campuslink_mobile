@@ -64,16 +64,25 @@ export function createSmtpMailer(transport: Pick<Transporter, 'sendMail'>, from:
   };
 }
 
-/** SMTP when SMTP_HOST is set (see .env.example), the console otherwise. */
-function defaultMailer(): Mailer {
-  if (!env.SMTP_HOST) return consoleMailer;
-  const transport = createTransport({
+/**
+ * The SMTP connection the SMTP_* settings describe, or null without
+ * SMTP_HOST. Port 465 is TLS from the start; the others (587, 2525) switch to
+ * TLS with STARTTLS. Also used by `npm run mail:test`.
+ */
+export function smtpTransportFromEnv(): Transporter | null {
+  if (!env.SMTP_HOST) return null;
+  return createTransport({
     host: env.SMTP_HOST,
     port: env.SMTP_PORT,
     secure: env.SMTP_PORT === 465,
     auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS ?? '' } : undefined,
   });
-  return createSmtpMailer(transport, env.SMTP_FROM);
+}
+
+/** SMTP when SMTP_HOST is set (see .env.example), the console otherwise. */
+function defaultMailer(): Mailer {
+  const transport = smtpTransportFromEnv();
+  return transport ? createSmtpMailer(transport, env.SMTP_FROM) : consoleMailer;
 }
 
 let current: Mailer = defaultMailer();

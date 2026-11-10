@@ -57,7 +57,7 @@ To start from nothing instead:
 1. On dashboard.render.com, choose **New › Blueprint**, connect GitHub and pick **this repository**. Render reads `render.yaml`.
 2. Fill in the values it asks for:
    - **`MONGO_URL`**: the Atlas address above.
-   - **`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`** (optional): real emails for sign-up codes and password resets. Leave them empty to read the codes in Render's **Logs** instead.
+   - **`SMTP_HOST`, `SMTP_USER`, `SMTP_PASS`, `SMTP_FROM`** (optional): real emails for sign-up codes and password resets. Leave them empty for now (see [Emails](#emails-sign-up-codes-and-password-resets-brevo) below): the codes are then printed in Render's **Logs**.
 
    Click **Apply**. Render generates `JWT_ACCESS_SECRET` itself.
 3. **Push notifications:**
@@ -82,6 +82,27 @@ Remove-Item Env:MONGO_URL
 
 - **`seed`** creates the demo accounts and the data of every screen. **Running it again resets them**, so everything teammates changed in the demo data is lost.
 - **`create-admin`** gives the demo admin a new password. The default one is written in this repository, so anyone could otherwise manage the users. Share the new one only with the team.
+
+### Emails: sign-up codes and password resets (Brevo)
+
+Without email settings, the API prints the codes in Render's **Logs**. Teammates then can't verify a new account themselves, and an admin has to create their accounts.
+
+**Render's free plan blocks the usual email ports** (25, 465, 587), so Gmail's SMTP can't work there. [Brevo](https://www.brevo.com) is free for 300 emails a day and also accepts port **2525**, which isn't blocked.
+
+1. **Sign up** on brevo.com, free plan.
+2. **Verify a sender:** in **Settings › Senders, Domains & Dedicated IPs › Senders › Add a sender**, enter the name `CampusPulse` and the address the emails come from (e.g. your Gmail). Confirm with the code Brevo emails you.
+3. **Get the SMTP login:** in **Settings › SMTP & API › SMTP**, note the **Login** (like `9a1b2c001@smtp-brevo.com`), then click **Generate a new SMTP key** and copy it. It is shown only once.
+4. **Test from your PC first**, with the same values in `backend/.env`:
+   ```
+   SMTP_HOST=smtp-relay.brevo.com
+   SMTP_PORT=2525
+   SMTP_USER=<the SMTP login>
+   SMTP_PASS=<the SMTP key>
+   SMTP_FROM=CampusPulse <the verified sender address>
+   ```
+   Then run `cd backend && npm run mail:test -- <your address>`. It must end with `Sent to …`, and the email arrives (check the spam folder). Otherwise it says what to fix.
+5. **Put them on Render:** in the service's **Environment**, set `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM` to the same values (`SMTP_PORT` is already `2525`), then **Save, rebuild and deploy**.
+6. **Check it** by registering in the app with a real address: the code arrives by email.
 
 ### The free plan sleeps: UptimeRobot keeps it awake
 
