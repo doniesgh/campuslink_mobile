@@ -83,13 +83,30 @@ Remove-Item Env:MONGO_URL
 - **`seed`** creates the demo accounts and the data of every screen. **Running it again resets them**, so everything teammates changed in the demo data is lost.
 - **`create-admin`** gives the demo admin a new password. The default one is written in this repository, so anyone could otherwise manage the users. Share the new one only with the team.
 
-### The free plan sleeps
+### The free plan sleeps: UptimeRobot keeps it awake
 
 After 15 minutes without requests, Render stops the API:
-- The next request then takes about a minute.
+- The next request then takes up to a minute.
 - **Class reminders don't go out while it sleeps.**
 
-To keep it awake, have a free monitor call `https://<your-service>.onrender.com/api/health` every 10 minutes, for example [UptimeRobot](https://uptimerobot.com) or [cron-job.org](https://cron-job.org). One service awake all month fits in Render's 750 free hours.
+A free [UptimeRobot](https://uptimerobot.com) monitor calls the API every few minutes, so it never sleeps. It also emails you when the API is down.
+
+1. **Sign up** on uptimerobot.com (free plan) and confirm your email.
+2. Click **New monitor** and fill in:
+
+   | Field | Value |
+   |---|---|
+   | Monitor type | **HTTP(s)** |
+   | URL | **`https://campuspulse-api-fmbf.onrender.com/api/health`** |
+   | Friendly name | `CampusPulse API` |
+   | Monitoring interval | **5 minutes** (anything up to 10 is fine: Render sleeps after 15) |
+   | Alert contacts | your email |
+
+3. Click **Create monitor**. Within a few minutes it shows **Up**, with response times under a second once Render is awake.
+
+**Optional: a status page for the team.** In **Status pages › New status page**, add the monitor. Share the link, so teammates can see whether the API is up before blaming the app.
+
+**Render's free hours:** a workspace gets **750 free instance hours a month**, and one service awake all month uses about 720. If another free service in the same Render workspace (e.g. another app's API) is kept awake too, together they run out before the month ends, and Render suspends them until the next month. Keep only one awake, or move one to a paid plan.
 
 ---
 

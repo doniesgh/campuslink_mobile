@@ -59,6 +59,10 @@ Problems we actually hit while building CampusPulse, and how to fix them.
 
 ## Connecting the app to the API
 
+**With the APK, the first sign-in takes up to a minute, or class reminders don't arrive**
+- **Cause:** the online API (Render free plan) went to sleep after 15 minutes without requests. It wakes on the next one, slowly, and sends no reminders while asleep.
+- **Fix:** the UptimeRobot monitor keeps it awake ([deploy.md](deploy.md#the-free-plan-sleeps-uptimerobot-keeps-it-awake)). Check it still shows **Up**, and that Render's free hours aren't used up for the month.
+
 **The app can't reach the API from the emulator**
 - **Check the API:** it must be running (`curl http://127.0.0.1:3000/api/health`).
 - **Check the configuration:** use `env/local.json`, with `USE_MOCK=false` and `API_BASE_URL=http://10.0.2.2:3000/api`. `10.0.2.2` is how the emulator reaches your PC.
