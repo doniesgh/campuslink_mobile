@@ -38,7 +38,3 @@ carpoolRouter.post(
     res.status(201).json(await carpool.reserveSeats(req.params.id, currentUserId(res), seatIds));
   },
 );
-
-carpoolRouter.get('/impact', async (_req, res) => {
-  res.json(await carpool.monthlyImpact());
-});

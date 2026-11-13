@@ -3,9 +3,7 @@ import { Types } from 'mongoose';
 import { conflict, notFound, unauthorized } from '../../lib/http-error';
 import { StudentProfileModel } from '../profile/profile.model';
 import { UserModel } from '../users/user.model';
-import { campusMonth } from './campus-time';
 import {
-  CarpoolImpactModel,
   RideCounterModel,
   RideModel,
   type RideDocument,
@@ -15,9 +13,6 @@ import type { CreateRideInput } from './carpool.schemas';
 const RIDE_NOT_FOUND = 'Ride not found.';
 const SEAT_TAKEN = 'This seat is no longer available.';
 const OWN_RIDE = "You can't book a seat in your own ride.";
-
-/** Used for a month that has no figures yet. */
-export const DEFAULT_MONTHLY_GOAL_KG = 2000;
 
 /** What the API sends for a ride (the shape the app's RideModel.fromJson reads). */
 export interface RideJson {
@@ -229,13 +224,4 @@ export async function reserveSeats(
     throw conflict(SEAT_TAKEN);
   }
   return toRideJson(ride, userId);
-}
-
-/** CO2 saved by ESPRIT carpoolers this campus month, shared by every student. */
-export async function monthlyImpact(now = new Date()): Promise<{ savedKg: number; goalKg: number }> {
-  const impact = await CarpoolImpactModel.findById(campusMonth(now));
-  return {
-    savedKg: impact?.savedKg ?? 0,
-    goalKg: impact?.goalKg ?? DEFAULT_MONTHLY_GOAL_KG,
-  };
 }

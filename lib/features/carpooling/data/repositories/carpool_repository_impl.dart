@@ -3,7 +3,6 @@ import 'package:dio/dio.dart';
 import '../../../../core/error/failure_mapper.dart';
 import '../../../../core/error/result.dart';
 import '../../../../core/network/api_endpoints.dart';
-import '../../domain/entities/carpool_impact.dart';
 import '../../domain/entities/new_ride.dart';
 import '../../domain/entities/ride.dart';
 import '../../domain/repositories/carpool_repository.dart';
@@ -40,14 +39,6 @@ class CarpoolRepositoryImpl implements CarpoolRepository {
         );
       });
 
-  @override
-  Future<Result<CarpoolImpact>> getMonthlyImpact() => guard(() async {
-        final r = await _dio.get<dynamic>(ApiEndpoints.carpoolImpact);
-        return CarpoolImpactModel.fromJson(r.data as Map<String, dynamic>);
-      });
-
-  /// POST /carpool/rides. A ride the server refuses (422) comes back as a
-  /// validation failure whose message, in French like the form, is shown as-is.
   @override
   Future<Result<Ride>> createRide(NewRide ride) => guard(() async {
         final r = await _dio.post<dynamic>(ApiEndpoints.rides, data: NewRideModel.toJson(ride));

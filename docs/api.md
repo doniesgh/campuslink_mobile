@@ -176,7 +176,6 @@ Quiz and due dates are computed on each request, relative to today, so the demo 
 | `GET /carpool/rides/:id` | — | `Ride` | 404 |
 | `POST /carpool/rides` | new ride (below) | `201 Ride`. You are the driver; ids `es-4094`, `es-4095`… | 422 (French messages) |
 | `POST /carpool/rides/:id/reservations` | `{ seatIds: ["s3"] }` | `201` updated `Ride` | 404 · 409 seat taken or your own ride · 422 |
-| `GET /carpool/impact` | — | `{ savedKg, goalKg }` (campus, this month) | |
 
 A `Ride` looks like this:
 

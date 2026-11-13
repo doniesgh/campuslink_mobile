@@ -1,6 +1,5 @@
 import '../../../../core/error/failures.dart';
 import '../../../../core/error/result.dart';
-import '../../domain/entities/carpool_impact.dart';
 import '../../domain/entities/new_ride.dart';
 import '../../domain/entities/ride.dart';
 import '../../domain/new_ride_rules.dart';
@@ -168,12 +167,6 @@ class MockCarpoolRepository implements CarpoolRepository {
             : s,
     ]);
     return const Success(null);
-  }
-
-  @override
-  Future<Result<CarpoolImpact>> getMonthlyImpact() async {
-    await Future<void>.delayed(_latency);
-    return const Success(CarpoolImpact(savedKg: 1420, goalKg: 2000));
   }
 
   /// Like the server: the student drives (seat "s1", with their name), as a

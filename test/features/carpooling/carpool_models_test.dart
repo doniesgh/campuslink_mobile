@@ -169,11 +169,4 @@ void main() {
     final rides = RideModel.listFromJson(jsonDecode('[$rideJson,$rideJson]') as List<dynamic>);
     expect(rides.map((r) => r.id), ['es-4092', 'es-4092']);
   });
-
-  test('CarpoolImpactModel.fromJson (backend fixture)', () {
-    final impact = CarpoolImpactModel.fromJson(_decode(impactJson));
-    expect(impact.savedKg, 1420.0);
-    expect(impact.goalKg, 2000.0);
-    expect(impact.percent, 71);
-  });
 }

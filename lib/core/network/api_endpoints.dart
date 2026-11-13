@@ -27,7 +27,6 @@ abstract final class ApiEndpoints {
   static const rides = '/carpool/rides';
   static String ride(String id) => '/carpool/rides/$id';
   static String rideReservations(String id) => '/carpool/rides/$id/reservations';
-  static const carpoolImpact = '/carpool/impact';
 
   // Jobs
   static const jobs = '/jobs';

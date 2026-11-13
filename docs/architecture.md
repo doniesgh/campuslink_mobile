@@ -440,7 +440,7 @@ Routers are mounted in `app.ts`:
 | `/api/users` | users | `users` |
 | `/api/timetable` | timetable | `timetabletemplates` (one weekly template per class group) |
 | `/api/courses` | courses | `courses`, `courseresources`, `courseattendances`, `assignmentsubmissions` |
-| `/api/carpool` | carpool | `rides` (seats embedded), `ridecounters`, `carpoolimpacts` |
+| `/api/carpool` | carpool | `rides` (seats embedded), `ridecounters` |
 | `/api/jobs` | jobs | `jobs`, `jobapplications` |
 | `/api/forum` | forum | `forumposts`, `lostitems`, `lostitemrequests`, `ideavotes`, `forumcounters` |
 | `/api/grades` | grades | `transcripts` |

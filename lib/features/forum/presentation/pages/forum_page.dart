@@ -7,7 +7,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_search_field.dart';
 import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/campus_header.dart';
-import '../../../../shared/widgets/state_views.dart';
 import '../../../carpooling/presentation/providers/carpool_providers.dart';
 import '../../../carpooling/presentation/widgets/carpooling_section.dart';
 import '../providers/forum_providers.dart';
@@ -19,8 +18,7 @@ import '../widgets/lost_item_publish_sheet.dart';
 enum ForumSection {
   carpooling('Covoiturage', Icons.directions_car_outlined),
   lostFound('Lost & Found', Icons.search),
-  ideas('Ideas', Icons.lightbulb_outline),
-  experiences('Experiences', Icons.auto_stories_outlined);
+  ideas('Ideas', Icons.lightbulb_outline);
 
   const ForumSection(this.label, this.icon);
   final String label;
@@ -105,7 +103,6 @@ class _ForumPageState extends ConsumerState<ForumPage> {
             icon: const Icon(Icons.tips_and_updates_outlined),
             label: const Text('Proposer une idée'),
           ),
-        _ => null,
       },
       body: SafeArea(
         bottom: false,
@@ -119,7 +116,7 @@ class _ForumPageState extends ConsumerState<ForumPage> {
                 hint: switch (section) {
                   ForumSection.lostFound => 'Rechercher par objet, salle ou bloc...',
                   ForumSection.ideas => 'Rechercher une idée, un thème...',
-                  _ => 'Search rides, lost items, or campus...',
+                  ForumSection.carpooling => 'Search rides, lost items, or campus...',
                 },
                 onChanged: (v) => setState(() => _query = v),
                 onFilterTap: () => _comingSoon('Filters'),
@@ -153,7 +150,6 @@ class _ForumPageState extends ConsumerState<ForumPage> {
                 ForumSection.lostFound =>
                   LostFoundSection(query: _query, onClearSearch: _clearSearch),
                 ForumSection.ideas => IdeasSection(query: _query, onClearSearch: _clearSearch),
-                _ => EmptyView(message: '${section.label} is coming soon.', icon: section.icon),
               },
             ),
           ],

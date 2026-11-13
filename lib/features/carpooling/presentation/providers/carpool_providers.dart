@@ -5,7 +5,6 @@ import '../../../../core/providers/core_providers.dart';
 import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../data/repositories/carpool_repository_impl.dart';
 import '../../data/repositories/mock_carpool_repository.dart';
-import '../../domain/entities/carpool_impact.dart';
 import '../../domain/entities/ride.dart';
 import '../../domain/repositories/carpool_repository.dart';
 
@@ -26,8 +25,4 @@ final ridesProvider = FutureProvider.autoDispose<List<Ride>>(
 
 final rideDetailProvider = FutureProvider.autoDispose.family<Ride, String>(
   (ref, id) async => (await ref.watch(carpoolRepositoryProvider).getRide(id)).unwrap(),
-);
-
-final impactProvider = FutureProvider.autoDispose<CarpoolImpact>(
-  (ref) async => (await ref.watch(carpoolRepositoryProvider).getMonthlyImpact()).unwrap(),
 );

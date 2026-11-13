@@ -8,7 +8,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/info_banner.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../providers/carpool_providers.dart';
-import 'impact_card.dart';
 import 'ride_card.dart';
 
 /// Content of the "Covoiturage" tab of the forum.
@@ -61,10 +60,6 @@ class CarpoolingSection extends ConsumerWidget {
                     ride: ride,
                     onTap: () => context.push(RoutePaths.ride(ride.id)),
                   ),
-                ),
-            ref.watch(impactProvider).maybeWhen(
-                  data: (impact) => ImpactCard(impact: impact),
-                  orElse: () => const SizedBox.shrink(),
                 ),
           ],
         );
