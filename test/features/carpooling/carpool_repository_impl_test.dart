@@ -116,15 +116,7 @@ void main() {
     expect(failure.message, 'This seat is no longer available.');
   });
 
-  test('getMonthlyImpact reads GET /carpool/impact', () async {
-    final (repo, api) = _repo((_) => (200, impactJson));
 
-    final impact = (await repo.getMonthlyImpact()).unwrap();
-
-    expect(api.requests.single.path, '/carpool/impact');
-    expect(impact.savedKg, 1420);
-    expect(impact.goalKg, 2000);
-  });
 
   test('createRide posts the ride and reads the 201 answer', () async {
     final (repo, api) = _repo((_) => (201, createdRideJson));
@@ -155,6 +147,39 @@ void main() {
     final failure = _failureOf(await repo.reserveSeats(rideId: 'es-4094', seatIds: ['s2']));
 
     expect(failure.message, "You can't book a seat in your own ride.");
+  });
+
+  test('updateRide puts the ride and reads the 200 answer', () async {
+    final (repo, api) = _repo((_) => (200, createdRideJson));
+
+    final ride = (await repo.updateRide('es-4094', _newRide)).unwrap();
+
+    final request = api.requests.single;
+    expect(request.method, 'PUT');
+    expect(request.path, '/carpool/rides/es-4094');
+    expect(ride.id, 'es-4094');
+  });
+
+  test('deleteRide deletes the ride with 204 answer', () async {
+    final (repo, api) = _repo((_) => (204, ''));
+
+    final result = await repo.deleteRide('es-4094');
+
+    expect(result, isA<Success<void>>());
+    final request = api.requests.single;
+    expect(request.method, 'DELETE');
+    expect(request.path, '/carpool/rides/es-4094');
+  });
+
+  test('cancelReservation deletes the reservation with 200 answer', () async {
+    final (repo, api) = _repo((_) => (200, createdRideJson));
+
+    final ride = (await repo.cancelReservation(rideId: 'es-4094', seatId: 's2')).unwrap();
+
+    final request = api.requests.single;
+    expect(request.method, 'DELETE');
+    expect(request.path, '/carpool/rides/es-4094/reservations/s2');
+    expect(ride.id, 'es-4094');
   });
 
   test('an unexpected body becomes a failure, not a crash', () async {

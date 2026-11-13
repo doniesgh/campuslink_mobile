@@ -1,6 +1,5 @@
 import '../../../../core/error/failures.dart';
 import '../../../../core/error/result.dart';
-import '../../domain/entities/carpool_impact.dart';
 import '../../domain/entities/new_ride.dart';
 import '../../domain/entities/ride.dart';
 import '../../domain/new_ride_rules.dart';
@@ -28,6 +27,7 @@ class MockCarpoolRepository implements CarpoolRepository {
   int _lastRideNumber = 4093;
 
   static const _ownRide = "You can't book a seat in your own ride.";
+  static const _notYourRide = 'Only the driver can change this ride.';
 
   static List<Ride> _seed() {
     final now = DateTime.now();
@@ -170,11 +170,6 @@ class MockCarpoolRepository implements CarpoolRepository {
     return const Success(null);
   }
 
-  @override
-  Future<Result<CarpoolImpact>> getMonthlyImpact() async {
-    await Future<void>.delayed(_latency);
-    return const Success(CarpoolImpact(savedKg: 1420, goalKg: 2000));
-  }
 
   /// Like the server: the student drives (seat "s1", with their name), as a
   /// new driver (no rating yet) whose car isn't verified.
@@ -218,5 +213,104 @@ class MockCarpoolRepository implements CarpoolRepository {
     );
     _rides.add(created);
     return Success(created);
+  }
+
+  /// Like the server: booked seats are kept, free seats follow the new count.
+  @override
+  Future<Result<Ride>> updateRide(String rideId, NewRide ride) async {
+    await Future<void>.delayed(_latency);
+    final index = _rides.indexWhere((r) => r.id == rideId);
+    if (index < 0) return const Err(ServerFailure('Ride not found.'));
+    final old = _rides[index];
+    if (!old.isMine) return const Err(ServerFailure(_notYourRide));
+
+    final errors = validateNewRide(ride, now: _clock());
+    if (errors.isNotEmpty) return Err(ValidationFailure(errors.values.first));
+
+    final booked = old.seats.where((s) => s.status == SeatStatus.booked).length;
+    if (ride.seatCount < booked) {
+      return Err(ValidationFailure(
+        '$booked ${booked == 1 ? 'place est déjà réservée' : 'places sont déjà réservées'} : '
+        'annulez des réservations avant de réduire le nombre de places.',
+      ));
+    }
+
+    final seats = [...old.seats];
+    final wanted = ride.seatCount + 1;
+    while (seats.length > wanted) {
+      seats.removeAt(seats.lastIndexWhere((s) => s.status == SeatStatus.free));
+    }
+    var next = seats.fold<int>(0, (m, s) {
+          final n = int.tryParse(s.id.substring(1)) ?? 0;
+          return n > m ? n : m;
+        }) +
+        1;
+    while (seats.length < wanted) {
+      seats.add(Seat(id: 's$next', label: 'Seat #$next', status: SeatStatus.free));
+      next++;
+    }
+    // Free seats are labelled by their position, like the server does.
+    for (var i = 0; i < seats.length; i++) {
+      if (seats[i].status == SeatStatus.free) {
+        seats[i] = Seat(id: seats[i].id, label: 'Seat #${i + 1}', status: SeatStatus.free);
+      }
+    }
+
+    final note = ride.dropoffNote.trim();
+    final updated = Ride(
+      id: old.id,
+      code: old.code,
+      pickup: ride.pickup.trim(),
+      dropoff: ride.dropoff.trim(),
+      pickupTag: ride.pickupTag.trim(),
+      dropoffTag: ride.dropoffTag.trim(),
+      dropoffNote: note,
+      departure: ride.departure,
+      arrival: ride.arrival,
+      distanceKm: ride.distanceKm ?? 0,
+      pricePerSeat: ride.pricePerSeat,
+      driver: Driver(
+        name: old.driver.name,
+        rating: old.driver.rating,
+        profile: old.driver.profile,
+        ridesCompleted: old.driver.ridesCompleted,
+        carModel: ride.carModel.trim(),
+        carColor: ride.carColor.trim(),
+        plate: ride.plate.trim(),
+        isCarVerified: old.driver.isCarVerified,
+      ),
+      seats: seats,
+      amenities: ride.amenities.toSet().toList(),
+      isMine: true,
+    );
+    _rides[index] = updated;
+    return Success(updated);
+  }
+
+  @override
+  Future<Result<void>> deleteRide(String rideId) async {
+    await Future<void>.delayed(_latency);
+    final index = _rides.indexWhere((r) => r.id == rideId);
+    if (index < 0) return const Err(ServerFailure('Ride not found.'));
+    if (!_rides[index].isMine) return const Err(ServerFailure(_notYourRide));
+    _rides.removeAt(index);
+    return const Success(null);
+  }
+
+  @override
+  Future<Result<Ride>> cancelReservation({required String rideId, required String seatId}) async {
+    await Future<void>.delayed(_latency);
+    final index = _rides.indexWhere((r) => r.id == rideId);
+    if (index < 0) return const Err(ServerFailure('Ride not found.'));
+    final ride = _rides[index];
+    if (!ride.isMine) return const Err(ServerFailure(_notYourRide));
+    final i = ride.seats.indexWhere((s) => s.id == seatId && s.status == SeatStatus.booked);
+    if (i < 0) return const Err(ValidationFailure('This seat is not booked.'));
+
+    final seats = [...ride.seats];
+    seats[i] = Seat(id: seatId, label: 'Seat #${i + 1}', status: SeatStatus.free);
+    final updated = ride.copyWithSeats(seats);
+    _rides[index] = updated;
+    return Success(updated);
   }
 }

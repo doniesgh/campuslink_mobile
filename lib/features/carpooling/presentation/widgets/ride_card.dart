@@ -42,7 +42,7 @@ class RideCard extends StatelessWidget {
                       const SizedBox(height: AppSpacing.md),
                       _RouteLines(ride: ride),
                       const Divider(height: AppSpacing.xl),
-                      _DriverRow(ride: ride, urgent: urgent, onJoin: onTap),
+                      _DriverRow(ride: ride, urgent: urgent),
                     ],
                   ),
                 ),
@@ -132,10 +132,9 @@ class _RouteLines extends StatelessWidget {
 }
 
 class _DriverRow extends StatelessWidget {
-  const _DriverRow({required this.ride, required this.urgent, required this.onJoin});
+  const _DriverRow({required this.ride, required this.urgent});
   final Ride ride;
   final bool urgent;
-  final VoidCallback onJoin;
 
   String get _seatsLabel {
     final n = ride.freeSeatCount;
@@ -192,16 +191,6 @@ class _DriverRow extends StatelessWidget {
         const SizedBox(width: AppSpacing.sm),
         Flexible(
           child: AppBadge(_seatsLabel, tone: urgent ? BadgeTone.accent : BadgeTone.primary),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        // minimumSize overridden: the global button theme is full-width.
-        FilledButton(
-          onPressed: ride.freeSeatCount == 0 ? null : onJoin,
-          style: FilledButton.styleFrom(
-            minimumSize: const Size(0, 38),
-            padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md),
-          ),
-          child: const Text('Rejoindre →'),
         ),
       ],
     );

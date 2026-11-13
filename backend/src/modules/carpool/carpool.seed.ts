@@ -1,7 +1,7 @@
 import type { Types } from 'mongoose';
 
 import { atCampusTime, campusMonth } from './campus-time';
-import { CarpoolImpactModel, RideModel } from './carpool.model';
+import {  RideModel } from './carpool.model';
 
 // The rides of the app's MockCarpoolRepository. Times are campus wall-clock
 // times "today" (day 0) or "tomorrow" (day 1), resolved when the seed runs.
@@ -84,8 +84,6 @@ const DEMO_RIDES = [
   },
 ];
 
-const DEMO_IMPACT = { savedKg: 1420, goalKg: 2000 };
-
 /**
  * Demo data for this module. Called by `npm run seed` with the demo
  * student's id. Must be idempotent (safe to run again).
@@ -113,9 +111,5 @@ export async function seedCarpool(_demoUserId: Types.ObjectId, now = new Date())
     );
   }
 
-  await CarpoolImpactModel.updateOne(
-    { _id: campusMonth(now) },
-    { $set: DEMO_IMPACT },
-    { upsert: true },
-  );
+ 
 }

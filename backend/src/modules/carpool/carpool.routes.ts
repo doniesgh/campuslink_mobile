@@ -5,8 +5,10 @@ import { currentUserId, requireAuth } from '../../middleware/require-auth';
 import {
   createRideSchema,
   reserveSeatsSchema,
+  updateRideSchema,
   type CreateRideInput,
   type ReserveSeatsInput,
+  type UpdateRideInput,
 } from './carpool.schemas';
 import * as carpool from './carpool.service';
 
@@ -39,6 +41,25 @@ carpoolRouter.post(
   },
 );
 
-carpoolRouter.get('/impact', async (_req, res) => {
-  res.json(await carpool.monthlyImpact());
+/** The driver edits their ride. 403 if it isn't theirs, 409 if too many seats are booked. */
+carpoolRouter.put(
+  '/rides/:id',
+  validateBody(updateRideSchema),
+  async (req: Request<{ id: string }>, res) => {
+    const input = req.body as UpdateRideInput;
+    res.json(await carpool.updateRide(req.params.id, currentUserId(res), input));
+  },
+);
+
+/** The driver deletes their ride. Answers 204. */
+carpoolRouter.delete('/rides/:id', async (req, res) => {
+  await carpool.deleteRide(req.params.id, currentUserId(res));
+  res.status(204).end();
 });
+
+/** The driver cancels the booking of one seat. Answers 200 with the updated ride. */
+carpoolRouter.delete('/rides/:id/reservations/:seatId', async (req, res) => {
+  res.json(await carpool.cancelReservation(req.params.id, currentUserId(res), req.params.seatId));
+});
+
+

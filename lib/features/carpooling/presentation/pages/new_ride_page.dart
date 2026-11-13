@@ -22,8 +22,13 @@ import '../widgets/ride_form_widgets.dart';
 /// "Proposer un trajet": the student publishes a ride as its driver.
 /// Route: RoutePaths.newRide. No Stitch design: built on the look of the
 /// ride detail screen. On success it opens the new ride's detail.
+///
+/// With [editing], the same form edits that ride (the driver's own): fields
+/// start filled in, and saving pops with `true` back to the ride detail.
 class NewRidePage extends ConsumerStatefulWidget {
-  const NewRidePage({super.key});
+  const NewRidePage({super.key, this.editing});
+
+  final Ride? editing;
 
   @override
   ConsumerState<NewRidePage> createState() => _NewRidePageState();
@@ -62,6 +67,52 @@ class _NewRidePageState extends ConsumerState<NewRidePage> {
   /// After the first attempt, errors follow every change.
   bool _submitted = false;
   bool _publishing = false;
+
+  bool get _isEditing => widget.editing != null;
+
+  /// Seats already taken in the ride being edited: the count can't go below.
+  int get _bookedSeats =>
+      widget.editing?.seats.where((s) => s.status == SeatStatus.booked).length ?? 0;
+
+  int get _minSeats => _bookedSeats > NewRideRules.minSeats ? _bookedSeats : NewRideRules.minSeats;
+
+  @override
+  void initState() {
+    super.initState();
+    final ride = widget.editing;
+    if (ride == null) return;
+
+    _pickup.text = ride.pickup;
+    _pickupTag.text = ride.pickupTag;
+    _dropoff.text = ride.dropoff;
+    _dropoffTag.text = ride.dropoffTag;
+    _carModel.text = ride.driver.carModel;
+    _carColor.text = ride.driver.carColor;
+    _plate.text = ride.driver.plate;
+    _note.text = ride.dropoffNote;
+    if (ride.hasDistance) {
+      _distance.text = ride.distanceKm.toString().replaceAll('.', ',');
+    }
+
+    final now = DateTime.now();
+    final dayDiff =
+        DateUtils.dateOnly(ride.departure).difference(DateUtils.dateOnly(now)).inDays;
+    switch (dayDiff) {
+      case 0:
+        _day = _Day.today;
+      case 1:
+        _day = _Day.tomorrow;
+      default:
+        _day = _Day.other;
+        _otherDate = DateUtils.dateOnly(ride.departure);
+    }
+    _time = TimeOfDay.fromDateTime(ride.departure);
+    _duration = ((ride.duration.inMinutes / _durationStep).round() * _durationStep)
+        .clamp(_minDuration, _maxDuration);
+    _seats = (ride.seats.length - 1).clamp(_minSeats, NewRideRules.maxSeats);
+    _price = ride.pricePerSeat;
+    _amenities.addAll(ride.amenities);
+  }
 
   @override
   void dispose() {
@@ -181,13 +232,23 @@ class _NewRidePageState extends ConsumerState<NewRidePage> {
     }
 
     setState(() => _publishing = true);
-    final result = await ref.read(carpoolRepositoryProvider).createRide(ride);
+    final repo = ref.read(carpoolRepositoryProvider);
+    final editing = widget.editing;
+    final result = editing == null
+        ? await repo.createRide(ride)
+        : await repo.updateRide(editing.id, ride);
     if (!mounted) return;
     setState(() => _publishing = false);
 
     result.when(
       success: (created) {
         ref.invalidate(ridesProvider);
+        if (editing != null) {
+          ref.invalidate(rideDetailProvider(editing.id));
+          showAppSnack(context, 'Trajet modifié.');
+          Navigator.of(context).pop(true);
+          return;
+        }
         showAppSnack(context, 'Trajet publié ! Les étudiants peuvent réserver vos places.');
         context.pushReplacement(RoutePaths.ride(created.id));
       },
@@ -234,10 +295,13 @@ class _NewRidePageState extends ConsumerState<NewRidePage> {
                         ],
                       ),
                       const SizedBox(height: AppSpacing.lg),
-                      Text('Proposer un trajet', style: theme.textTheme.headlineSmall),
+                      Text(_isEditing ? 'Modifier le trajet' : 'Proposer un trajet',
+                          style: theme.textTheme.headlineSmall),
                       const SizedBox(height: AppSpacing.xs),
                       Text(
-                        'Partagez votre trajet : les étudiants ESPRIT réservent vos places libres.',
+                        _isEditing
+                            ? 'Les changements sont visibles tout de suite par les étudiants.'
+                            : 'Partagez votre trajet : les étudiants ESPRIT réservent vos places libres.',
                         style: theme.textTheme.bodyMedium?.copyWith(color: muted),
                       ),
                       const SizedBox(height: AppSpacing.lg),
@@ -275,7 +339,7 @@ class _NewRidePageState extends ConsumerState<NewRidePage> {
                 ],
               ),
               action: AppButton(
-                label: 'Publier',
+                label: _isEditing ? 'Enregistrer' : 'Publier',
                 icon: Icons.check_rounded,
                 variant: AppButtonVariant.accent,
                 isLoading: _publishing,
@@ -428,11 +492,13 @@ class _NewRidePageState extends ConsumerState<NewRidePage> {
         children: [
           RideStepper(
             label: 'Places passagers',
-            caption: 'Sans compter la vôtre',
+            caption: _bookedSeats > 0
+                ? 'Sans compter la vôtre · $_bookedSeats déjà réservée${_bookedSeats > 1 ? 's' : ''}'
+                : 'Sans compter la vôtre',
             value: '$_seats',
             decrementTooltip: 'Une place de moins',
             incrementTooltip: 'Une place de plus',
-            onDecrement: _seats <= NewRideRules.minSeats ? null : () => setState(() => _seats--),
+            onDecrement: _seats <= _minSeats ? null : () => setState(() => _seats--),
             onIncrement: _seats >= NewRideRules.maxSeats ? null : () => setState(() => _seats++),
           ),
           const Divider(height: AppSpacing.xl),

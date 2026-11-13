@@ -1,20 +1,22 @@
 import { Types } from 'mongoose';
 
-import { conflict, notFound, unauthorized } from '../../lib/http-error';
+import { conflict, forbidden, notFound, unauthorized } from '../../lib/http-error';
 import { StudentProfileModel } from '../profile/profile.model';
 import { UserModel } from '../users/user.model';
 import { campusMonth } from './campus-time';
 import {
-  CarpoolImpactModel,
   RideCounterModel,
   RideModel,
   type RideDocument,
 } from './carpool.model';
-import type { CreateRideInput } from './carpool.schemas';
+import type { CreateRideInput, UpdateRideInput } from './carpool.schemas';
 
 const RIDE_NOT_FOUND = 'Ride not found.';
 const SEAT_TAKEN = 'This seat is no longer available.';
 const OWN_RIDE = "You can't book a seat in your own ride.";
+const NOT_YOUR_RIDE = 'Only the driver can change this ride.';
+const SEAT_NOT_BOOKED = 'This seat is not booked.';
+const RIDE_CHANGED = 'The ride was just updated. Please try again.';
 
 /** Used for a month that has no figures yet. */
 export const DEFAULT_MONTHLY_GOAL_KG = 2000;
@@ -231,11 +233,122 @@ export async function reserveSeats(
   return toRideJson(ride, userId);
 }
 
-/** CO2 saved by ESPRIT carpoolers this campus month, shared by every student. */
-export async function monthlyImpact(now = new Date()): Promise<{ savedKg: number; goalKg: number }> {
-  const impact = await CarpoolImpactModel.findById(campusMonth(now));
-  return {
-    savedKg: impact?.savedKg ?? 0,
-    goalKg: impact?.goalKg ?? DEFAULT_MONTHLY_GOAL_KG,
-  };
+/**
+ * Loads a ride and makes sure [userId] is its driver: 404 for an unknown
+ * ride, 403 for a ride that belongs to someone else (or to a demo driver).
+ */
+async function findOwnRide(rideId: string, userId: string): Promise<RideDocument> {
+  const ride = await RideModel.findById(rideId);
+  if (!ride) throw notFound(RIDE_NOT_FOUND);
+  if (!ride.driverId?.equals(userId)) throw forbidden(NOT_YOUR_RIDE);
+  return ride;
 }
+
+/** "s4" -> 4 (0 for an id that doesn't follow the "s<number>" pattern). */
+const seatNumber = (seatId: string) => Number(/^s(\d+)$/.exec(seatId)?.[1] ?? 0);
+
+/**
+ * The driver edits their ride. Booked seats are kept as they are: only the
+ * number of free seats follows [input.seatCount] (free seats are added at
+ * the end, or removed from the end). It can't go below the number of seats
+ * already booked.
+ */
+export async function updateRide(
+  rideId: string,
+  userId: string,
+  input: UpdateRideInput,
+): Promise<RideJson> {
+  const ride = await findOwnRide(rideId, userId);
+
+  const booked = ride.seats.filter((seat) => seat.status === 'booked').length;
+  if (input.seatCount < booked) {
+    throw conflict(
+      `${booked} ${booked === 1 ? 'place est déjà réservée' : 'places sont déjà réservées'} : ` +
+        'annulez des réservations avant de réduire le nombre de places.',
+    );
+  }
+
+  const seats = ride.seats.map((seat) => ({
+    seatId: seat.seatId,
+    status: seat.status,
+    passengerId: seat.passengerId ?? null,
+    passengerName: seat.passengerName ?? null,
+  }));
+  const wanted = input.seatCount + 1; // + the driver's seat
+  while (seats.length > wanted) {
+    const lastFree = seats.map((s) => s.status).lastIndexOf('free');
+    seats.splice(lastFree, 1);
+  }
+  let next = Math.max(0, ...seats.map((seat) => seatNumber(seat.seatId))) + 1;
+  while (seats.length < wanted) {
+    seats.push({ seatId: `s${next}`, status: 'free', passengerId: null, passengerName: null });
+    next += 1;
+  }
+
+  ride.pickup = input.pickup;
+  ride.pickupTag = input.pickupTag;
+  ride.dropoff = input.dropoff;
+  ride.dropoffTag = input.dropoffTag;
+  ride.dropoffNote = input.dropoffNote ?? '';
+  ride.departure = input.departure;
+  ride.arrival = input.arrival;
+  ride.distanceKm = input.distanceKm ?? 0;
+  ride.pricePerSeat = input.pricePerSeat;
+  ride.driver.carModel = input.carModel;
+  ride.driver.carColor = input.carColor;
+  ride.driver.plate = input.plate;
+  ride.amenities = input.amenities;
+  ride.seats = seats as typeof ride.seats;
+
+  try {
+    // Replacing the seats is versioned: a seat booked in the meantime makes
+    // this save fail instead of being overwritten.
+    await ride.save();
+  } catch (err) {
+    if ((err as { name?: string }).name === 'VersionError') throw conflict(RIDE_CHANGED);
+    throw err;
+  }
+  return toRideJson(ride, userId);
+}
+
+/** The driver deletes their ride, with the bookings in it. */
+export async function deleteRide(rideId: string, userId: string): Promise<void> {
+  const deleted = await RideModel.findOneAndDelete({ _id: rideId, driverId: new Types.ObjectId(userId) });
+  if (deleted) return;
+  // Nothing deleted: say why.
+  await findOwnRide(rideId, userId);
+  throw notFound(RIDE_NOT_FOUND);
+}
+
+/**
+ * The driver cancels the booking of [seatId]: the seat is free again.
+ * Atomic like [reserveSeats]: it only matches a seat that is still booked.
+ */
+export async function cancelReservation(
+  rideId: string,
+  userId: string,
+  seatId: string,
+): Promise<RideJson> {
+  const ride = await RideModel.findOneAndUpdate(
+    {
+      _id: rideId,
+      driverId: new Types.ObjectId(userId),
+      seats: { $elemMatch: { seatId, status: 'booked' } },
+    },
+    {
+      $set: {
+        'seats.$[seat].status': 'free',
+        'seats.$[seat].passengerId': null,
+        'seats.$[seat].passengerName': null,
+      },
+    },
+    { arrayFilters: [{ 'seat.seatId': seatId }], returnDocument: 'after' },
+  );
+  if (!ride) {
+    await findOwnRide(rideId, userId); // 404 / 403
+    throw conflict(SEAT_NOT_BOOKED);
+  }
+  return toRideJson(ride, userId);
+}
+
+

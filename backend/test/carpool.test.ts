@@ -3,7 +3,7 @@ import { Types } from 'mongoose';
 
 import { createApp } from '../src/app';
 import { atCampusTime, campusMonth } from '../src/modules/carpool/campus-time';
-import { CarpoolImpactModel, RideModel } from '../src/modules/carpool/carpool.model';
+import { RideModel } from '../src/modules/carpool/carpool.model';
 import { seedCarpool } from '../src/modules/carpool/carpool.seed';
 import { clearTestDb, closeTestDb, connectTestDb, createStudent, validationError } from './helpers';
 
@@ -53,7 +53,6 @@ describe('every carpool route needs a token', () => {
     ['post', '/api/carpool/rides'],
     ['get', '/api/carpool/rides/es-4091'],
     ['post', '/api/carpool/rides/es-4091/reservations'],
-    ['get', '/api/carpool/impact'],
   ] as const)('%s %s answers 401', async (method, path) => {
     const res = await request(app)[method](path).send({ seatIds: ['s3'] }).expect(401);
     expect(res.body).toEqual({ message: 'Invalid credentials or expired session.' });
@@ -256,25 +255,6 @@ describe('POST /api/carpool/rides/:id/reservations', () => {
   });
 });
 
-describe('GET /api/carpool/impact', () => {
-  test('returns the campus figures of the current month', async () => {
-    await seed(new Date());
-    const { auth } = await createStudent();
-    await request(app).get('/api/carpool/impact').set(auth).expect(200, {
-      savedKg: 1420,
-      goalKg: 2000,
-    });
-  });
-
-  test('starts from zero in a month without figures', async () => {
-    const { auth } = await createStudent();
-    await request(app).get('/api/carpool/impact').set(auth).expect(200, {
-      savedKg: 0,
-      goalKg: 2000,
-    });
-  });
-});
-
 describe('seedCarpool', () => {
   test('is idempotent, moves the rides to the new day and drops old bookings', async () => {
     await seed();
@@ -288,7 +268,6 @@ describe('seedCarpool', () => {
     await seed(new Date('2026-11-09T10:00:00.000Z'));
 
     expect(await RideModel.countDocuments()).toBe(3);
-    expect(await CarpoolImpactModel.countDocuments()).toBe(1);
     const res = await request(app).get('/api/carpool/rides/es-4091').set(auth).expect(200);
     const ride = res.body as RideBody;
     expect(ride.departure).toBe('2026-11-09T12:15:00.000Z');
