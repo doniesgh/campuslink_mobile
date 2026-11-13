@@ -141,10 +141,5 @@ void main() {
     await _dismissSnack(tester);
   });
 
-  testWidgets('Experiences is still coming soon, without a button', (tester) async {
-    await _pumpForum(tester, ForumSection.experiences);
 
-    expect(find.text('Experiences is coming soon.'), findsOneWidget);
-    expect(find.byType(FloatingActionButton), findsNothing);
-  });
 }

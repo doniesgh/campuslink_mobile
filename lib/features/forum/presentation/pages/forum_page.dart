@@ -19,8 +19,7 @@ import '../widgets/lost_item_publish_sheet.dart';
 enum ForumSection {
   carpooling('Covoiturage', Icons.directions_car_outlined),
   lostFound('Lost & Found', Icons.search),
-  ideas('Ideas', Icons.lightbulb_outline),
-  experiences('Experiences', Icons.auto_stories_outlined);
+  ideas('Ideas', Icons.lightbulb_outline);
 
   const ForumSection(this.label, this.icon);
   final String label;
@@ -41,13 +40,7 @@ class ForumPage extends ConsumerStatefulWidget {
 
 class _ForumPageState extends ConsumerState<ForumPage> {
   String _query = '';
-
-  /// Bumped to rebuild (and so empty) the search field.
   int _searchFieldGeneration = 0;
-
-  void _comingSoon(String what) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text('$what - coming soon')));
-
   void _clearSearch() => setState(() {
         _query = '';
         _searchFieldGeneration++;
@@ -122,7 +115,6 @@ class _ForumPageState extends ConsumerState<ForumPage> {
                   _ => 'Search rides, lost items, or campus...',
                 },
                 onChanged: (v) => setState(() => _query = v),
-                onFilterTap: () => _comingSoon('Filters'),
               ),
             ),
             const SizedBox(height: AppSpacing.md),
