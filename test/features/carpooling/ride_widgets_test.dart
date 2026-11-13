@@ -4,7 +4,6 @@ import 'package:campuspulse/core/error/failures.dart';
 import 'package:campuspulse/core/error/result.dart';
 import 'package:campuspulse/core/theme/app_colors.dart';
 import 'package:campuspulse/features/carpooling/data/models/carpool_models.dart';
-import 'package:campuspulse/features/carpooling/domain/entities/carpool_impact.dart';
 import 'package:campuspulse/features/carpooling/domain/entities/new_ride.dart';
 import 'package:campuspulse/features/carpooling/domain/entities/ride.dart';
 import 'package:campuspulse/features/carpooling/domain/repositories/carpool_repository.dart';
@@ -41,10 +40,6 @@ class _OneRideRepository implements CarpoolRepository {
     required List<String> seatIds,
   }) async =>
       const Success(null);
-
-  @override
-  Future<Result<CarpoolImpact>> getMonthlyImpact() async =>
-      const Success(CarpoolImpact(savedKg: 0, goalKg: 2000));
 
   @override
   Future<Result<Ride>> createRide(NewRide ride) async => Success(this.ride);

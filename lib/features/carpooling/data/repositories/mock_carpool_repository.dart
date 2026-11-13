@@ -1,6 +1,5 @@
 import '../../../../core/error/failures.dart';
 import '../../../../core/error/result.dart';
-import '../../domain/entities/carpool_impact.dart';
 import '../../domain/entities/new_ride.dart';
 import '../../domain/entities/ride.dart';
 import '../../domain/new_ride_rules.dart';
@@ -170,12 +169,6 @@ class MockCarpoolRepository implements CarpoolRepository {
     return const Success(null);
   }
 
-  @override
-  Future<Result<CarpoolImpact>> getMonthlyImpact() async {
-    await Future<void>.delayed(_latency);
-    return const Success(CarpoolImpact(savedKg: 1420, goalKg: 2000));
-  }
-
   /// Like the server: the student drives (seat "s1", with their name), as a
   /// new driver (no rating yet) whose car isn't verified.
   @override
@@ -218,5 +211,14 @@ class MockCarpoolRepository implements CarpoolRepository {
     );
     _rides.add(created);
     return Success(created);
+  }
+
+  @override
+  Future<Result<void>> deleteRide(String id) async {
+    await Future<void>.delayed(_latency);
+    final idx = _rides.indexWhere((r) => r.id == id);
+    if (idx == -1) return const Err(ServerFailure('Ride not found.'));
+    _rides.removeAt(idx);
+    return const Success(null);
   }
 }

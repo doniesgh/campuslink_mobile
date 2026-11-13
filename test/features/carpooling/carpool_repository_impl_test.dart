@@ -116,16 +116,6 @@ void main() {
     expect(failure.message, 'This seat is no longer available.');
   });
 
-  test('getMonthlyImpact reads GET /carpool/impact', () async {
-    final (repo, api) = _repo((_) => (200, impactJson));
-
-    final impact = (await repo.getMonthlyImpact()).unwrap();
-
-    expect(api.requests.single.path, '/carpool/impact');
-    expect(impact.savedKg, 1420);
-    expect(impact.goalKg, 2000);
-  });
-
   test('createRide posts the ride and reads the 201 answer', () async {
     final (repo, api) = _repo((_) => (201, createdRideJson));
 

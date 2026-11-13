@@ -39,6 +39,8 @@ carpoolRouter.post(
   },
 );
 
-carpoolRouter.get('/impact', async (_req, res) => {
-  res.json(await carpool.monthlyImpact());
+/** Deletes the student's own ride. Answers 204. */
+carpoolRouter.delete('/rides/:id', async (req: Request<{ id: string }>, res) => {
+  await carpool.deleteRide(currentUserId(res), req.params.id);
+  res.sendStatus(204);
 });

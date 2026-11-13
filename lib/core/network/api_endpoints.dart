@@ -30,7 +30,6 @@ abstract final class ApiEndpoints {
   static const rides = '/carpool/rides';
   static String ride(String id) => '/carpool/rides/$id';
   static String rideReservations(String id) => '/carpool/rides/$id/reservations';
-  static const carpoolImpact = '/carpool/impact';
 
   // Jobs (POST on jobs posts an offer; PATCH / DELETE on job(id) edit / delete it)
   static const jobs = '/jobs';
@@ -47,6 +46,8 @@ abstract final class ApiEndpoints {
   static String lostItemMatches(String id) => '/forum/lost-items/$id/matches';
   static const ideas = '/forum/ideas';
   static String ideaUpvote(String id) => '/forum/ideas/$id/upvote';
+  static String idea(String id) => '/forum/ideas/$id';
+  static String lostItem(String id) => '/forum/lost-items/$id';
 
   // Grades
   static const transcript = '/grades/transcript';

@@ -110,4 +110,16 @@ class ForumRepositoryImpl implements ForumRepository {
         final r = await _dio.post<dynamic>(ApiEndpoints.ideaUpvote(Uri.encodeComponent(id)));
         return ideaUpvoteFromJson(_object(r));
       });
+
+  /// 204 on success; 403/404 from the server become a ServerFailure.
+  @override
+  Future<Result<void>> deleteIdea(String id) => guard<void>(() async {
+        await _dio.delete<dynamic>(ApiEndpoints.idea(Uri.encodeComponent(id)));
+      });
+
+  /// 204 on success; 403/404 from the server become a ServerFailure.
+  @override
+  Future<Result<void>> deleteLostItem(String id) => guard<void>(() async {
+        await _dio.delete<dynamic>(ApiEndpoints.lostItem(Uri.encodeComponent(id)));
+      });
 }

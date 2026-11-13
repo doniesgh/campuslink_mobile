@@ -26,6 +26,3 @@ const invalidRideJson = '{"message":"Proposez entre 1 et 4 places."}';
 
 /// 409 answer when the driver of [createdRideJson] books its seat s2.
 const ownRideJson = '{"message":"You can\'t book a seat in your own ride."}';
-
-/// GET /carpool/impact after the seed.
-const impactJson = '{"savedKg":1420,"goalKg":2000}';

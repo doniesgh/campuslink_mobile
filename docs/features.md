@@ -102,7 +102,7 @@ All of them share the `AuthScaffold` layout.
 
 **Screens:** `ForumPage` (third tab, *Covoiturage* section), `RideDetailPage`, `NewRidePage`.
 
-- **Ride list:** search, rides as cards and the campus CO₂ impact card.
+- **Ride list:** search and rides as cards.
 - **Ride detail & booking:** a map preview, the driver card (with "New driver" for first-time drivers) and a seat picker. **Reserve Seat** books the chosen seats, and the seats you booked are labelled "You".
 - **Publishing a ride:** the **"Proposer un trajet +"** button opens a form with:
   - route
@@ -114,7 +114,7 @@ All of them share the `AuthScaffold` layout.
 
   You become the driver and the ride appears for everyone. You can't book your own ride.
 
-**API:** `GET /carpool/rides`, `GET /carpool/rides/:id`, `POST /carpool/rides`, `POST /carpool/rides/:id/reservations`, `GET /carpool/impact`.
+**API:** `GET /carpool/rides`, `GET /carpool/rides/:id`, `POST /carpool/rides`, `POST /carpool/rides/:id/reservations`.
 
 **Code:**
 - The Forum page itself is in `forum/presentation/pages/forum_page.dart`. Its selected section is `forumSectionProvider`, so other screens can open a given section.
@@ -146,8 +146,6 @@ All of them share the `AuthScaffold` layout.
 - **"Proposer une idée"** publishes an idea with a theme.
 
 **API:** `GET /forum/ideas`, `POST /forum/ideas`, `POST /forum/ideas/:id/upvote`.
-
-The *Experiences* section is still "coming soon".
 
 ## Jobs
 
@@ -314,4 +312,3 @@ These show a "coming soon" message and are marked with a `// TODO:` in the code:
 - The Discord / community links
 - Transcript PDF download
 - Notification preferences and SMS alerts
-- The Forum's *Experiences* section

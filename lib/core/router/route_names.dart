@@ -28,6 +28,8 @@ abstract final class RoutePaths {
   /// "Proposer un trajet" form.
   static const newRide = '$forum/rides/new';
   static String ride(String id) => '$forum/rides/$id';
+  static String ideaDetail(String id) => '$forum/ideas/$id';
+  static String lostItemDetail(String id) => '$forum/lost-items/$id';
   static String job(String id) => '$jobs/$id';
 
   /// Offer form (companies and admins): post a new offer, or edit offer [id].
