@@ -189,14 +189,15 @@ const isIndex = (value: unknown, end: number): value is number =>
   typeof value === 'number' && Number.isInteger(value) && value >= 0 && value < end;
 
 /**
- * Columns the cells give away: most cells hold an "@" (email) or are masked
- * passwords (•••), or the column holds the role values the model read.
+ * Columns the cells give away: most cells hold an "@" (email), are masked
+ * passwords (•••) or ENT IDs (241JMT0101), or the column holds the role
+ * values the model read.
  */
 function evidentColumns(
   lines: string[][],
   width: number,
   roleTexts: string[],
-): { email: number | null; password: number | null; role: number | null } {
+): { email: number | null; password: number | null; role: number | null; studentId: number | null } {
   const best = (score: (cell: string) => boolean, minShare: number): number | null => {
     let found: number | null = null;
     let top = 0;
@@ -215,6 +216,8 @@ function evidentColumns(
     email: best((cell) => /\S@\S/.test(cell), 0.5),
     password: best((cell) => cell === MASKED_PASSWORD, 0.5),
     role: roles.size > 0 ? best((cell) => roles.has(cell), 0.5) : null,
+    // ENT IDs such as 241JMT0101: capitals and digits, one word, with a digit.
+    studentId: best((cell) => /^(?=.*\d)(?=.*[A-Z])[A-Z0-9]{6,20}$/.test(cell), 0.5),
   };
 }
 
@@ -228,6 +231,64 @@ function checkHeaderRow(proposed: number, emailColumn: number | null, lines: str
   if (emailColumn === null) return proposed;
   const firstAccount = lines.findIndex((cells) => (cells[emailColumn] ?? '').includes('@'));
   return firstAccount < 0 ? proposed : firstAccount;
+}
+
+/** "Élève ingénieure" → "eleveingenieure": lower case, no accents, letters and digits only. */
+const foldText = (text: string): string =>
+  text
+    .normalize('NFD')
+    .replace(/\p{M}/gu, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, '');
+
+/** Two words or more, letters only ("BEN SALAH Amina"), as a name cell is. */
+const NAME_CELL = /^\p{L}[\p{L}'’.-]*(\s+\p{L}[\p{L}'’.-]*)+$/u;
+
+/**
+ * When the model found no name column, the unused column whose cells are
+ * names (two words or more, letters only): the accounts need a name.
+ */
+function nameColumn(dataLines: string[][], width: number, used: Set<number>): number | null {
+  let found: number | null = null;
+  let top = 0;
+  for (let column = 0; column < width; column += 1) {
+    if (used.has(column)) continue;
+    const cells = dataLines.map((cells) => (cells[column] ?? '').trim()).filter(Boolean);
+    const names = cells.filter((cell) => NAME_CELL.test(cell)).length;
+    if (names > top && names / cells.length >= 0.8) {
+      top = names;
+      found = column;
+    }
+  }
+  return found;
+}
+
+/**
+ * Role values the model left out that are another form of one it read
+ * ("Élève ingénieure" for "Élève ingénieur", "Maître assistante" for "Maître
+ * assistant") get the same role. Small models often skip such variants.
+ */
+function addRoleVariants(
+  roles: AssistMapping['roles'],
+  seen: Set<string>,
+  roleTitle: string | null,
+  dataLines: string[][],
+  roleColumn: number,
+): void {
+  const known = roles.filter((entry) => entry.role !== null);
+  for (const cells of dataLines) {
+    const text = (cells[roleColumn] ?? '').trim();
+    if (!text || seen.has(text) || text === roleTitle) continue;
+    const folded = foldText(text);
+    const twin = known.find((entry) => {
+      const other = foldText(entry.text);
+      const shorter = Math.min(other.length, folded.length);
+      return shorter >= 4 && (folded.startsWith(other) || other.startsWith(folded));
+    });
+    if (!twin) continue;
+    seen.add(text);
+    roles.push({ text, role: twin.role });
+  }
 }
 
 /**
@@ -250,7 +311,7 @@ export function sanitize(answer: unknown, { lines, values }: AssistRequest): Ass
     .map((item) => (isRecord(item) && typeof item.text === 'string' ? item.text.trim() : ''))
     .filter(Boolean);
   const evident = evidentColumns(lines, width, roleTexts);
-  for (const field of ['email', 'password', 'role'] as const) {
+  for (const field of ['email', 'password', 'role', 'studentId'] as const) {
     const index = evident[field];
     if (index !== null && !used.has(index)) {
       columns[field] = index;
@@ -275,6 +336,10 @@ export function sanitize(answer: unknown, { lines, values }: AssistRequest): Ass
     lines,
   );
   correctColumns(columns, lines.slice(headerRow), used);
+  if (columns.lastName === null && columns.firstName === null && columns.fullName === null) {
+    columns.fullName = nameColumn(lines.slice(headerRow), width, used);
+    if (columns.fullName !== null) used.add(columns.fullName);
+  }
 
   // Every value sent; the title of the role column ("Profil") is one of them, but isn't a role.
   const sent = new Set([
@@ -292,6 +357,9 @@ export function sanitize(answer: unknown, { lines, values }: AssistRequest): Ass
     seen.add(text);
     const role = typeof item.role === 'string' ? item.role.trim().toLowerCase() : '';
     roles.push({ text, role: USER_ROLES.find((r) => r === role) ?? null });
+  }
+  if (columns.role !== null) {
+    addRoleVariants(roles, seen, roleTitle, lines.slice(headerRow), columns.role);
   }
 
   return {
