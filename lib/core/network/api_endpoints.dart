@@ -39,6 +39,8 @@ abstract final class ApiEndpoints {
   static String lostItemRequests(String id) => '/forum/lost-items/$id/requests';
   static const ideas = '/forum/ideas';
   static String ideaUpvote(String id) => '/forum/ideas/$id/upvote';
+  static String idea(String id) => '/forum/ideas/$id';
+  static String lostItem(String id) => '/forum/lost-items/$id';
 
   // Grades
   static const transcript = '/grades/transcript';

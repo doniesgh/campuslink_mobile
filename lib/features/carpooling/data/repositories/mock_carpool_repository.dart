@@ -212,4 +212,13 @@ class MockCarpoolRepository implements CarpoolRepository {
     _rides.add(created);
     return Success(created);
   }
+
+  @override
+  Future<Result<void>> deleteRide(String id) async {
+    await Future<void>.delayed(_latency);
+    final idx = _rides.indexWhere((r) => r.id == id);
+    if (idx == -1) return const Err(ServerFailure('Ride not found.'));
+    _rides.removeAt(idx);
+    return const Success(null);
+  }
 }

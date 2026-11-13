@@ -32,4 +32,11 @@ abstract interface class ForumRepository {
   /// Adds the student's upvote to idea [id], or takes it back. Returns the
   /// new count and state. An idea that no longer exists is a ServerFailure.
   Future<Result<IdeaUpvote>> toggleIdeaUpvote(String id);
+
+  /// Deletes the student's own idea [id]. A 403/404 from the server becomes
+  /// a ServerFailure with the API's message.
+  Future<Result<void>> deleteIdea(String id);
+
+  /// Deletes the student's own lost-item notice [id].
+  Future<Result<void>> deleteLostItem(String id);
 }

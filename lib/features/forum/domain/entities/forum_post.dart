@@ -20,6 +20,7 @@ class ForumPost {
     this.comments = 0,
     this.status,
     this.isUpvotedByMe = false,
+    this.isMine = false,
   });
 
   final String id;
@@ -45,6 +46,9 @@ class ForumPost {
   /// Whether the signed-in student upvoted this idea (always false for other posts).
   final bool isUpvotedByMe;
 
+  /// Whether this post was created by the signed-in student.
+  final bool isMine;
+
   /// [upvotes] and [isUpvotedByMe] together.
   IdeaUpvote get upvote => (upvotes: upvotes, isUpvotedByMe: isUpvotedByMe);
 
@@ -62,6 +66,7 @@ class ForumPost {
         comments: comments,
         status: status,
         isUpvotedByMe: upvote.isUpvotedByMe,
+        isMine: isMine,
       );
 
   /// Case- and accent-insensitive search on the text, badge, author and status.

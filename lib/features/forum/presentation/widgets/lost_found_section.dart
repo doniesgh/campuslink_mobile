@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-
+import 'package:go_router/go_router.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/providers/clock_provider.dart';
+import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_snack.dart';
@@ -18,7 +19,8 @@ const _page = EdgeInsets.symmetric(horizontal: AppSpacing.page);
 /// Content of the "Lost & Found" tab of the forum
 /// (Stitch "07. Lost & Found Campus Items").
 class LostFoundSection extends ConsumerStatefulWidget {
-  const LostFoundSection({super.key, required this.query, required this.onClearSearch});
+  const LostFoundSection(
+      {super.key, required this.query, required this.onClearSearch});
 
   /// Text typed in the forum search field.
   final String query;
@@ -50,7 +52,8 @@ class _LostFoundSectionState extends ConsumerState<LostFoundSection> {
 
   Future<void> _openRequest(LostItem item) async {
     final sent = await showLostItemRequestSheet(context, item);
-    if (sent && mounted) showAppSnack(context, 'Signalement transmis au staff de sécurité !');
+    if (sent && mounted)
+      showAppSnack(context, 'Signalement transmis au staff de sécurité !');
   }
 
   @override
@@ -71,7 +74,8 @@ class _LostFoundSectionState extends ConsumerState<LostFoundSection> {
         return RefreshIndicator(
           onRefresh: _refresh,
           child: ListView(
-            padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: 96), // room for the FAB
+            padding: const EdgeInsets.only(
+                top: AppSpacing.xs, bottom: 96), // room for the FAB
             children: [
               const Padding(padding: _page, child: _CampusContextHeader()),
               const SizedBox(height: AppSpacing.md),
@@ -80,36 +84,36 @@ class _LostFoundSectionState extends ConsumerState<LostFoundSection> {
                 counts: countLostItems(matching),
                 onSelected: (kind) => setState(() => _kind = kind),
               ),
-              const SizedBox(height: AppSpacing.md),
-              Padding(
-                padding: _page,
-                child: _DropOffBanner(
-                  // TODO: open the campus map on the drop-off points.
-                  onTap: () => showAppSnack(context, 'The campus map is coming soon.'),
-                ),
-              ),
               const SizedBox(height: AppSpacing.lg),
               if (visible.isEmpty)
                 Padding(
                   padding: _page,
                   child: _NoMatchView(
-                    onReset: widget.query.trim().isEmpty && _kind == null ? null : _reset,
+                    onReset: widget.query.trim().isEmpty && _kind == null
+                        ? null
+                        : _reset,
                   ),
                 )
               else
                 for (final item in visible)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.page, 0, AppSpacing.page, AppSpacing.md,
+                      AppSpacing.page,
+                      0,
+                      AppSpacing.page,
+                      AppSpacing.md,
                     ),
-                    child: LostItemCard(
-                      item: item,
-                      now: now,
-                      onAction: () => _openRequest(item),
+                    child: GestureDetector(
+                      onTap: () =>
+                          context.push(RoutePaths.lostItemDetail(item.id)),
+                      child: LostItemCard(
+                        item: item,
+                        now: now,
+                        onAction: () => _openRequest(item),
+                      ),
                     ),
                   ),
-              const SizedBox(height: AppSpacing.sm),
-              const Padding(padding: _page, child: _StudentTipCard()),
+            
             ],
           ),
         );
@@ -126,62 +130,19 @@ class _CampusContextHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final label = theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700);
+    final label =
+        theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.xs,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: AppSpacing.xs),
-              decoration: ShapeDecoration(
-                color: scheme.surfaceContainerHigh,
-                shape: const StadiumBorder(),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.school_outlined, size: 14, color: scheme.primary),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      'ESPRIT Ghazela & Charguia',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: label?.copyWith(color: scheme.primary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.schedule, size: 16, color: lostFoundSuccessColor(scheme)),
-                const SizedBox(width: AppSpacing.xs),
-                Flexible(
-                  child: Text(
-                    "Guichet ouvert jusqu'à 18h",
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: label?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
         const SizedBox(height: AppSpacing.sm),
         Text('Objets Perdus & Trouvés', style: theme.textTheme.headlineSmall),
         const SizedBox(height: 2),
         Text(
           'Retrouvez vos effets ou déclarez un objet égaré dans les blocs',
-          style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          style: theme.textTheme.bodySmall
+              ?.copyWith(color: scheme.onSurfaceVariant),
         ),
       ],
     );
@@ -190,7 +151,8 @@ class _CampusContextHeader extends StatelessWidget {
 
 /// "Tous 18" / "● Objets Perdus 7" / "● Objets Trouvés 11".
 class _FilterPills extends StatelessWidget {
-  const _FilterPills({required this.selected, required this.counts, required this.onSelected});
+  const _FilterPills(
+      {required this.selected, required this.counts, required this.onSelected});
 
   final LostItemKind? selected;
   final LostItemCounts counts;
@@ -261,8 +223,10 @@ class _FilterPill extends StatelessWidget {
     final (bg, fg) = selected
         ? selectedColors
         : (scheme.surfaceContainer, scheme.onSurfaceVariant);
-    final bubble = selected ? fg.withValues(alpha: 0.22) : scheme.surfaceContainerHighest;
-    final style = theme.textTheme.labelMedium?.copyWith(color: fg, fontWeight: FontWeight.w700);
+    final bubble =
+        selected ? fg.withValues(alpha: 0.22) : scheme.surfaceContainerHighest;
+    final style = theme.textTheme.labelMedium
+        ?.copyWith(color: fg, fontWeight: FontWeight.w700);
 
     return Semantics(
       selected: selected,
@@ -282,77 +246,26 @@ class _FilterPill extends StatelessWidget {
                   Container(
                     width: 8,
                     height: 8,
-                    decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                    decoration:
+                        BoxDecoration(color: dotColor, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 6),
                 ],
                 Text(label, style: style),
                 const SizedBox(width: 6),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(color: bubble, borderRadius: BorderRadius.circular(10)),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(
+                      color: bubble, borderRadius: BorderRadius.circular(10)),
                   child: Text(
                     '$count',
-                    style: theme.textTheme.labelSmall?.copyWith(color: fg, fontWeight: FontWeight.w700),
+                    style: theme.textTheme.labelSmall
+                        ?.copyWith(color: fg, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// "Point de collecte central" banner.
-class _DropOffBanner extends StatelessWidget {
-  const _DropOffBanner({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      color: scheme.surfaceContainer,
-      borderRadius: AppRadius.lgAll,
-      child: InkWell(
-        borderRadius: AppRadius.lgAll,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerLowest,
-                  borderRadius: AppRadius.mdAll,
-                ),
-                child: Icon(Icons.pin_drop_outlined, size: 20, color: scheme.primary),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Point de collecte central',
-                      style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    Text(
-                      'Accueil Bloc C (Ghazela) & Hall Central (Charguia)',
-                      style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(Icons.chevron_right, size: 18, color: scheme.outline),
-            ],
           ),
         ),
       ),
@@ -391,7 +304,8 @@ class _NoMatchView extends StatelessWidget {
             'Essayez un autre mot-clé ou publiez un avis de recherche pour alerter '
             'la communauté ESPRIT.',
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
           ),
           if (onReset != null) ...[
             const SizedBox(height: AppSpacing.lg),
@@ -406,49 +320,6 @@ class _NoMatchView extends StatelessWidget {
               child: const Text('Réinitialiser la recherche'),
             ),
           ],
-        ],
-      ),
-    );
-  }
-}
-
-/// "Conseil étudiant" card at the end of the list.
-class _StudentTipCard extends StatelessWidget {
-  const _StudentTipCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(color: scheme.surfaceContainer, borderRadius: AppRadius.lgAll),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: scheme.surfaceContainerHighest,
-            child: Icon(Icons.lightbulb_outline, size: 18, color: scheme.secondary),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Conseil étudiant',
-                  style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Pour tout objet de valeur (PC, smartphone), le service de sécurité '
-                  "ESPRIT effectue une vérification d'adresse MAC et compte ENT.",
-                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );

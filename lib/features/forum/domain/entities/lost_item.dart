@@ -40,6 +40,7 @@ class LostItem {
     this.dropOffNote,
     this.pickupDesk,
     this.isSerialHidden = false,
+    this.isMine = false,
   });
 
   final String id;
@@ -78,6 +79,9 @@ class LostItem {
 
   /// The serial number is hidden so the owner can prove ownership.
   final bool isSerialHidden;
+
+  /// Whether this item was reported by the signed-in student.
+  final bool isMine;
 
   bool get isLost => kind == LostItemKind.lost;
 

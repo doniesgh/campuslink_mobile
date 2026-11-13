@@ -62,6 +62,7 @@ class MockForumRepository implements ForumRepository {
       tag: theme.isEmpty ? defaultIdeaTag : theme,
       body: body.trim(),
       postedAt: DateTime.now(),
+      isMine: true,
     );
     _publishedIdeas.insert(0, idea);
     return Success(idea);
@@ -162,6 +163,7 @@ class MockForumRepository implements ForumRepository {
       isUrgent: draft.isLost && draft.isUrgent,
       dropOffNote: draft.isLost ? null : text(draft.dropOffNote),
       pickupDesk: draft.isLost ? null : text(draft.pickupDesk),
+      isMine: true,
     );
     _publishedItems.insert(0, item);
     return Success(item);
@@ -179,6 +181,24 @@ class MockForumRepository implements ForumRepository {
     if (proof.trim().isEmpty) {
       return const Err(ValidationFailure('Please add a detail that identifies the item.'));
     }
+    return const Success(null);
+  }
+
+  @override
+  Future<Result<void>> deleteIdea(String id) async {
+    await Future<void>.delayed(_latency);
+    final idx = _publishedIdeas.indexWhere((p) => p.id == id);
+    if (idx == -1) return const Err(ServerFailure("Cette idée n'existe plus."));
+    _publishedIdeas.removeAt(idx);
+    return const Success(null);
+  }
+
+  @override
+  Future<Result<void>> deleteLostItem(String id) async {
+    await Future<void>.delayed(_latency);
+    final idx = _publishedItems.indexWhere((item) => item.id == id);
+    if (idx == -1) return const Err(ServerFailure('This item is no longer listed.'));
+    _publishedItems.removeAt(idx);
     return const Success(null);
   }
 

@@ -17,6 +17,8 @@ import '../../features/carpooling/presentation/pages/new_ride_page.dart';
 import '../../features/carpooling/presentation/pages/ride_detail_page.dart';
 import '../../features/courses/presentation/pages/courses_page.dart';
 import '../../features/forum/presentation/pages/forum_page.dart';
+import '../../features/forum/presentation/pages/idea_detail_page.dart';
+import '../../features/forum/presentation/pages/lost_item_detail_page.dart';
 import '../../features/grades/presentation/pages/grades_page.dart';
 import '../../features/jobs/presentation/pages/job_detail_page.dart';
 import '../../features/jobs/presentation/pages/jobs_page.dart';
@@ -116,6 +118,16 @@ final routerProvider = Provider<GoRouter>((ref) {
                   path: 'rides/:rideId',
                   builder: (_, state) =>
                       RideDetailPage(rideId: state.pathParameters['rideId']!),
+                ),
+                GoRoute(
+                  path: 'ideas/:ideaId',
+                  builder: (_, state) =>
+                      IdeaDetailPage(ideaId: state.pathParameters['ideaId']!),
+                ),
+                GoRoute(
+                  path: 'lost-items/:itemId',
+                  builder: (_, state) =>
+                      LostItemDetailPage(itemId: state.pathParameters['itemId']!),
                 ),
               ],
             ),

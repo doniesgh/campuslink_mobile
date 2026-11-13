@@ -43,9 +43,6 @@ class _ForumPageState extends ConsumerState<ForumPage> {
   /// Bumped to rebuild (and so empty) the search field.
   int _searchFieldGeneration = 0;
 
-  void _comingSoon(String what) => ScaffoldMessenger.of(context)
-      .showSnackBar(SnackBar(content: Text('$what - coming soon')));
-
   void _clearSearch() => setState(() {
         _query = '';
         _searchFieldGeneration++;
@@ -119,7 +116,6 @@ class _ForumPageState extends ConsumerState<ForumPage> {
                   ForumSection.carpooling => 'Search rides, lost items, or campus...',
                 },
                 onChanged: (v) => setState(() => _query = v),
-                onFilterTap: () => _comingSoon('Filters'),
               ),
             ),
             const SizedBox(height: AppSpacing.md),

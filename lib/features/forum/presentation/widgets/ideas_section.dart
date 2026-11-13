@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/providers/clock_provider.dart';
+import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/state_views.dart';
@@ -66,12 +68,15 @@ class IdeasSection extends ConsumerWidget {
                     padding: const EdgeInsets.fromLTRB(
                       AppSpacing.page, 0, AppSpacing.page, AppSpacing.md,
                     ),
-                    child: IdeaCard(
-                      key: ValueKey(idea.id),
-                      idea: idea,
-                      upvote: votes[idea.id] ?? idea.upvote,
-                      now: now,
-                      onUpvote: () => _upvote(context, ref, idea),
+                    child: GestureDetector(
+                      onTap: () => context.push(RoutePaths.ideaDetail(idea.id)),
+                      child: IdeaCard(
+                        key: ValueKey(idea.id),
+                        idea: idea,
+                        upvote: votes[idea.id] ?? idea.upvote,
+                        now: now,
+                        onUpvote: () => _upvote(context, ref, idea),
+                      ),
                     ),
                   ),
             ],
@@ -102,41 +107,6 @@ class _IdeasHeader extends StatelessWidget {
           crossAxisAlignment: WrapCrossAlignment.center,
           spacing: AppSpacing.sm,
           runSpacing: AppSpacing.xs,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: AppSpacing.xs),
-              decoration: ShapeDecoration(
-                color: scheme.surfaceContainerHigh,
-                shape: const StadiumBorder(),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.how_to_vote_outlined, size: 14, color: scheme.primary),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      'Boîte à idées · BDE ESPRIT',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: label?.copyWith(color: scheme.primary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.lightbulb_outline, size: 16, color: scheme.secondary),
-                const SizedBox(width: AppSpacing.xs),
-                Text(
-                  ideaCountLabel(count),
-                  style: label?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ],
         ),
         const SizedBox(height: AppSpacing.sm),
         Text('Idées du campus', style: theme.textTheme.headlineSmall),

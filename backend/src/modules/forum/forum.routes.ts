@@ -21,7 +21,7 @@ forumRouter.get('/highlights', async (_req, res) => {
 });
 
 forumRouter.get('/lost-items', async (_req, res) => {
-  res.json(await forum.listLostItems());
+  res.json(await forum.listLostItems(currentUserId(res)));
 });
 
 /** Publishes a lost or found notice. Answers 201 with the created item. */
@@ -53,4 +53,16 @@ forumRouter.post('/ideas', validateBody(publishIdeaSchema), async (req, res) => 
 /** Adds or removes the student's vote. Answers `{ upvotes, isUpvotedByMe }`. */
 forumRouter.post('/ideas/:id/upvote', async (req, res) => {
   res.json(await forum.toggleIdeaUpvote(currentUserId(res), req.params.id));
+});
+
+/** Deletes the student's own lost-item notice. Answers 204. */
+forumRouter.delete('/lost-items/:id', async (req: Request<{ id: string }>, res) => {
+  await forum.deleteLostItem(currentUserId(res), req.params.id);
+  res.sendStatus(204);
+});
+
+/** Deletes the student's own idea. Answers 204. */
+forumRouter.delete('/ideas/:id', async (req: Request<{ id: string }>, res) => {
+  await forum.deleteIdea(currentUserId(res), req.params.id);
+  res.sendStatus(204);
 });

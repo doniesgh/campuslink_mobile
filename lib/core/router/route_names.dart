@@ -29,6 +29,8 @@ abstract final class RoutePaths {
   /// "Proposer un trajet" form.
   static const newRide = '$forum/rides/new';
   static String ride(String id) => '$forum/rides/$id';
+  static String ideaDetail(String id) => '$forum/ideas/$id';
+  static String lostItemDetail(String id) => '$forum/lost-items/$id';
   static String job(String id) => '$jobs/$id';
 
   /// Administration, inside the Profile tab. Admins only: [authRedirect]

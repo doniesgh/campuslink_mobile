@@ -225,3 +225,11 @@ export async function reserveSeats(
   }
   return toRideJson(ride, userId);
 }
+
+/** Deletes ride [rideId] if [userId] is its driver. Throws 403 otherwise, 404 if gone. */
+export async function deleteRide(userId: string, rideId: string): Promise<void> {
+  const ride = await RideModel.findById(rideId).select('driverId').lean();
+  if (!ride) throw notFound(RIDE_NOT_FOUND);
+  if (!ride.driverId || !ride.driverId.equals(userId)) throw unauthorized();
+  await RideModel.deleteOne({ _id: rideId });
+}

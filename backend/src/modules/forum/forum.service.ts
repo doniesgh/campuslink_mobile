@@ -30,7 +30,7 @@ export const UNKNOWN_CLASS_INFO = 'Étudiant ESPRIT';
  */
 async function withVotes(posts: ForumPost[], userId: string): Promise<PublicForumPost[]> {
   const ideaIds = posts.filter((post) => post.category === 'idea').map((post) => post._id);
-  if (ideaIds.length === 0) return posts.map((post) => toPublicPost(post));
+  if (ideaIds.length === 0) return posts.map((post) => toPublicPost(post, undefined, userId));
 
   const [counts, mine] = await Promise.all([
     IdeaVoteModel.aggregate<{ _id: string; count: number }>([
@@ -42,10 +42,11 @@ async function withVotes(posts: ForumPost[], userId: string): Promise<PublicForu
   const countById = new Map(counts.map((c) => [c._id, c.count]));
   const votedIds = new Set(mine.map((vote) => vote.ideaId));
   return posts.map((post) =>
-    toPublicPost(post, {
-      count: countById.get(post._id) ?? 0,
-      isUpvotedByMe: votedIds.has(post._id),
-    }),
+    toPublicPost(
+      post,
+      { count: countById.get(post._id) ?? 0, isUpvotedByMe: votedIds.has(post._id) },
+      userId,
+    ),
   );
 }
 
@@ -117,7 +118,7 @@ export async function publishIdea(
     status: null,
     postedAt: new Date(),
   });
-  return toPublicPost(idea.toObject());
+  return toPublicPost(idea.toObject(), undefined, userId);
 }
 
 const isDuplicateKey = (err: unknown): boolean =>
@@ -151,9 +152,9 @@ export async function toggleIdeaUpvote(
 }
 
 /** The whole Lost & Found board, newest first. Shared by every student. */
-export async function listLostItems(): Promise<PublicLostItem[]> {
+export async function listLostItems(userId = ''): Promise<PublicLostItem[]> {
   const items = await LostItemModel.find().sort({ reportedAt: -1, _id: -1 }).lean();
-  return items.map(toPublicLostItem);
+  return items.map((item) => toPublicLostItem(item, userId));
 }
 
 /**
@@ -185,7 +186,7 @@ export async function publishLostItem(
     photoCount: 0,
     isSerialHidden: false,
   });
-  return toPublicLostItem(item.toObject());
+  return toPublicLostItem(item.toObject(), userId);
 }
 
 /**
@@ -211,4 +212,22 @@ export async function sendLostItemRequest(
     if (isDuplicateKey(err)) throw conflict(ALREADY_SENT);
     throw err;
   }
+}
+
+/** Deletes idea [ideaId] if [userId] is its author. Throws 403 otherwise, 404 if gone. */
+export async function deleteIdea(userId: string, ideaId: string): Promise<void> {
+  const idea = await ForumPostModel.findOne({ _id: ideaId, category: 'idea' })
+    .select('authorId')
+    .lean();
+  if (!idea) throw notFound(IDEA_GONE);
+  if (!idea.authorId || idea.authorId.toHexString() !== userId) throw unauthorized();
+  await ForumPostModel.deleteOne({ _id: ideaId });
+}
+
+/** Deletes lost-item [itemId] if [userId] is its reporter. Throws 403 otherwise, 404 if gone. */
+export async function deleteLostItem(userId: string, itemId: string): Promise<void> {
+  const item = await LostItemModel.findOne({ _id: itemId }).select('reporterId').lean();
+  if (!item) throw notFound(ITEM_GONE);
+  if (!item.reporterId || item.reporterId.toHexString() !== userId) throw unauthorized();
+  await LostItemModel.deleteOne({ _id: itemId });
 }

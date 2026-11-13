@@ -22,6 +22,7 @@ class ForumPostModel extends ForumPost {
     super.comments,
     super.status,
     super.isUpvotedByMe,
+    super.isMine,
   });
 
   factory ForumPostModel.fromJson(Map<String, dynamic> json) => ForumPostModel(
@@ -37,6 +38,7 @@ class ForumPostModel extends ForumPost {
         comments: _int(json['comments']),
         status: json['status'] as String?,
         isUpvotedByMe: (json['isUpvotedByMe'] as bool?) ?? false,
+        isMine: (json['isMine'] as bool?) ?? false,
       );
 }
 
@@ -74,6 +76,7 @@ class LostItemModel extends LostItem {
     super.dropOffNote,
     super.pickupDesk,
     super.isSerialHidden,
+    super.isMine,
   });
 
   factory LostItemModel.fromJson(Map<String, dynamic> json) => LostItemModel(
@@ -100,6 +103,7 @@ class LostItemModel extends LostItem {
         dropOffNote: json['dropOffNote'] as String?,
         pickupDesk: json['pickupDesk'] as String?,
         isSerialHidden: (json['isSerialHidden'] as bool?) ?? false,
+        isMine: (json['isMine'] as bool?) ?? false,
       );
 }
 

@@ -123,3 +123,41 @@ class IdeaUpvotesNotifier extends Notifier<Map<String, IdeaUpvote>> {
 
   void _set(String id, IdeaUpvote upvote) => state = {...state, id: upvote};
 }
+
+/// Deletes idea [id] by the signed-in student. Invalidates [ideasProvider] and
+/// [highlightsProvider] on success; returns a [Failure] message on error.
+Future<String?> deleteIdea(WidgetRef ref, String id) async {
+  final result = await ref.read(forumRepositoryProvider).deleteIdea(id);
+
+  return result.when(
+    success: (_) {
+      ref.invalidate(ideasProvider);
+      ref.invalidate(highlightsProvider);
+      return null;
+    },
+    failure: (f) => f.message,
+  );
+}
+/// Deletes lost-item [id] by the signed-in student. Invalidates
+/// [lostItemsProvider] on success; returns a [Failure] message on error.
+// Future<String?> deleteLostItem(Ref ref, String id) async {
+//   final result = await ref.read(forumRepositoryProvider).deleteLostItem(id);
+//   return result.when(
+//     success: (_) {
+//       ref.invalidate(lostItemsProvider);
+//       return null;
+//     },
+//     failure: (f) => f.message,
+//   );
+// }
+Future<String?> deleteLostItem(WidgetRef ref, String id) async {
+  final result = await ref.read(forumRepositoryProvider).deleteLostItem(id);
+
+  return result.when(
+    success: (_) {
+      ref.invalidate(lostItemsProvider);
+      return null;
+    },
+    failure: (f) => f.message,
+  );
+}

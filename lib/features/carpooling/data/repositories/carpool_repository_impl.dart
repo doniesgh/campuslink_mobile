@@ -44,4 +44,9 @@ class CarpoolRepositoryImpl implements CarpoolRepository {
         final r = await _dio.post<dynamic>(ApiEndpoints.rides, data: NewRideModel.toJson(ride));
         return RideModel.fromJson(r.data as Map<String, dynamic>);
       });
+
+  @override
+  Future<Result<void>> deleteRide(String id) => guard<void>(() async {
+        await _dio.delete<dynamic>(ApiEndpoints.ride(Uri.encodeComponent(id)));
+      });
 }

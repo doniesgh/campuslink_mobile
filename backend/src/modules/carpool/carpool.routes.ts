@@ -38,3 +38,9 @@ carpoolRouter.post(
     res.status(201).json(await carpool.reserveSeats(req.params.id, currentUserId(res), seatIds));
   },
 );
+
+/** Deletes the student's own ride. Answers 204. */
+carpoolRouter.delete('/rides/:id', async (req: Request<{ id: string }>, res) => {
+  await carpool.deleteRide(currentUserId(res), req.params.id);
+  res.sendStatus(204);
+});

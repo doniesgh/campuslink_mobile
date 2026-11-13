@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/router/route_names.dart';
@@ -31,6 +32,7 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
   /// null = user has not touched the seats yet -> first free seat is preselected.
   Set<String>? _picked;
   bool _reserving = false;
+  bool _deleting = false;
 
   Set<String> _selection(Ride ride) {
     // The driver can't book a seat in their own ride.
@@ -52,6 +54,44 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
 
   void _snack(String message) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+
+  Future<void> _confirmDelete(Ride ride) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer ce trajet ?'),
+        content: const Text(
+          'Cette action est irréversible. Les passagers qui avaient réservé seront avertis.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Annuler'),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+
+    setState(() => _deleting = true);
+    final result = await ref.read(carpoolRepositoryProvider).deleteRide(ride.id);
+    if (!mounted) return;
+    setState(() => _deleting = false);
+
+    result.when(
+      success: (_) {
+        ref.invalidate(ridesProvider);
+        context.canPop() ? context.pop() : context.go(RoutePaths.forum);
+        _snack('Trajet supprimé.');
+      },
+      failure: (f) => _snack(f.message),
+    );
+  }
 
   Future<void> _reserve(Ride ride) async {
     final seatIds = _selection(ride).toList();
@@ -179,6 +219,21 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
               variant: AppButtonVariant.accent,
               isLoading: _reserving,
               onPressed: count == 0 ? null : () => _reserve(ride),
+            ),
+          )
+        else
+          BottomActionBar(
+            leading: Text(
+              'Votre trajet',
+              style: theme.textTheme.labelMedium
+                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            ),
+            action: AppButton(
+              label: 'Supprimer le trajet',
+              icon: Icons.delete_outline,
+              variant: AppButtonVariant.outlined,
+              isLoading: _deleting,
+              onPressed: () => _confirmDelete(ride),
             ),
           ),
       ],

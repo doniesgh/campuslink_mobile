@@ -63,6 +63,8 @@ export interface PublicForumPost {
 
   /** Whether the student asking voted for this idea (always false for other posts). */
   isUpvotedByMe: boolean;
+  /** Whether this post was created by the student asking. */
+  isMine: boolean;
 }
 
 /** Students' votes on an idea, as counted by the service. */
@@ -73,7 +75,11 @@ export interface IdeaVotes {
 
 const NO_VOTES: IdeaVotes = { count: 0, isUpvotedByMe: false };
 
-export const toPublicPost = (post: ForumPost, votes: IdeaVotes = NO_VOTES): PublicForumPost => ({
+export const toPublicPost = (
+  post: ForumPost,
+  votes: IdeaVotes = NO_VOTES,
+  userId = '',
+): PublicForumPost => ({
   id: post._id,
   authorName: post.authorName,
   authorInfo: post.authorInfo,
@@ -86,4 +92,5 @@ export const toPublicPost = (post: ForumPost, votes: IdeaVotes = NO_VOTES): Publ
   status: post.status ?? null,
   postedAt: post.postedAt.toISOString(),
   isUpvotedByMe: votes.isUpvotedByMe,
+  isMine: post.authorId != null && post.authorId.toHexString() === userId,
 });

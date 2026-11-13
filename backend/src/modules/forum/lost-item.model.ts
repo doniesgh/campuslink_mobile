@@ -79,9 +79,11 @@ export interface PublicLostItem {
   dropOffNote: string | null;
   pickupDesk: string | null;
   isSerialHidden: boolean;
+  /** Whether this item was reported by the student asking. */
+  isMine: boolean;
 }
 
-export const toPublicLostItem = (item: LostItem): PublicLostItem => ({
+export const toPublicLostItem = (item: LostItem, userId = ''): PublicLostItem => ({
   id: item._id,
   kind: item.kind,
   title: item.title,
@@ -100,4 +102,5 @@ export const toPublicLostItem = (item: LostItem): PublicLostItem => ({
   dropOffNote: item.dropOffNote ?? null,
   pickupDesk: item.pickupDesk ?? null,
   isSerialHidden: item.isSerialHidden,
+  isMine: item.reporterId != null && item.reporterId.toHexString() === userId,
 });
