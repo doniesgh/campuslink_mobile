@@ -221,7 +221,8 @@ describe('sanitize', () => {
     expect(mapping.columns).toEqual({
       lastName: null,
       firstName: null,
-      fullName: null,
+      // No name column left: the column of names (two words, letters only) is the full name.
+      fullName: 0,
       email: 1,
       studentId: null,
       // The column holding the role values the model read, found from the lines.
@@ -245,6 +246,63 @@ describe('sanitize', () => {
       separate,
     );
     expect(mapping.columns).toMatchObject({ lastName: 0, firstName: 1, fullName: null, email: 2 });
+  });
+
+  test('a column of ENT IDs is the ENT ID, never a name (a real model took it for the last name)', () => {
+    const ids = readRequest({
+      lines: [
+        ['Fonction', 'Identité', 'Num. inscription', 'Adresse de contact'],
+        ['Élève ingénieur', 'BEN SALAH Amina', '241JMT0101', 'a…@campus.test'],
+        ['Élève ingénieur', 'EL AMRI Sami', '241JMT0102', 's…@campus.test'],
+        ['Maître assistant', 'BEN AMOR Hichem', '', 'h…@campus.test'],
+      ],
+      values: [],
+    });
+    const mapping = sanitize(
+      { ...ANSWER, headerRow: 1, columns: columns({ lastName: 2, firstName: 1, email: 3, role: 0 }), roles: [] },
+      ids,
+    );
+    expect(mapping.columns).toMatchObject({ studentId: 2, fullName: 1, lastName: null, firstName: null });
+  });
+
+  test('a model that finds no name column: the column of names is the full name', () => {
+    // A real model answered this for the demo file (docs: Read with AI).
+    const mapping = sanitize({ ...ANSWER, columns: columns({ email: 1, role: 2, password: 3 }) }, req);
+    expect(mapping.columns).toMatchObject({ fullName: 0, lastName: null, firstName: null });
+  });
+
+  test('role values the model skipped get the role of their other form', () => {
+    const demo = readRequest({
+      lines: [
+        ['Fonction', 'Identité', 'Adresse de contact'],
+        ['Élève ingénieur', 'BEN SALAH Amina', 'a…@campus.test'],
+        ['Élève ingénieure', 'GHARBI Yasmine', 'y…@campus.test'],
+        ['Maître assistant', 'BEN AMOR Hichem', 'h…@campus.test'],
+        ['Maître assistante', 'CHAABANE Leila', 'l…@campus.test'],
+        ['Promo 2024', 'JLASSI Mehdi', 'm…@campus.test'],
+      ],
+      values: [],
+    });
+    const mapping = sanitize(
+      {
+        headerRow: 1,
+        columns: { fullName: 1, email: 2, role: 0 },
+        nameOrder: 'LAST_FIRST',
+        roles: [
+          { text: 'Élève ingénieur', role: 'student' },
+          { text: 'Maître assistant', role: 'teacher' },
+          { text: 'Promo 2024', role: 'alumni' },
+        ],
+      },
+      demo,
+    );
+    expect(mapping.roles).toEqual([
+      { text: 'Élève ingénieur', role: 'student' },
+      { text: 'Maître assistant', role: 'teacher' },
+      { text: 'Promo 2024', role: 'alumni' },
+      { text: 'Élève ingénieure', role: 'student' },
+      { text: 'Maître assistante', role: 'teacher' },
+    ]);
   });
 
   test('the cells win over a model that is off by a column', () => {
@@ -318,7 +376,7 @@ describe('sanitize', () => {
       expect(sanitize(answer, req)).toEqual({
         // The title line is right above the first email.
         headerRow: 2,
-        columns: columns({ email: 1, password: 3 }),
+        columns: columns({ fullName: 0, email: 1, password: 3 }),
         nameOrder: 'LAST_FIRST',
         roles: [],
       });
