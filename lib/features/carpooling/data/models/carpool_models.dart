@@ -1,4 +1,3 @@
-import '../../domain/entities/carpool_impact.dart';
 import '../../domain/entities/new_ride.dart';
 import '../../domain/entities/ride.dart';
 abstract final class RideModel {
@@ -67,10 +66,3 @@ abstract final class NewRideModel {
       };
 }
 
-/// Backend impact JSON (GET /carpool/impact): { "savedKg": 1420, "goalKg": 2000 }
-abstract final class CarpoolImpactModel {
-  static CarpoolImpact fromJson(Map<String, dynamic> json) => CarpoolImpact(
-        savedKg: (json['savedKg'] as num).toDouble(),
-        goalKg: (json['goalKg'] as num).toDouble(),
-      );
-}

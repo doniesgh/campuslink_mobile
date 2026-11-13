@@ -14,6 +14,7 @@ class SeatPicker extends StatelessWidget {
     required this.selected,
     required this.onToggle,
     this.enabled = true,
+    this.onBookedTap,
   });
 
   final List<Seat> seats;
@@ -22,6 +23,9 @@ class SeatPicker extends StatelessWidget {
 
   /// False for the driver of the ride: they see the seats but can't book.
   final bool enabled;
+
+  /// Set for the driver: tapping a booked seat offers to cancel its booking.
+  final ValueChanged<Seat>? onBookedTap;
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +46,11 @@ class SeatPicker extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.xs),
           Text(
-            enabled ? 'Tap an available seat to select' : 'Students book your free seats here',
+            enabled
+                ? 'Tap an available seat to select'
+                : onBookedTap != null
+                    ? 'Tap a booked seat to cancel its booking'
+                    : 'Students book your free seats here',
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: AppSpacing.lg),
@@ -58,7 +66,12 @@ class SeatPicker extends StatelessWidget {
                 _SeatTile(
                   seat: seat,
                   selected: selected.contains(seat.id),
-                  onTap: enabled && seat.status == SeatStatus.free ? () => onToggle(seat.id) : null,
+                  cancellable: onBookedTap != null && seat.status == SeatStatus.booked,
+                  onTap: enabled && seat.status == SeatStatus.free
+                      ? () => onToggle(seat.id)
+                      : onBookedTap != null && seat.status == SeatStatus.booked
+                          ? () => onBookedTap!(seat)
+                          : null,
                 ),
             ],
           ),
@@ -69,10 +82,16 @@ class SeatPicker extends StatelessWidget {
 }
 
 class _SeatTile extends StatelessWidget {
-  const _SeatTile({required this.seat, required this.selected, required this.onTap});
+  const _SeatTile({
+    required this.seat,
+    required this.selected,
+    required this.onTap,
+    this.cancellable = false,
+  });
 
   final Seat seat;
   final bool selected;
+  final bool cancellable;
   final VoidCallback? onTap;
 
   @override
@@ -111,7 +130,7 @@ class _SeatTile extends StatelessWidget {
           fg = scheme.onSurfaceVariant;
           border = Colors.transparent;
           icon = Icons.person_outline;
-          caption = 'Booked';
+          caption = cancellable ? 'Tap to cancel' : 'Booked';
       }
     }
 

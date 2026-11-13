@@ -76,15 +76,7 @@ class IdeaCard extends StatelessWidget {
           Row(
             children: [
               IdeaUpvoteButton(upvote: upvote, onTap: onUpvote),
-              const SizedBox(width: AppSpacing.sm),
-              Expanded(
-                child: Text(
-                  ideaCommentsLabel(idea.comments),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ),
+             
               if (status != null) ...[
                 const SizedBox(width: AppSpacing.sm),
                 Flexible(child: AppBadge(status, tone: BadgeTone.success)),

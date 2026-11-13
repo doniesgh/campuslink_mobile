@@ -7,7 +7,6 @@ import 'package:campuspulse/core/providers/clock_provider.dart';
 import 'package:campuspulse/core/router/route_names.dart';
 import 'package:campuspulse/core/theme/app_colors.dart';
 import 'package:campuspulse/features/carpooling/data/models/carpool_models.dart';
-import 'package:campuspulse/features/carpooling/domain/entities/carpool_impact.dart';
 import 'package:campuspulse/features/carpooling/domain/entities/new_ride.dart';
 import 'package:campuspulse/features/carpooling/domain/entities/ride.dart';
 import 'package:campuspulse/features/carpooling/domain/repositories/carpool_repository.dart';
@@ -57,8 +56,15 @@ class _FakeCarpoolRepository implements CarpoolRepository {
       const Success(null);
 
   @override
-  Future<Result<CarpoolImpact>> getMonthlyImpact() async =>
-      const Success(CarpoolImpact(savedKg: 0, goalKg: 2000));
+  Future<Result<Ride>> updateRide(String rideId, NewRide ride) async =>
+      const Err(ServerFailure('Not implemented'));
+
+  @override
+  Future<Result<void>> deleteRide(String rideId) async => const Success(null);
+
+  @override
+  Future<Result<Ride>> cancelReservation({required String rideId, required String seatId}) async =>
+      const Err(ServerFailure('Not implemented'));
 }
 
 /// Opens the form above a stand-in Forum (which lists the rides, so the

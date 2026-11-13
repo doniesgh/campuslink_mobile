@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_badge.dart';
 import '../../../../shared/widgets/app_button.dart';
+import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/bottom_action_bar.dart';
 import '../../../../shared/widgets/detail_top_bar.dart';
 import '../../../../shared/widgets/info_banner.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../../domain/entities/ride.dart';
 import '../providers/carpool_providers.dart';
+import 'new_ride_page.dart';
 import '../widgets/driver_card.dart';
 import '../widgets/ride_summary_card.dart';
 import '../widgets/route_map_preview.dart';
@@ -31,6 +34,7 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
   /// null = user has not touched the seats yet -> first free seat is preselected.
   Set<String>? _picked;
   bool _reserving = false;
+  bool _busy = false; // the driver is editing, deleting or cancelling
 
   Set<String> _selection(Ride ride) {
     // The driver can't book a seat in their own ride.
@@ -73,6 +77,104 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
     );
   }
 
+  // ---- Driver actions (own ride only) ----
+
+  Future<bool> _confirm({
+    required String title,
+    required String message,
+    required String confirmLabel,
+  }) async {
+    final scheme = Theme.of(context).colorScheme;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            style: TextButton.styleFrom(minimumSize: const Size(0, 40)),
+            child: const Text('Keep'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 40),
+              foregroundColor: scheme.error,
+            ),
+            child: Text(confirmLabel),
+          ),
+        ],
+      ),
+    );
+    return ok ?? false;
+  }
+
+  Future<void> _edit(Ride ride) async {
+    final saved = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(builder: (_) => NewRidePage(editing: ride)),
+    );
+    if (saved != true || !mounted) return;
+    setState(() => _picked = null);
+    ref.invalidate(rideDetailProvider(ride.id));
+    ref.invalidate(ridesProvider);
+  }
+
+  Future<void> _delete(Ride ride) async {
+    final ok = await _confirm(
+      title: 'Delete this ride?',
+      message: 'Ride ${ride.code} will disappear for every student, and the '
+          'seats already booked are cancelled. This cannot be undone.',
+      confirmLabel: 'Delete',
+    );
+    if (!ok || !mounted) return;
+
+    setState(() => _busy = true);
+    final result = await ref.read(carpoolRepositoryProvider).deleteRide(ride.id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    result.when(
+      success: (_) {
+        // Not the detail provider: the ride no longer exists, refetching it would fail.
+        ref.invalidate(ridesProvider);
+        showAppSnack(context, 'Ride deleted.');
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go(RoutePaths.forum);
+        }
+      },
+      failure: (f) => _snack(f.message),
+    );
+  }
+
+  Future<void> _cancelBooking(Ride ride, Seat seat) async {
+    final ok = await _confirm(
+      title: 'Cancel this booking?',
+      message: '${seat.label} will lose their seat, and it becomes free again '
+          'for other students.',
+      confirmLabel: 'Cancel booking',
+    );
+    if (!ok || !mounted) return;
+
+    setState(() => _busy = true);
+    final result = await ref
+        .read(carpoolRepositoryProvider)
+        .cancelReservation(rideId: ride.id, seatId: seat.id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    result.when(
+      success: (_) {
+        ref.invalidate(rideDetailProvider(ride.id));
+        ref.invalidate(ridesProvider);
+        _snack('Booking cancelled. The seat is free again.');
+      },
+      failure: (f) => _snack(f.message),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final async = ref.watch(rideDetailProvider(widget.rideId));
@@ -106,7 +208,7 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
               AppSpacing.md,
               AppSpacing.page,
               // Without the booking bar, keep clear of the system bar.
-              AppSpacing.lg + (ride.isMine ? MediaQuery.paddingOf(context).bottom : 0),
+              AppSpacing.lg,
             ),
             children: [
               DetailTopBar(
@@ -129,8 +231,8 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
                   icon: Icons.drive_eta_outlined,
                   tone: BadgeTone.success,
                   title: "You're driving this ride",
-                  message: 'Students book your free seats from here. Their names '
-                      'appear on the seats they take.',
+                  message: 'Students book your free seats from here. You can edit or '
+                      'delete the ride below, or tap a booked seat to cancel its booking.',
                 ),
                 const SizedBox(height: AppSpacing.md),
               ],
@@ -139,12 +241,32 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
                 selected: selected,
                 enabled: !ride.isMine,
                 onToggle: (id) => _toggle(ride, id),
+                onBookedTap: ride.isMine && !_busy ? (seat) => _cancelBooking(ride, seat) : null,
               ),
-             
             ],
           ),
         ),
-        if (!ride.isMine)
+        if (ride.isMine)
+          BottomActionBar(
+            leading: TextButton.icon(
+              onPressed: _busy ? null : () => _delete(ride),
+              icon: const Icon(Icons.delete_outline),
+              label: const Text('Delete'),
+              style: TextButton.styleFrom(
+                // The global button theme is full-width.
+                minimumSize: const Size(0, 44),
+                foregroundColor: theme.colorScheme.error,
+              ),
+            ),
+            action: AppButton(
+              label: 'Edit ride',
+              icon: Icons.edit_outlined,
+              variant: AppButtonVariant.accent,
+              isLoading: _busy,
+              onPressed: _busy ? null : () => _edit(ride),
+            ),
+          )
+        else
           BottomActionBar(
             leading: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

@@ -83,14 +83,4 @@ const rideCounterSchema = new Schema({
 
 export const RideCounterModel = model('RideCounter', rideCounterSchema);
 
-/** Campus-wide CO2 savings, one document per campus month ("2026-11"). */
-const carpoolImpactSchema = new Schema(
-  {
-    _id: { type: String, required: true },
-    savedKg: { type: Number, required: true },
-    goalKg: { type: Number, required: true },
-  },
-  { timestamps: true },
-);
 
-export const CarpoolImpactModel = model('CarpoolImpact', carpoolImpactSchema);

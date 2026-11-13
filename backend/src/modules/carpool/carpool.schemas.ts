@@ -117,3 +117,12 @@ export const createRideSchema = z
   );
 
 export type CreateRideInput = z.infer<typeof createRideSchema>;
+
+/**
+ * PUT /carpool/rides/:id: the driver edits their ride. Same fields and rules
+ * as publishing (the form is the same), `seatCount` can't go below the
+ * number of seats already booked (the service checks it).
+ */
+export const updateRideSchema = createRideSchema;
+
+export type UpdateRideInput = CreateRideInput;

@@ -98,4 +98,37 @@ void main() {
 
     expect(await repo.reserveSeats(rideId: 'es-4092', seatIds: ['s2']), isA<Success<void>>());
   });
+
+  test('deleteRide deletes the driver ride', () async {
+    final repo = _repo();
+    final ride = (await repo.createRide(_newRide())).unwrap();
+
+    final result = await repo.deleteRide(ride.id);
+    expect(result, isA<Success<void>>());
+
+    final rides = (await repo.getRides()).unwrap();
+    expect(rides.map((r) => r.id), isNot(contains(ride.id)));
+  });
+
+  test('updateRide modifies the driver ride', () async {
+    final repo = _repo();
+    final ride = (await repo.createRide(_newRide())).unwrap();
+
+    final updated = (await repo.updateRide(ride.id, _newRide(seatCount: 3))).unwrap();
+    expect(updated.seats, hasLength(4)); // driver + 3 passenger seats
+  });
+
+  test('cancelReservation frees a booked seat', () async {
+    final repo = _repo();
+    final ride = (await repo.createRide(_newRide(seatCount: 2))).unwrap();
+
+    // Someone books seat #2
+    await repo.reserveSeats(rideId: ride.id, seatIds: ['s2']);
+    final booked = (await repo.getRide(ride.id)).unwrap();
+    expect(booked.seats[1].status, SeatStatus.booked);
+
+    // Driver cancels seat #2 reservation
+    final canceled = (await repo.cancelReservation(rideId: ride.id, seatId: 's2')).unwrap();
+    expect(canceled.seats[1].status, SeatStatus.free);
+  });
 }
