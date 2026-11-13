@@ -33,6 +33,8 @@ abstract final class RoutePaths {
   /// Offer form (companies and admins): post a new offer, or edit offer [id].
   static const newJob = '$jobs/new';
   static String editJob(String id) => '$jobs/$id/edit';
+  static const myApplications = '$jobs/applications';
+  static String jobApplications(String id) => '${job(id)}/applications';
 
   /// Administration, inside the Profile tab. Admins only: [authRedirect]
   /// sends everyone else back to Profile (and the API refuses them anyway).

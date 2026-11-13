@@ -1,4 +1,5 @@
 import '../../domain/entities/job.dart';
+import '../../domain/entities/job_application.dart';
 import '../../domain/entities/job_draft.dart';
 import '../../domain/entities/job_summary.dart';
 
@@ -11,6 +12,7 @@ import '../../domain/entities/job_summary.dart';
 ///   "missionItems": [{ "title": "...", "description": "..." }],
 ///   "matchPercent": 94 | null, "criteria": [...], "skills": [...],
 ///   "hasApplied": false,            // for the signed-in student
+///   "applicationStatus": null | "pending" | "accepted" | "rejected",
 ///   "authorId": "..." | null,       // null for the seeded catalogue
 ///   "canEdit": false }              // its author or an admin
 ///
@@ -43,6 +45,7 @@ abstract final class JobModel {
         criteria: _strings(json['criteria']),
         skills: _strings(json['skills']),
         hasApplied: json['hasApplied'] as bool? ?? false,
+        applicationStatus: ApplicationStatus.tryParse(json['applicationStatus']),
         authorId: json['authorId'] as String?,
         canEdit: json['canEdit'] as bool? ?? false,
       );
@@ -88,4 +91,34 @@ abstract final class JobSummaryModel {
         model: json['model'] as String? ?? '',
         cached: json['cached'] as bool? ?? false,
       );
+}
+
+/// Application JSON, in the two shapes of the API:
+/// GET /jobs/applications/mine (student):
+/// { "id", "jobId", "status", "appliedAt", "decidedAt": null | "...",
+///   "job": { "id", "title", "company", "location" } }
+/// GET /jobs/:id/applications and PATCH /jobs/:id/applications/:applicationId (company):
+/// { "id", "jobId", "status", "appliedAt", "decidedAt",
+///   "applicant": { "id", "displayName", "email" } }
+abstract final class JobApplicationModel {
+  static JobApplication fromJson(Map<String, dynamic> json) {
+    final job = json['job'] as Map<String, dynamic>?;
+    final applicant = json['applicant'] as Map<String, dynamic>?;
+    final decidedAt = json['decidedAt'] as String?;
+    return JobApplication(
+      id: json['id'] as String,
+      jobId: json['jobId'] as String,
+      status: ApplicationStatus.tryParse(json['status']) ?? ApplicationStatus.pending,
+      appliedAt: DateTime.parse(json['appliedAt'] as String).toLocal(),
+      decidedAt: decidedAt == null ? null : DateTime.parse(decidedAt).toLocal(),
+      jobTitle: job?['title'] as String? ?? '',
+      company: job?['company'] as String? ?? '',
+      location: job?['location'] as String? ?? '',
+      applicantName: applicant?['displayName'] as String? ?? '',
+      applicantEmail: applicant?['email'] as String? ?? '',
+    );
+  }
+
+  static List<JobApplication> listFromJson(List<dynamic> json) =>
+      [for (final item in json) fromJson(item as Map<String, dynamic>)];
 }

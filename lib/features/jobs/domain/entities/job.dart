@@ -1,3 +1,5 @@
+import 'job_application.dart';
+
 class MissionItem {
   const MissionItem({required this.title, required this.description});
   final String title;
@@ -30,6 +32,7 @@ class Job {
     this.skills = const [],
     this.featuredLabel,
     this.hasApplied = false,
+    this.applicationStatus,
     this.authorId,
     this.canEdit = false,
   });
@@ -68,6 +71,9 @@ class Job {
   /// Whether the signed-in student already applied to this offer.
   final bool hasApplied;
 
+  /// Where the signed-in student's application stands; null when they didn't apply.
+  final ApplicationStatus? applicationStatus;
+
   /// The company or admin who posted it; null for the seeded catalogue.
   final String? authorId;
 
@@ -100,6 +106,8 @@ class Job {
         skills: skills,
         featuredLabel: featuredLabel,
         hasApplied: applied,
+        // Applying starts pending; cancelling clears it.
+        applicationStatus: applied ? (applicationStatus ?? ApplicationStatus.pending) : null,
         authorId: authorId,
         canEdit: canEdit,
       );

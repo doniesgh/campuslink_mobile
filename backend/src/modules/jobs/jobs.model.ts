@@ -69,11 +69,21 @@ export type JobDocument = HydratedDocument<Job>;
 
 export const JobModel = model('Job', jobSchema);
 
-/** One per student and offer: the unique index makes a second application fail. */
+export const APPLICATION_STATUSES = ['pending', 'accepted', 'rejected'] as const;
+export type ApplicationStatus = (typeof APPLICATION_STATUSES)[number];
+
+/**
+ * One per student and offer: the unique index makes a second application fail.
+ * It starts `pending`; the offer's company (or an admin) accepts or refuses it,
+ * and the student can cancel it (= delete it) while it is still pending.
+ */
 const jobApplicationSchema = new Schema(
   {
-    jobId: { type: String, ref: 'Job', required: true },
+    jobId: { type: String, ref: 'Job', required: true, index: true },
     userId: { type: Schema.Types.ObjectId, ref: 'User', required: true },
+    status: { type: String, enum: APPLICATION_STATUSES, default: 'pending' },
+    /** When the company accepted or refused it; null while pending. */
+    decidedAt: { type: Date, default: null },
   },
   { timestamps: true },
 );
