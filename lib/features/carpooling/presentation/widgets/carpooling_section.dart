@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/error/failures.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
-import '../../../../shared/widgets/info_banner.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../providers/carpool_providers.dart';
 import 'ride_card.dart';

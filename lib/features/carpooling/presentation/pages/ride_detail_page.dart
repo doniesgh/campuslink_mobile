@@ -140,14 +140,7 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
                 enabled: !ride.isMine,
                 onToggle: (id) => _toggle(ride, id),
               ),
-              const SizedBox(height: AppSpacing.md),
-              const InfoBanner(
-                icon: Icons.shield_outlined,
-                tone: BadgeTone.accent,
-                title: 'Campus Student Mobility Policy',
-                message: 'Payment cash or D17 on boarding · No detour without prior '
-                    'agreement. Students must display valid ESPRIT badge when riding.',
-              ),
+             
             ],
           ),
         ),

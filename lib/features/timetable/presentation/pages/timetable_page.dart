@@ -18,7 +18,6 @@ import '../timetable_format.dart';
 import '../widgets/day_strip.dart';
 import '../widgets/day_summary_banner.dart';
 import '../widgets/session_timeline.dart';
-import '../widgets/student_pass_card.dart';
 import '../widgets/timetable_title.dart';
 import '../widgets/week_navigator.dart';
 

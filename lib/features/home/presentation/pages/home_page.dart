@@ -7,7 +7,6 @@ import '../../../../core/providers/clock_provider.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_badge.dart';
-import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/campus_header.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../../../admin/presentation/providers/admin_providers.dart';
