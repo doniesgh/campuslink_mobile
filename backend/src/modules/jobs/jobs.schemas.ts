@@ -95,3 +95,10 @@ export const jobUpdateSchema = jobCreateSchema
   .refine((value) => Object.values(value).some((v) => v !== undefined), M.nothingToUpdate);
 
 export type JobUpdateInput = z.infer<typeof jobUpdateSchema>;
+
+/** PATCH /jobs/:id/applications/:applicationId: accept or refuse an application. */
+export const applicationDecisionSchema = z.object({
+  status: z.enum(['accepted', 'rejected'], { error: 'The status is "accepted" or "rejected".' }),
+});
+
+export type ApplicationDecisionInput = z.infer<typeof applicationDecisionSchema>;

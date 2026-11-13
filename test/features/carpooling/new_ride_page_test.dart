@@ -28,8 +28,8 @@ final _now = DateTime(2026, 11, 6, 10);
 class _FakeCarpoolRepository implements CarpoolRepository {
   final published = <NewRide>[];
   Completer<void>? hold;
-  Result<Ride> Function(NewRide ride) answer =
-      (_) => Success(RideModel.fromJson(jsonDecode(createdRideJson) as Map<String, dynamic>));
+  Result<Ride> Function(NewRide ride) answer = (_) => Success(
+      RideModel.fromJson(jsonDecode(createdRideJson) as Map<String, dynamic>));
   int getRidesCalls = 0;
 
   @override
@@ -46,14 +46,35 @@ class _FakeCarpoolRepository implements CarpoolRepository {
   }
 
   @override
-  Future<Result<Ride>> getRide(String id) async => const Err(ServerFailure('Ride not found.'));
+  Future<Result<List<Ride>>> getMyRideRequests() async => const Success([]);
 
   @override
-  Future<Result<void>> reserveSeats({
+  Future<Result<List<Ride>>> getMyBookings() async => const Success([]);
+
+  @override
+  Future<Result<Ride>> acceptReservation({
+    required String rideId,
+    required String seatId,
+  }) async =>
+      const Err(ServerFailure('Not implemented'));
+
+  @override
+  Future<Result<Ride>> refuseReservation({
+    required String rideId,
+    required String seatId,
+  }) async =>
+      const Err(ServerFailure('Not implemented'));
+
+  @override
+  Future<Result<Ride>> getRide(String id) async =>
+      const Err(ServerFailure('Ride not found.'));
+
+  @override
+  Future<Result<Ride>> reserveSeats({
     required String rideId,
     required List<String> seatIds,
   }) async =>
-      const Success(null);
+      const Err(ServerFailure('Not implemented'));
 
   @override
   Future<Result<Ride>> updateRide(String rideId, NewRide ride) async =>
@@ -63,7 +84,8 @@ class _FakeCarpoolRepository implements CarpoolRepository {
   Future<Result<void>> deleteRide(String rideId) async => const Success(null);
 
   @override
-  Future<Result<Ride>> cancelReservation({required String rideId, required String seatId}) async =>
+  Future<Result<Ride>> cancelReservation(
+          {required String rideId, required String seatId}) async =>
       const Err(ServerFailure('Not implemented'));
 }
 
@@ -95,8 +117,9 @@ Future<(GoRouter, _FakeCarpoolRepository)> _openForm(
           GoRoute(path: 'rides/new', builder: (_, __) => const NewRidePage()),
           GoRoute(
             path: 'rides/:rideId',
-            builder: (_, state) =>
-                Scaffold(body: Center(child: Text('Ride ${state.pathParameters['rideId']}'))),
+            builder: (_, state) => Scaffold(
+                body: Center(
+                    child: Text('Ride ${state.pathParameters['rideId']}'))),
           ),
         ],
       ),
@@ -113,11 +136,13 @@ Future<(GoRouter, _FakeCarpoolRepository)> _openForm(
       child: MaterialApp.router(
         // Plain theme: the app theme pulls Google Fonts from the network.
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: brightness),
+          colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.primary, brightness: brightness),
         ),
         routerConfig: router,
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: TextScaler.linear(textScale)),
           child: child!,
         ),
       ),
@@ -208,11 +233,15 @@ void main() {
 
         // Optional fields are checked too.
         await _type(tester, 'Distance (km)', 'loin');
-        expect(find.text('La distance doit être entre 0,1 et 1000 km.'), findsOneWidget);
+        expect(find.text('La distance doit être entre 0,1 et 1000 km.'),
+            findsOneWidget);
 
         await _fillForm(tester);
         // Errors follow the edits once the student has tried to publish.
-        for (final message in [..._requiredErrors, 'La distance doit être entre 0,1 et 1000 km.']) {
+        for (final message in [
+          ..._requiredErrors,
+          'La distance doit être entre 0,1 et 1000 km.'
+        ]) {
           expect(find.text(message), findsNothing, reason: message);
         }
         expect(find.text('2 places proposées'), findsOneWidget);
@@ -234,7 +263,8 @@ void main() {
         expect(sent.arrival, DateTime(2026, 11, 7, 11, 35));
         expect(sent.seatCount, 2);
         expect(sent.pricePerSeat, 2.5);
-        expect((sent.carModel, sent.carColor, sent.plate), ('Volkswagen Polo', 'Blue', '231 TN 1187'));
+        expect((sent.carModel, sent.carColor, sent.plate),
+            ('Volkswagen Polo', 'Blue', '231 TN 1187'));
         expect(sent.amenities, [RideAmenity.airConditioned]);
         expect(sent.dropoffNote, 'Dépôt devant le Bloc E');
         expect(sent.distanceKm, 12.4);
@@ -246,10 +276,12 @@ void main() {
         // The new ride's detail replaces the form; back leads to the Forum.
         expect(find.text('Ride es-4094'), findsOneWidget);
         expect(
-          find.text('Trajet publié ! Les étudiants peuvent réserver vos places.'),
+          find.text(
+              'Trajet publié ! Les étudiants peuvent réserver vos places.'),
           findsOneWidget,
         );
-        expect(repo.getRidesCalls, listLoads + 1, reason: 'the ride list is refreshed');
+        expect(repo.getRidesCalls, listLoads + 1,
+            reason: 'the ride list is refreshed');
         router.pop();
         await tester.pumpAndSettle();
         expect(find.text('Forum screen'), findsOneWidget);
@@ -259,10 +291,12 @@ void main() {
     );
   }
 
-  testWidgets('shows the server message when publishing fails, and stays on the form',
+  testWidgets(
+      'shows the server message when publishing fails, and stays on the form',
       (tester) async {
     final (_, repo) = await _openForm(tester);
-    repo.answer = (_) => const Err(ValidationFailure('Le départ doit être dans le futur.'));
+    repo.answer = (_) =>
+        const Err(ValidationFailure('Le départ doit être dans le futur.'));
 
     await _fillForm(tester);
     await tester.tap(find.text('Publier'));
@@ -275,7 +309,8 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('"Aujourd\'hui" with the suggested time leaves in an hour, and steppers stop at '
+  testWidgets(
+      '"Aujourd\'hui" with the suggested time leaves in an hour, and steppers stop at '
       'their limits', (tester) async {
     final (_, repo) = await _openForm(tester);
 
@@ -299,11 +334,13 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('scrolls down to the end without overflow at 320 dp', (tester) async {
+  testWidgets('scrolls down to the end without overflow at 320 dp',
+      (tester) async {
     await _openForm(tester, width: 320, textScale: 1);
     await tester.tap(find.text('Publier'));
     await tester.pumpAndSettle();
-    await tester.drag(find.byType(SingleChildScrollView), const Offset(0, -4000));
+    await tester.drag(
+        find.byType(SingleChildScrollView), const Offset(0, -4000));
     await tester.pumpAndSettle();
     expect(find.text('Ce que voient les passagers'), findsOneWidget);
     expect(tester.takeException(), isNull);

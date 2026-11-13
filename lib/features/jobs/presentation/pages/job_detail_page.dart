@@ -12,6 +12,7 @@ import '../../../../shared/widgets/detail_top_bar.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../../../auth/domain/entities/user.dart';
 import '../../domain/entities/job.dart';
+import '../../domain/entities/job_application.dart';
 import '../providers/job_providers.dart';
 import '../widgets/job_detail_sections.dart';
 import '../widgets/job_summary_sheet.dart';
@@ -30,7 +31,7 @@ class JobDetailPage extends ConsumerStatefulWidget {
 class _JobDetailPageState extends ConsumerState<JobDetailPage> {
   bool _saved = false;
   bool _applying = false;
-  bool _applied = false;
+  bool _cancelling = false;
   bool _deleting = false;
 
   void _snack(String message) =>
@@ -48,11 +49,49 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
     setState(() => _applying = false);
     result.when(
       success: (_) {
-        setState(() => _applied = true);
         // The list shows an "Applied" badge too.
         ref.invalidate(jobsProvider);
+        ref.invalidate(jobDetailProvider(job.id));
+        ref.invalidate(myApplicationsProvider);
         _snack('Application sent to ${job.company}');
       },
+      failure: (f) => _snack(f.message),
+    );
+  }
+
+  Future<void> _cancelApplication(Job job) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Cancel your application?'),
+        content: Text('Your application to "${job.title}" will be withdrawn.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Keep it'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Cancel application'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _cancelling = true);
+    final result = await ref.read(jobRepositoryProvider).cancelApplication(job.id);
+    if (!mounted) return;
+    setState(() => _cancelling = false);
+    // Success or not (it may have been answered meanwhile), show the real state.
+    ref.invalidate(jobsProvider);
+    ref.invalidate(jobDetailProvider(job.id));
+    ref.invalidate(myApplicationsProvider);
+    result.when(
+      success: (_) => _snack('Application cancelled'),
       failure: (f) => _snack(f.message),
     );
   }
@@ -118,8 +157,8 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
   Widget _buildContent(Job job) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    // From the API (applied earlier) or from this visit.
-    final applied = _applied || job.hasApplied;
+    final applied = job.hasApplied;
+    final status = job.applicationStatus ?? ApplicationStatus.pending;
     // The API says so; an admin may manage every offer (the mock can't tell).
     final canManage = job.canEdit || ref.watch(jobsRoleProvider) == UserRole.admin;
     final canApply = ref.watch(canApplyToJobsProvider);
@@ -186,6 +225,13 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
                     ),
                   ],
                 ),
+                const SizedBox(height: AppSpacing.sm),
+                AppButton(
+                  label: 'Applications',
+                  icon: Icons.people_outline,
+                  variant: AppButtonVariant.outlined,
+                  onPressed: () => context.push(RoutePaths.jobApplications(job.id)),
+                ),
               ],
               if (JobStatsRow.hasStats(job)) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -224,13 +270,29 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
             ],
           ),
           action: canApply
-              ? AppButton(
-                  label: applied ? 'Applied' : 'Apply Now',
-                  icon: applied ? Icons.check : Icons.send_rounded,
-                  variant: AppButtonVariant.accent,
-                  isLoading: _applying,
-                  onPressed: applied ? null : () => _apply(job),
-                )
+              ? (applied
+                  // Pending: the student can still withdraw. Answered: just the status.
+                  ? (status == ApplicationStatus.pending
+                      ? AppButton(
+                          label: 'Cancel application',
+                          icon: Icons.close,
+                          variant: AppButtonVariant.outlined,
+                          isLoading: _cancelling,
+                          onPressed: () => _cancelApplication(job),
+                        )
+                      : AppButton(
+                          label: status.label,
+                          icon: status == ApplicationStatus.accepted ? Icons.check : Icons.block,
+                          variant: AppButtonVariant.outlined,
+                          onPressed: null,
+                        ))
+                  : AppButton(
+                      label: 'Apply Now',
+                      icon: Icons.send_rounded,
+                      variant: AppButtonVariant.accent,
+                      isLoading: _applying,
+                      onPressed: () => _apply(job),
+                    ))
               : const AppButton(
                   label: 'Students apply',
                   icon: Icons.school_outlined,

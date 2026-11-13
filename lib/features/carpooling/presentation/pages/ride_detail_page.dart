@@ -15,6 +15,7 @@ import '../../../../shared/widgets/state_views.dart';
 import '../../domain/entities/ride.dart';
 import '../providers/carpool_providers.dart';
 import 'new_ride_page.dart';
+import '../widgets/booking_requests_card.dart';
 import '../widgets/driver_card.dart';
 import '../widgets/ride_summary_card.dart';
 import '../widgets/route_map_preview.dart';
@@ -67,11 +68,16 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
     setState(() => _reserving = false);
 
     result.when(
-      success: (_) {
+      success: (updated) {
         setState(() => _picked = <String>{});
         ref.invalidate(rideDetailProvider(ride.id));
         ref.invalidate(ridesProvider);
-        _snack('Seat reserved. See you on board!');
+        ref.invalidate(myBookingsProvider);
+        _snack(
+          updated.hasMyPendingRequest
+              ? 'Request sent. The driver will answer soon.'
+              : 'Seat reserved. See you on board!',
+        );
       },
       failure: (f) => _snack(f.message),
     );
@@ -152,8 +158,10 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
   Future<void> _cancelBooking(Ride ride, Seat seat) async {
     final ok = await _confirm(
       title: 'Cancel this booking?',
-      message: '${seat.label} will lose their seat, and it becomes free again '
-          'for other students.',
+      message: seat.isMine
+          ? 'Your seat becomes free again for other students.'
+          : '${seat.label} will lose their seat, and it becomes free again '
+              'for other students.',
       confirmLabel: 'Cancel booking',
     );
     if (!ok || !mounted) return;
@@ -169,9 +177,100 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
       success: (_) {
         ref.invalidate(rideDetailProvider(ride.id));
         ref.invalidate(ridesProvider);
+        ref.invalidate(myBookingsProvider);
         _snack('Booking cancelled. The seat is free again.');
       },
       failure: (f) => _snack(f.message),
+    );
+  }
+
+  Future<void> _answer(Ride ride, Seat seat, {required bool accept}) async {
+    setState(() => _busy = true);
+    final repo = ref.read(carpoolRepositoryProvider);
+    final result = accept
+        ? await repo.acceptReservation(rideId: ride.id, seatId: seat.id)
+        : await repo.refuseReservation(rideId: ride.id, seatId: seat.id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+
+    result.when(
+      success: (_) {
+        ref.invalidate(rideDetailProvider(ride.id));
+        ref.invalidate(ridesProvider);
+        ref.invalidate(myRideRequestsProvider);
+        _snack(accept ? '${seat.label} is confirmed.' : 'Request refused. The seat is free again.');
+      },
+      failure: (f) => _snack(f.message),
+    );
+  }
+
+  /// The student cancels everything they booked or asked for in this ride.
+  Future<void> _cancelMyBooking(Ride ride) async {
+    final ok = await _confirm(
+      title: ride.hasMyPendingRequest ? 'Withdraw your request?' : 'Cancel your booking?',
+      message: 'Your seat${ride.mySeats.length == 1 ? '' : 's'} will be free again '
+          'for other students.',
+      confirmLabel: ride.hasMyPendingRequest ? 'Withdraw' : 'Cancel booking',
+    );
+    if (!ok || !mounted) return;
+
+    setState(() => _busy = true);
+    final repo = ref.read(carpoolRepositoryProvider);
+    String? error;
+    for (final seat in ride.mySeats) {
+      final result = await repo.cancelReservation(rideId: ride.id, seatId: seat.id);
+      error = result.when(success: (_) => null, failure: (f) => f.message);
+      if (error != null) break;
+    }
+    if (!mounted) return;
+    setState(() => _busy = false);
+    ref.invalidate(rideDetailProvider(ride.id));
+    ref.invalidate(ridesProvider);
+    ref.invalidate(myBookingsProvider);
+    _snack(error ?? 'Booking cancelled.');
+  }
+
+  /// What the student's own booking looks like in this ride.
+  Widget _myBookingBanner(Ride ride) {
+    final pending = ride.mySeats.where((s) => s.status == SeatStatus.pending).length;
+    final booked = ride.mySeats.length - pending;
+    final String title;
+    final String message;
+    if (pending > 0 && booked == 0) {
+      title = 'Request sent';
+      message = 'Waiting for the driver to accept. You can cancel until then.';
+    } else if (pending == 0) {
+      title = 'Booking confirmed';
+      message = 'The driver accepted your '
+          '${booked == 1 ? 'seat' : '$booked seats'}. See you on board!';
+    } else {
+      title = 'Your booking';
+      message = '$booked confirmed · $pending waiting for the driver.';
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        InfoBanner(
+          icon: pending > 0 ? Icons.hourglass_top_rounded : Icons.check_circle_outline,
+          tone: pending > 0 ? BadgeTone.accent : BadgeTone.success,
+          title: title,
+          message: message,
+        ),
+        Align(
+          alignment: Alignment.centerRight,
+          child: TextButton.icon(
+            onPressed: _busy ? null : () => _cancelMyBooking(ride),
+            icon: const Icon(Icons.close_rounded),
+            label: Text(pending > 0 && booked == 0 ? 'Withdraw request' : 'Cancel booking'),
+            style: TextButton.styleFrom(
+              minimumSize: const Size(0, 40),
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpacing.sm),
+      ],
     );
   }
 
@@ -231,17 +330,32 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
                   icon: Icons.drive_eta_outlined,
                   tone: BadgeTone.success,
                   title: "You're driving this ride",
-                  message: 'Students book your free seats from here. You can edit or '
-                      'delete the ride below, or tap a booked seat to cancel its booking.',
+                  message: 'Students ask for your free seats from here and you accept or '
+                      'refuse each request. You can also edit or delete the ride below.',
                 ),
                 const SizedBox(height: AppSpacing.md),
-              ],
+                if (ride.pendingSeats.isNotEmpty) ...[
+                  BookingRequestsCard(
+                    requests: ride.pendingSeats,
+                    busy: _busy,
+                    onAccept: (seat) => _answer(ride, seat, accept: true),
+                    onRefuse: (seat) => _answer(ride, seat, accept: false),
+                  ),
+                  const SizedBox(height: AppSpacing.md),
+                ],
+              ] else if (ride.hasMyBooking)
+                _myBookingBanner(ride),
               SeatPicker(
                 seats: ride.seats,
                 selected: selected,
                 enabled: !ride.isMine,
                 onToggle: (id) => _toggle(ride, id),
-                onBookedTap: ride.isMine && !_busy ? (seat) => _cancelBooking(ride, seat) : null,
+                onManageTap: _busy ? null : (seat) => _cancelBooking(ride, seat),
+                // The driver cancels booked seats (pending ones are answered
+                // above); a student cancels their own seats.
+                isManageable: (seat) => ride.isMine
+                    ? seat.status == SeatStatus.booked
+                    : seat.isMine,
               ),
             ],
           ),

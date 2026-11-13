@@ -28,6 +28,8 @@ class MockCarpoolRepository implements CarpoolRepository {
 
   static const _ownRide = "You can't book a seat in your own ride.";
   static const _notYourRide = 'Only the driver can change this ride.';
+  static const _notYourBooking =
+      'Only the driver or the student who booked can cancel this seat.';
 
   static List<Ride> _seed() {
     final now = DateTime.now();
@@ -146,8 +148,10 @@ class MockCarpoolRepository implements CarpoolRepository {
     return Success(_rides[index]);
   }
 
+  /// Demo rides have no driver account to answer, so (like the server) the
+  /// seats are booked right away.
   @override
-  Future<Result<void>> reserveSeats({
+  Future<Result<Ride>> reserveSeats({
     required String rideId,
     required List<String> seatIds,
   }) async {
@@ -161,15 +165,32 @@ class MockCarpoolRepository implements CarpoolRepository {
     if (seatIds.isEmpty || !seatIds.every(free.contains)) {
       return const Err(ValidationFailure('This seat is no longer available.'));
     }
-    _rides[index] = ride.copyWithSeats([
+    final updated = ride.copyWithSeats([
       for (final s in ride.seats)
         seatIds.contains(s.id)
-            ? Seat(id: s.id, label: 'You', status: SeatStatus.booked)
+            ? Seat(id: s.id, label: 'You', status: SeatStatus.booked, isMine: true)
             : s,
     ]);
-    return const Success(null);
+    _rides[index] = updated;
+    return Success(updated);
   }
 
+  @override
+  Future<Result<List<Ride>>> getMyBookings() async {
+    await Future<void>.delayed(_latency);
+    return Success([for (final r in _rides) if (r.hasMyBooking) r]);
+  }
+
+  @override
+  Future<Result<List<Ride>>> getMyRideRequests() async {
+    await Future<void>.delayed(_latency);
+    return Success([
+      for (final r in _rides)
+        if (r.isMine &&
+            r.seats.any((s) => s.status == SeatStatus.pending || s.status == SeatStatus.booked))
+          r,
+    ]);
+  }
 
   /// Like the server: the student drives (seat "s1", with their name), as a
   /// new driver (no rating yet) whose car isn't verified.
@@ -227,7 +248,10 @@ class MockCarpoolRepository implements CarpoolRepository {
     final errors = validateNewRide(ride, now: _clock());
     if (errors.isNotEmpty) return Err(ValidationFailure(errors.values.first));
 
-    final booked = old.seats.where((s) => s.status == SeatStatus.booked).length;
+    // Seats asked for count too: a student is waiting on them.
+    final booked = old.seats
+        .where((s) => s.status == SeatStatus.booked || s.status == SeatStatus.pending)
+        .length;
     if (ride.seatCount < booked) {
       return Err(ValidationFailure(
         '$booked ${booked == 1 ? 'place est déjà réservée' : 'places sont déjà réservées'} : '
@@ -303,12 +327,41 @@ class MockCarpoolRepository implements CarpoolRepository {
     final index = _rides.indexWhere((r) => r.id == rideId);
     if (index < 0) return const Err(ServerFailure('Ride not found.'));
     final ride = _rides[index];
-    if (!ride.isMine) return const Err(ServerFailure(_notYourRide));
-    final i = ride.seats.indexWhere((s) => s.id == seatId && s.status == SeatStatus.booked);
+    final i = ride.seats.indexWhere(
+      (s) => s.id == seatId && (s.status == SeatStatus.booked || s.status == SeatStatus.pending),
+    );
     if (i < 0) return const Err(ValidationFailure('This seat is not booked.'));
+    // The driver, or the student who booked the seat.
+    if (!ride.isMine && !ride.seats[i].isMine) return const Err(ServerFailure(_notYourBooking));
 
     final seats = [...ride.seats];
     seats[i] = Seat(id: seatId, label: 'Seat #${i + 1}', status: SeatStatus.free);
+    final updated = ride.copyWithSeats(seats);
+    _rides[index] = updated;
+    return Success(updated);
+  }
+
+  @override
+  Future<Result<Ride>> acceptReservation({required String rideId, required String seatId}) =>
+      _answer(rideId, seatId, accept: true);
+
+  @override
+  Future<Result<Ride>> refuseReservation({required String rideId, required String seatId}) =>
+      _answer(rideId, seatId, accept: false);
+
+  Future<Result<Ride>> _answer(String rideId, String seatId, {required bool accept}) async {
+    await Future<void>.delayed(_latency);
+    final index = _rides.indexWhere((r) => r.id == rideId);
+    if (index < 0) return const Err(ServerFailure('Ride not found.'));
+    final ride = _rides[index];
+    if (!ride.isMine) return const Err(ServerFailure(_notYourRide));
+    final i = ride.seats.indexWhere((s) => s.id == seatId && s.status == SeatStatus.pending);
+    if (i < 0) return const Err(ValidationFailure('There is no pending request for this seat.'));
+
+    final seats = [...ride.seats];
+    seats[i] = accept
+        ? Seat(id: seatId, label: seats[i].label, status: SeatStatus.booked)
+        : Seat(id: seatId, label: 'Seat #${i + 1}', status: SeatStatus.free);
     final updated = ride.copyWithSeats(seats);
     _rides[index] = updated;
     return Success(updated);

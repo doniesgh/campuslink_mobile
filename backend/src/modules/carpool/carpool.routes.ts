@@ -26,6 +26,16 @@ carpoolRouter.post('/rides', validateBody(createRideSchema), async (req, res) =>
   res.status(201).json(await carpool.createRide(currentUserId(res), input));
 });
 
+/** The rides the student booked (or asked for). Declared before "/rides/:id". */
+carpoolRouter.get('/rides/bookings/mine', async (_req, res) => {
+  res.json(await carpool.listMyBookings(currentUserId(res)));
+});
+
+/** The rides the student drives that received requests (or have passengers). Declared before "/rides/:id". */
+carpoolRouter.get('/rides/requests/mine', async (_req, res) => {
+  res.json(await carpool.listMyRideRequests(currentUserId(res)));
+});
+
 carpoolRouter.get('/rides/:id', async (req, res) => {
   res.json(await carpool.getRide(req.params.id, currentUserId(res)));
 });
@@ -57,9 +67,17 @@ carpoolRouter.delete('/rides/:id', async (req, res) => {
   res.status(204).end();
 });
 
-/** The driver cancels the booking of one seat. Answers 200 with the updated ride. */
+/** The driver accepts a pending request. 409 if the seat isn't pending. */
+carpoolRouter.post('/rides/:id/reservations/:seatId/accept', async (req, res) => {
+  res.json(await carpool.acceptReservation(req.params.id, currentUserId(res), req.params.seatId));
+});
+
+/** The driver refuses a pending request: the seat is free again. */
+carpoolRouter.post('/rides/:id/reservations/:seatId/refuse', async (req, res) => {
+  res.json(await carpool.refuseReservation(req.params.id, currentUserId(res), req.params.seatId));
+});
+
+/** The driver or the student who booked cancels a seat. Answers 200 with the updated ride. */
 carpoolRouter.delete('/rides/:id/reservations/:seatId', async (req, res) => {
   res.json(await carpool.cancelReservation(req.params.id, currentUserId(res), req.params.seatId));
 });
-
-

@@ -1,15 +1,24 @@
-enum SeatStatus { driver, booked, free }
+/// [pending]: a student asked for the seat, the driver hasn't answered yet.
+enum SeatStatus { driver, pending, booked, free }
 
 enum RideAmenity { nonSmoking, airConditioned, musicOk }
 
 class Seat {
-  const Seat({required this.id, required this.label, required this.status});
+  const Seat({
+    required this.id,
+    required this.label,
+    required this.status,
+    this.isMine = false,
+  });
 
   final String id;
 
   /// Driver / passenger name, or "Seat #3" for a free seat.
   final String label;
   final SeatStatus status;
+
+  /// The signed-in student booked (or asked for) this seat.
+  final bool isMine;
 }
 
 class Driver {
@@ -86,6 +95,14 @@ class Ride {
 
   List<Seat> get freeSeats => seats.where((s) => s.status == SeatStatus.free).toList();
   int get freeSeatCount => freeSeats.length;
+
+  /// Seats students asked for, waiting for the driver's answer.
+  List<Seat> get pendingSeats => seats.where((s) => s.status == SeatStatus.pending).toList();
+
+  /// The seats the signed-in student booked or asked for in this ride.
+  List<Seat> get mySeats => seats.where((s) => s.isMine).toList();
+  bool get hasMyBooking => mySeats.isNotEmpty;
+  bool get hasMyPendingRequest => mySeats.any((s) => s.status == SeatStatus.pending);
   bool get isAlmostFull => freeSeatCount == 1;
   Duration get duration => arrival.difference(departure);
 

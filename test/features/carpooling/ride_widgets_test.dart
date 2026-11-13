@@ -20,7 +20,8 @@ import 'carpool_fixtures.dart';
 /// The detail page's list (the seat grid inside it is a Scrollable too).
 final _pageList = find.byType(Scrollable).first;
 
-Ride _parse(String json) => RideModel.fromJson(jsonDecode(json) as Map<String, dynamic>);
+Ride _parse(String json) =>
+    RideModel.fromJson(jsonDecode(json) as Map<String, dynamic>);
 
 /// Serves one ride to the detail page.
 class _OneRideRepository implements CarpoolRepository {
@@ -28,31 +29,48 @@ class _OneRideRepository implements CarpoolRepository {
   final Ride ride;
 
   @override
-  Future<Result<Ride>> getRide(String id) async =>
-      id == ride.id ? Success(ride) : const Err(ServerFailure('Ride not found.'));
-
+  Future<Result<Ride>> getRide(String id) async => id == ride.id
+      ? Success(ride)
+      : const Err(ServerFailure('Ride not found.'));
+  @override
+  Future<Result<List<Ride>>> getMyBookings() async => const Success([]);
   @override
   Future<Result<List<Ride>>> getRides() async => Success([ride]);
 
   @override
-  Future<Result<void>> reserveSeats({
+  Future<Result<List<Ride>>> getMyRideRequests() async => const Success([]);
+  @override
+  Future<Result<Ride>> reserveSeats({
     required String rideId,
     required List<String> seatIds,
   }) async =>
-      const Success(null);
+      const Err(ServerFailure('Not implemented'));
 
- 
   @override
   Future<Result<Ride>> createRide(NewRide ride) async => Success(this.ride);
 
   @override
-  Future<Result<Ride>> updateRide(String rideId, NewRide ride) async => Success(this.ride);
+  Future<Result<Ride>> updateRide(String rideId, NewRide ride) async =>
+      Success(this.ride);
+  @override
+  Future<Result<Ride>> refuseReservation({
+    required String rideId,
+    required String seatId,
+  }) async =>
+      const Err(ServerFailure('Not implemented'));
 
   @override
   Future<Result<void>> deleteRide(String rideId) async => const Success(null);
+  @override
+  Future<Result<Ride>> acceptReservation({
+    required String rideId,
+    required String seatId,
+  }) async =>
+      const Err(ServerFailure('Not implemented'));
 
   @override
-  Future<Result<Ride>> cancelReservation({required String rideId, required String seatId}) async =>
+  Future<Result<Ride>> cancelReservation(
+          {required String rideId, required String seatId}) async =>
       Success(this.ride);
 }
 
@@ -68,14 +86,17 @@ Future<void> _pump(
   await tester.pumpWidget(
     ProviderScope(
       overrides: [
-        if (ride != null) carpoolRepositoryProvider.overrideWithValue(_OneRideRepository(ride)),
+        if (ride != null)
+          carpoolRepositoryProvider.overrideWithValue(_OneRideRepository(ride)),
       ],
       child: MaterialApp(
         theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: brightness),
+          colorScheme: ColorScheme.fromSeed(
+              seedColor: AppColors.primary, brightness: brightness),
         ),
         builder: (context, child) => MediaQuery(
-          data: MediaQuery.of(context).copyWith(textScaler: const TextScaler.linear(1.3)),
+          data: MediaQuery.of(context)
+              .copyWith(textScaler: const TextScaler.linear(1.3)),
           child: child!,
         ),
         home: child,
@@ -89,10 +110,13 @@ void main() {
   final created = _parse(createdRideJson);
   final rated = _parse(rideJson);
 
-  testWidgets('DriverCard shows "New driver" instead of a 0.0 star rating', (tester) async {
+  testWidgets('DriverCard shows "New driver" instead of a 0.0 star rating',
+      (tester) async {
     await _pump(
       tester,
-      Scaffold(body: DriverCard(driver: created.driver, amenities: created.amenities)),
+      Scaffold(
+          body:
+              DriverCard(driver: created.driver, amenities: created.amenities)),
     );
     expect(find.text('New driver'), findsOneWidget);
     expect(find.text('0.0'), findsNothing);
@@ -105,7 +129,8 @@ void main() {
   testWidgets('DriverCard keeps the rating of a rated driver', (tester) async {
     await _pump(
       tester,
-      Scaffold(body: DriverCard(driver: rated.driver, amenities: rated.amenities)),
+      Scaffold(
+          body: DriverCard(driver: rated.driver, amenities: rated.amenities)),
     );
     expect(find.text('4.8'), findsOneWidget);
     expect(find.text('21 campus rides completed'), findsOneWidget);
@@ -120,7 +145,8 @@ void main() {
   });
 
   for (final brightness in Brightness.values) {
-    testWidgets("the driver sees their own ride but can't book in it (${brightness.name})",
+    testWidgets(
+        "the driver sees their own ride but can't book in it (${brightness.name})",
         (tester) async {
       await _pump(
         tester,
@@ -135,13 +161,20 @@ void main() {
 
       // The list is lazy: scroll to each part in turn.
       // No note and no distance were given.
-      await tester.scrollUntilVisible(find.text('not given'), 200, scrollable: _pageList);
+      await tester.scrollUntilVisible(find.text('not given'), 200,
+          scrollable: _pageList);
       expect(find.text('—'), findsOneWidget);
-      await tester.scrollUntilVisible(find.text('New driver'), 200, scrollable: _pageList);
-      await tester.scrollUntilVisible(find.text("You're driving this ride"), 200, scrollable: _pageList);
-      await tester.scrollUntilVisible(find.text('Students book your free seats here'), 200, scrollable: _pageList);
+      await tester.scrollUntilVisible(find.text('New driver'), 200,
+          scrollable: _pageList);
+      await tester.scrollUntilVisible(
+          find.text("You're driving this ride"), 200,
+          scrollable: _pageList);
+      await tester.scrollUntilVisible(
+          find.text('Students book your free seats here'), 200,
+          scrollable: _pageList);
 
-      await tester.scrollUntilVisible(find.text('Seat #2'), 200, scrollable: _pageList);
+      await tester.scrollUntilVisible(find.text('Seat #2'), 200,
+          scrollable: _pageList);
       await tester.tap(find.text('Seat #2'));
       await tester.pumpAndSettle();
       expect(find.text('Selected'), findsNothing);
@@ -152,7 +185,9 @@ void main() {
   testWidgets('another student can still book in a ride', (tester) async {
     await _pump(tester, RideDetailPage(rideId: rated.id), ride: rated);
     expect(find.text('Reserve Seat'), findsOneWidget);
-    await tester.scrollUntilVisible(find.text('Tap an available seat to select'), 200, scrollable: _pageList);
+    await tester.scrollUntilVisible(
+        find.text('Tap an available seat to select'), 200,
+        scrollable: _pageList);
     expect(find.text("You're driving this ride"), findsNothing);
     expect(tester.takeException(), isNull);
   });

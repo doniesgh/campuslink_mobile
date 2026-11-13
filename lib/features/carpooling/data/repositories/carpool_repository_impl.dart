@@ -28,18 +28,31 @@ class CarpoolRepositoryImpl implements CarpoolRepository {
   /// A seat taken in the meantime, or a seat in the student's own ride,
   /// comes back as a failure whose message is shown as-is.
   @override
-  Future<Result<void>> reserveSeats({
+  Future<Result<Ride>> reserveSeats({
     required String rideId,
     required List<String> seatIds,
   }) =>
       guard(() async {
-        await _dio.post<dynamic>(
+        final r = await _dio.post<dynamic>(
           ApiEndpoints.rideReservations(rideId),
           data: {'seatIds': seatIds},
         );
+        return RideModel.fromJson(r.data as Map<String, dynamic>);
       });
 
+  /// GET /carpool/rides/bookings/mine
+  @override
+  Future<Result<List<Ride>>> getMyBookings() => guard(() async {
+        final r = await _dio.get<dynamic>('${ApiEndpoints.rides}/bookings/mine');
+        return RideModel.listFromJson(r.data as List<dynamic>);
+      });
 
+  /// GET /carpool/rides/requests/mine
+  @override
+  Future<Result<List<Ride>>> getMyRideRequests() => guard(() async {
+        final r = await _dio.get<dynamic>('${ApiEndpoints.rides}/requests/mine');
+        return RideModel.listFromJson(r.data as List<dynamic>);
+      });
 
   /// POST /carpool/rides. A ride the server refuses (422) comes back as a
   /// validation failure whose message, in French like the form, is shown as-is.
@@ -67,6 +80,22 @@ class CarpoolRepositoryImpl implements CarpoolRepository {
   Future<Result<Ride>> cancelReservation({required String rideId, required String seatId}) =>
       guard(() async {
         final r = await _dio.delete<dynamic>('${ApiEndpoints.rideReservations(rideId)}/$seatId');
+        return RideModel.fromJson(r.data as Map<String, dynamic>);
+      });
+
+  /// POST /carpool/rides/:id/reservations/:seatId/accept (driver only).
+  @override
+  Future<Result<Ride>> acceptReservation({required String rideId, required String seatId}) =>
+      guard(() async {
+        final r = await _dio.post<dynamic>('${ApiEndpoints.rideReservations(rideId)}/$seatId/accept');
+        return RideModel.fromJson(r.data as Map<String, dynamic>);
+      });
+
+  /// POST /carpool/rides/:id/reservations/:seatId/refuse (driver only).
+  @override
+  Future<Result<Ride>> refuseReservation({required String rideId, required String seatId}) =>
+      guard(() async {
+        final r = await _dio.post<dynamic>('${ApiEndpoints.rideReservations(rideId)}/$seatId/refuse');
         return RideModel.fromJson(r.data as Map<String, dynamic>);
       });
 }

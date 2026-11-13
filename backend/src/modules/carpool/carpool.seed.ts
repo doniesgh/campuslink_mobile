@@ -1,7 +1,7 @@
 import type { Types } from 'mongoose';
 
-import { atCampusTime, campusMonth } from './campus-time';
-import {  RideModel } from './carpool.model';
+import { atCampusTime } from './campus-time';
+import { RideModel } from './carpool.model';
 
 // The rides of the app's MockCarpoolRepository. Times are campus wall-clock
 // times "today" (day 0) or "tomorrow" (day 1), resolved when the seed runs.
@@ -90,7 +90,7 @@ const DEMO_RIDES = [
  *
  * Each run puts the demo rides back on "today" / "tomorrow" relative to
  * [now], with the mock's seats: a refreshed ride is a new trip, so earlier
- * bookings on it are dropped. The impact figures go on the current month.
+ * bookings on it are dropped.
  */
 export async function seedCarpool(_demoUserId: Types.ObjectId, now = new Date()): Promise<void> {
   for (const { departure, arrival, seats, ...ride } of DEMO_RIDES) {
@@ -110,6 +110,4 @@ export async function seedCarpool(_demoUserId: Types.ObjectId, now = new Date())
       { upsert: true, runValidators: true },
     );
   }
-
- 
 }

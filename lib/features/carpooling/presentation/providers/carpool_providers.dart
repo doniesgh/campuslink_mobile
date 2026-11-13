@@ -27,4 +27,18 @@ final rideDetailProvider = FutureProvider.autoDispose.family<Ride, String>(
   (ref, id) async => (await ref.watch(carpoolRepositoryProvider).getRide(id)).unwrap(),
 );
 
+/// The rides where the student booked or asked for a seat.
+final myBookingsProvider = FutureProvider.autoDispose<List<Ride>>(
+  (ref) async => (await ref.watch(carpoolRepositoryProvider).getMyBookings()).unwrap(),
+);
 
+/// The rides the student drives that received seat requests (or have passengers).
+final myRideRequestsProvider = FutureProvider.autoDispose<List<Ride>>(
+  (ref) async => (await ref.watch(carpoolRepositoryProvider).getMyRideRequests()).unwrap(),
+);
+
+/// How many seat requests wait for the driver's answer, across their rides.
+final pendingRequestCountProvider = Provider.autoDispose<int>((ref) {
+  final rides = ref.watch(myRideRequestsProvider).valueOrNull ?? const <Ride>[];
+  return rides.fold(0, (sum, ride) => sum + ride.pendingSeats.length);
+});

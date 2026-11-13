@@ -1,6 +1,7 @@
 import '../../../../core/error/failures.dart';
 import '../../../../core/error/result.dart';
 import '../../domain/entities/job.dart';
+import '../../domain/entities/job_application.dart';
 import '../../domain/entities/job_draft.dart';
 import '../../domain/entities/job_summary.dart';
 import '../../domain/repositories/job_repository.dart';
@@ -110,8 +111,15 @@ class MockJobRepository implements JobRepository {
   /// The catalogue plus the offers posted in this session (newest first).
   final _offers = [..._jobs];
 
-  /// Offers this fake student applied to, so "Applied" survives leaving the page.
-  final _applied = <String>{};
+  /// Offers this fake student applied to (with where each stands), so "Applied"
+  /// survives leaving the page.
+  final _applied = <String, ApplicationStatus>{};
+
+  /// Every application of this session: the student's own and, for the company
+  /// side, a few fake applicants added the first time an offer's list is opened.
+  final _applications = <JobApplication>[];
+  final _withApplicants = <String>{};
+  var _applicationCount = 0;
   var _posted = 0;
 
   static const _notFound = ServerFailure('Job not found.');
@@ -123,17 +131,48 @@ class MockJobRepository implements JobRepository {
     return null;
   }
 
+  Job _withState(Job job) {
+    final status = _applied[job.id];
+    final marked = job.withApplied(status != null);
+    return status == null ? marked : _withStatus(marked, status);
+  }
+
+  Job _withStatus(Job job, ApplicationStatus status) => Job(
+        id: job.id,
+        title: job.title,
+        company: job.company,
+        mission: job.mission,
+        location: job.location,
+        tags: job.tags,
+        stipendTnd: job.stipendTnd,
+        durationMonths: job.durationMonths,
+        period: job.period,
+        labGroup: job.labGroup,
+        labGroupNote: job.labGroupNote,
+        workspaceTitle: job.workspaceTitle,
+        workspaceBadges: job.workspaceBadges,
+        missionItems: job.missionItems,
+        matchPercent: job.matchPercent,
+        criteria: job.criteria,
+        skills: job.skills,
+        featuredLabel: job.featuredLabel,
+        hasApplied: true,
+        applicationStatus: status,
+        authorId: job.authorId,
+        canEdit: job.canEdit,
+      );
+
   @override
   Future<Result<List<Job>>> getJobs() async {
     await Future<void>.delayed(latency);
-    return Success([for (final job in _offers) job.withApplied(_applied.contains(job.id))]);
+    return Success([for (final job in _offers) _withState(job)]);
   }
 
   @override
   Future<Result<Job>> getJob(String id) async {
     await Future<void>.delayed(latency);
     final job = _find(id);
-    return job == null ? const Err(_notFound) : Success(job.withApplied(_applied.contains(id)));
+    return job == null ? const Err(_notFound) : Success(_withState(job));
   }
 
   /// Same answers as the API: 404-like for unknown offers, 409-like when applying twice.
@@ -141,10 +180,90 @@ class MockJobRepository implements JobRepository {
   Future<Result<void>> apply(String jobId) async {
     await Future<void>.delayed(latency);
     if (_find(jobId) == null) return const Err(_notFound);
-    if (!_applied.add(jobId)) {
+    if (_applied.containsKey(jobId)) {
       return const Err(ServerFailure('You already applied to this offer.'));
     }
+    _applied[jobId] = ApplicationStatus.pending;
+    final job = _find(jobId)!;
+    _applications.add(JobApplication(
+      id: 'mock-application-${++_applicationCount}',
+      jobId: jobId,
+      status: ApplicationStatus.pending,
+      appliedAt: DateTime.now(),
+      jobTitle: job.title,
+      company: job.company,
+      location: job.location,
+      applicantName: 'You (demo student)',
+      applicantEmail: 'student@campus.test',
+    ));
     return const Success(null);
+  }
+
+  @override
+  Future<Result<List<JobApplication>>> getMyApplications() async {
+    await Future<void>.delayed(latency);
+    final mine = [
+      for (final application in _applications)
+        if (_applied.containsKey(application.jobId) && application.applicantName.startsWith('You'))
+          application,
+    ];
+    return Success(mine.reversed.toList());
+  }
+
+  /// 409-like once the company answered, as the API.
+  @override
+  Future<Result<void>> cancelApplication(String jobId) async {
+    await Future<void>.delayed(latency);
+    final status = _applied[jobId];
+    if (status == null) return const Err(ServerFailure('Application not found.'));
+    if (status != ApplicationStatus.pending) {
+      return const Err(ServerFailure('This application has already been answered.'));
+    }
+    _applied.remove(jobId);
+    _applications.removeWhere((a) => a.jobId == jobId && a.applicantName.startsWith('You'));
+    return const Success(null);
+  }
+
+  @override
+  Future<Result<List<JobApplication>>> getJobApplications(String jobId) async {
+    await Future<void>.delayed(latency);
+    if (_find(jobId) == null) return const Err(_notFound);
+    if (_withApplicants.add(jobId)) {
+      for (final (name, email) in const [
+        ('Sarra Ben Ali', 'sarra.benali@campus.test'),
+        ('Yassine Trabelsi', 'yassine.trabelsi@campus.test'),
+      ]) {
+        _applications.add(JobApplication(
+          id: 'mock-application-${++_applicationCount}',
+          jobId: jobId,
+          status: ApplicationStatus.pending,
+          appliedAt: DateTime.now().subtract(Duration(days: _applicationCount)),
+          applicantName: name,
+          applicantEmail: email,
+        ));
+      }
+    }
+    return Success([for (final a in _applications) if (a.jobId == jobId) a]);
+  }
+
+  @override
+  Future<Result<JobApplication>> decideApplication(
+    String jobId,
+    String applicationId, {
+    required bool accept,
+  }) async {
+    await Future<void>.delayed(latency);
+    final index = _applications.indexWhere((a) => a.id == applicationId && a.jobId == jobId);
+    if (index < 0) return const Err(ServerFailure('Application not found.'));
+    final current = _applications[index];
+    if (!current.isPending) {
+      return const Err(ServerFailure('This application has already been answered.'));
+    }
+    final status = accept ? ApplicationStatus.accepted : ApplicationStatus.rejected;
+    final updated = current.withStatus(status);
+    _applications[index] = updated;
+    if (current.applicantName.startsWith('You')) _applied[jobId] = status;
+    return Success(updated);
   }
 
   /// Posted by "me": editable, listed first, without the catalogue's rich fields.
@@ -186,7 +305,7 @@ class MockJobRepository implements JobRepository {
       canEdit: old.canEdit,
     );
     _offers[_offers.indexOf(old)] = job;
-    return Success(job.withApplied(_applied.contains(id)));
+    return Success(_withState(job));
   }
 
   @override
@@ -196,6 +315,7 @@ class MockJobRepository implements JobRepository {
     if (job == null) return const Err(_notFound);
     _offers.remove(job);
     _applied.remove(id);
+    _applications.removeWhere((a) => a.jobId == id);
     return const Success(null);
   }
 

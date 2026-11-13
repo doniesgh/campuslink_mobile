@@ -14,7 +14,8 @@ class SeatPicker extends StatelessWidget {
     required this.selected,
     required this.onToggle,
     this.enabled = true,
-    this.onBookedTap,
+    this.onManageTap,
+    this.isManageable,
   });
 
   final List<Seat> seats;
@@ -24,8 +25,15 @@ class SeatPicker extends StatelessWidget {
   /// False for the driver of the ride: they see the seats but can't book.
   final bool enabled;
 
-  /// Set for the driver: tapping a booked seat offers to cancel its booking.
-  final ValueChanged<Seat>? onBookedTap;
+  /// Tapping a taken seat that [isManageable] accepts (the driver's booked
+  /// seats, the student's own seats) offers to cancel its booking.
+  final ValueChanged<Seat>? onManageTap;
+  final bool Function(Seat seat)? isManageable;
+
+  bool _manageable(Seat seat) =>
+      onManageTap != null &&
+      (seat.status == SeatStatus.booked || seat.status == SeatStatus.pending) &&
+      (isManageable?.call(seat) ?? false);
 
   @override
   Widget build(BuildContext context) {
@@ -48,7 +56,7 @@ class SeatPicker extends StatelessWidget {
           Text(
             enabled
                 ? 'Tap an available seat to select'
-                : onBookedTap != null
+                : onManageTap != null
                     ? 'Tap a booked seat to cancel its booking'
                     : 'Students book your free seats here',
             style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
@@ -66,11 +74,11 @@ class SeatPicker extends StatelessWidget {
                 _SeatTile(
                   seat: seat,
                   selected: selected.contains(seat.id),
-                  cancellable: onBookedTap != null && seat.status == SeatStatus.booked,
+                  cancellable: _manageable(seat),
                   onTap: enabled && seat.status == SeatStatus.free
                       ? () => onToggle(seat.id)
-                      : onBookedTap != null && seat.status == SeatStatus.booked
-                          ? () => onBookedTap!(seat)
+                      : _manageable(seat)
+                          ? () => onManageTap!(seat)
                           : null,
                 ),
             ],
@@ -125,6 +133,12 @@ class _SeatTile extends StatelessWidget {
           border = Colors.transparent;
           icon = Icons.flag_rounded;
           caption = 'Driver';
+        case SeatStatus.pending:
+          bg = scheme.tertiaryContainer.withValues(alpha: 0.6);
+          fg = scheme.onSurfaceVariant;
+          border = Colors.transparent;
+          icon = Icons.hourglass_top_rounded;
+          caption = cancellable ? 'Tap to cancel' : 'Pending';
         case SeatStatus.booked:
           bg = scheme.primaryContainer.withValues(alpha: 0.5);
           fg = scheme.onSurfaceVariant;

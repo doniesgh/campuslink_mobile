@@ -1,7 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-
+import '../../features/jobs/presentation/pages/my_applications_page.dart';
+import '../../features/jobs/presentation/pages/job_applications_page.dart';
 import '../../features/admin/presentation/pages/admin_users_page.dart';
 import '../../features/admin/presentation/pages/audit_log_page.dart';
 import '../../features/admin/presentation/pages/import_users_page.dart';
@@ -120,8 +121,9 @@ final routerProvider = Provider<GoRouter>((ref) {
               path: RoutePaths.jobs,
               builder: (_, __) => const JobsPage(),
               routes: [
-                // Before ':jobId', or "new" would be read as an offer id.
+                // Before ':jobId', or "new" / "applications" would be read as an offer id.
                 GoRoute(path: 'new', builder: (_, __) => const JobFormPage()),
+                GoRoute(path: 'applications', builder: (_, __) => const MyApplicationsPage()),
                 GoRoute(
                   path: ':jobId',
                   builder: (_, state) =>
@@ -132,11 +134,38 @@ final routerProvider = Provider<GoRouter>((ref) {
                       builder: (_, state) =>
                           JobFormPage(jobId: state.pathParameters['jobId']),
                     ),
+                    GoRoute(
+                      path: 'applications',
+                      builder: (_, state) =>
+                          JobApplicationsPage(jobId: state.pathParameters['jobId']!),
+                    ),
                   ],
                 ),
               ],
             ),
           ]),
+          // StatefulShellBranch(routes: [
+          //   GoRoute(
+          //     path: RoutePaths.jobs,
+          //     builder: (_, __) => const JobsPage(),
+          //     routes: [
+          //       // Before ':jobId', or "new" would be read as an offer id.
+          //       GoRoute(path: 'new', builder: (_, __) => const JobFormPage()),
+          //       GoRoute(
+          //         path: ':jobId',
+          //         builder: (_, state) =>
+          //             JobDetailPage(jobId: state.pathParameters['jobId']!),
+          //         routes: [
+          //           GoRoute(
+          //             path: 'edit',
+          //             builder: (_, state) =>
+          //                 JobFormPage(jobId: state.pathParameters['jobId']),
+          //           ),
+          //         ],
+          //       ),
+          //     ],
+          //   ),
+          // ]),
           StatefulShellBranch(routes: [
             GoRoute(
               path: RoutePaths.profile,

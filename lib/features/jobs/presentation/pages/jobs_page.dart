@@ -27,6 +27,7 @@ class _JobsPageState extends ConsumerState<JobsPage> {
   Widget build(BuildContext context) {
     final jobs = ref.watch(jobsProvider);
     final canPost = ref.watch(canPostJobsProvider);
+    final isStudent = ref.watch(canApplyToJobsProvider);
     return Scaffold(
       floatingActionButton: canPost
           ? FloatingActionButton.extended(
@@ -48,6 +49,18 @@ class _JobsPageState extends ConsumerState<JobsPage> {
                 onChanged: (v) => setState(() => _query = v.trim().toLowerCase()),
               ),
             ),
+            if (isStudent)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(AppSpacing.page, AppSpacing.sm, AppSpacing.page, 0),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: TextButton.icon(
+                    icon: const Icon(Icons.assignment_turned_in_outlined),
+                    label: const Text('My applications'),
+                    onPressed: () => context.push(RoutePaths.myApplications),
+                  ),
+                ),
+              ),
             const SizedBox(height: AppSpacing.md),
             Expanded(
               child: jobs.when(

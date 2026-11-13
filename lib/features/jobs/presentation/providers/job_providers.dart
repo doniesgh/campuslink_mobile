@@ -7,6 +7,7 @@ import '../../../auth/presentation/providers/auth_controller.dart';
 import '../../data/repositories/job_repository_impl.dart';
 import '../../data/repositories/mock_job_repository.dart';
 import '../../domain/entities/job.dart';
+import '../../domain/entities/job_application.dart';
 import '../../domain/entities/job_summary.dart';
 import '../../domain/repositories/job_repository.dart';
 
@@ -23,6 +24,17 @@ final jobsProvider = FutureProvider.autoDispose<List<Job>>((ref) async {
 
 final jobDetailProvider = FutureProvider.autoDispose.family<Job, String>(
   (ref, id) async => (await ref.watch(jobRepositoryProvider).getJob(id)).unwrap(),
+);
+
+/// The signed-in student's applications.
+final myApplicationsProvider = FutureProvider.autoDispose<List<JobApplication>>((ref) async {
+  ref.watch(currentUserIdProvider);
+  return (await ref.watch(jobRepositoryProvider).getMyApplications()).unwrap();
+});
+
+/// The applications received by one offer (its company or an admin).
+final jobApplicationsProvider = FutureProvider.autoDispose.family<List<JobApplication>, String>(
+  (ref, jobId) async => (await ref.watch(jobRepositoryProvider).getJobApplications(jobId)).unwrap(),
 );
 
 /// The AI summary of an offer, asked once per opening of the summary sheet

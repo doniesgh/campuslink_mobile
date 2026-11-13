@@ -4,6 +4,7 @@ import '../../../../core/error/failure_mapper.dart';
 import '../../../../core/error/result.dart';
 import '../../../../core/network/api_endpoints.dart';
 import '../../domain/entities/job.dart';
+import '../../domain/entities/job_application.dart';
 import '../../domain/entities/job_draft.dart';
 import '../../domain/entities/job_summary.dart';
 import '../../domain/repositories/job_repository.dart';
@@ -34,6 +35,39 @@ class JobRepositoryImpl implements JobRepository {
   @override
   Future<Result<void>> apply(String jobId) => guard(() async {
         await _dio.post<dynamic>(ApiEndpoints.jobApplications(jobId));
+      });
+
+  @override
+  Future<Result<List<JobApplication>>> getMyApplications() => guard(() async {
+        final r = await _dio.get<dynamic>('${ApiEndpoints.jobs}/applications/mine');
+        return JobApplicationModel.listFromJson(r.data as List<dynamic>);
+      });
+
+  /// Cancelling after the company answered comes back as a 409 failure
+  /// ("This application has already been answered."), shown as-is.
+  @override
+  Future<Result<void>> cancelApplication(String jobId) => guard(() async {
+        await _dio.delete<dynamic>(ApiEndpoints.jobApplications(jobId));
+      });
+
+  @override
+  Future<Result<List<JobApplication>>> getJobApplications(String jobId) => guard(() async {
+        final r = await _dio.get<dynamic>(ApiEndpoints.jobApplications(jobId));
+        return JobApplicationModel.listFromJson(r.data as List<dynamic>);
+      });
+
+  @override
+  Future<Result<JobApplication>> decideApplication(
+    String jobId,
+    String applicationId, {
+    required bool accept,
+  }) =>
+      guard(() async {
+        final r = await _dio.patch<dynamic>(
+          '${ApiEndpoints.jobApplications(jobId)}/$applicationId',
+          data: {'status': accept ? 'accepted' : 'rejected'},
+        );
+        return JobApplicationModel.fromJson(r.data as Map<String, dynamic>);
       });
 
   @override

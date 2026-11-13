@@ -4,7 +4,7 @@ import { validateBody } from '../../lib/validate';
 import { userLimit } from '../../middleware/rate-limit';
 import { currentUserId, requireAuth } from '../../middleware/require-auth';
 import { currentRole, requireRole } from '../../middleware/require-role';
-import { jobCreateSchema, jobUpdateSchema } from './jobs.schemas';
+import { applicationDecisionSchema, jobCreateSchema, jobUpdateSchema } from './jobs.schemas';
 import * as jobs from './jobs.service';
 
 /** AI summaries a user may ask for per hour (cached ones included), as in the PWA. */
@@ -28,6 +28,11 @@ const viewer = (res: Response) => ({
 
 jobsRouter.get('/', async (_req, res) => {
   res.json(await jobs.listJobs(currentUserId(res)));
+});
+
+/** The signed-in student's applications. Declared before `/:id`. */
+jobsRouter.get('/applications/mine', requireRole(['student'], ONLY_STUDENTS), async (_req, res) => {
+  res.json(await jobs.listMyApplications(currentUserId(res)));
 });
 
 jobsRouter.post('/', recruitersOnly, validateBody(jobCreateSchema), async (req, res) => {
@@ -66,3 +71,31 @@ jobsRouter.post(
 jobsRouter.post('/:id/applications', requireRole(['student'], ONLY_STUDENTS), async (req, res) => {
   res.status(201).json(await jobs.apply(req.params.id as string, currentUserId(res)));
 });
+
+/** The student withdraws their application (204). Only while it is pending: 409 otherwise. */
+jobsRouter.delete('/:id/applications', requireRole(['student'], ONLY_STUDENTS), async (req, res) => {
+  await jobs.cancelApplication(req.params.id as string, currentUserId(res));
+  res.status(204).end();
+});
+
+/** Applications received by an offer: its company, or an admin. */
+jobsRouter.get('/:id/applications', recruitersOnly, async (req, res) => {
+  res.json(await jobs.listOfferApplications(req.params.id as string, viewer(res)));
+});
+
+/** Body `{ "status": "accepted" | "rejected" }`: answers the application (pending ones only). */
+jobsRouter.patch(
+  '/:id/applications/:applicationId',
+  recruitersOnly,
+  validateBody(applicationDecisionSchema),
+  async (req, res) => {
+    res.json(
+      await jobs.decideApplication(
+        req.params.id as string,
+        req.params.applicationId as string,
+        viewer(res),
+        req.body.status,
+      ),
+    );
+  },
+);
