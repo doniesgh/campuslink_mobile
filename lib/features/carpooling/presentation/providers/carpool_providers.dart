@@ -27,4 +27,7 @@ final rideDetailProvider = FutureProvider.autoDispose.family<Ride, String>(
   (ref, id) async => (await ref.watch(carpoolRepositoryProvider).getRide(id)).unwrap(),
 );
 
-
+/// The rides where the student booked or asked for a seat.
+final myBookingsProvider = FutureProvider.autoDispose<List<Ride>>(
+  (ref) async => (await ref.watch(carpoolRepositoryProvider).getMyBookings()).unwrap(),
+);

@@ -6,6 +6,7 @@ import '../../../../core/error/failures.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/state_views.dart';
+import '../pages/my_bookings_page.dart';
 import '../providers/carpool_providers.dart';
 import 'ride_card.dart';
 
@@ -37,8 +38,22 @@ class CarpoolingSection extends ConsumerWidget {
            
             Row(
               children: [
-                Text('Available Departures', style: theme.textTheme.titleMedium),
-                
+                Expanded(
+                  child: Text('Available Departures', style: theme.textTheme.titleMedium),
+                ),
+                TextButton.icon(
+                  onPressed: () async {
+                    await Navigator.of(context).push<void>(
+                      MaterialPageRoute(builder: (_) => const MyBookingsPage()),
+                    );
+                    // A booking may have been cancelled: refresh the free seats.
+                    ref.invalidate(ridesProvider);
+                  },
+                  icon: const Icon(Icons.confirmation_number_outlined, size: 18),
+                  label: const Text('My bookings'),
+                  // The global button theme is full-width.
+                  style: TextButton.styleFrom(minimumSize: const Size(0, 38)),
+                ),
               ],
             ),
             const SizedBox(height: AppSpacing.md),

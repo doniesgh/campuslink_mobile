@@ -61,6 +61,18 @@ class _Header extends StatelessWidget {
   final Color accent;
   final bool urgent;
 
+  /// What the student should notice on this ride: requests to answer (their
+  /// own ride) or the state of their booking.
+  (String, BadgeTone)? _status() {
+    final requests = ride.pendingSeats.length;
+    if (ride.isMine && requests > 0) {
+      return (requests == 1 ? '1 request' : '$requests requests', BadgeTone.accent);
+    }
+    if (ride.hasMyPendingRequest) return ('Pending', BadgeTone.accent);
+    if (ride.hasMyBooking) return ('Booked', BadgeTone.success);
+    return null;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
@@ -74,6 +86,10 @@ class _Header extends StatelessWidget {
             style: theme.textTheme.labelLarge?.copyWith(color: accent),
           ),
         ),
+        if (_status() case (final label, final tone)?) ...[
+          Flexible(child: AppBadge(label, tone: tone)),
+          const SizedBox(width: AppSpacing.xs),
+        ],
         AppBadge(
           '${ride.pricePerSeat.toStringAsFixed(1)} TND / pers',
           tone: BadgeTone.accent,

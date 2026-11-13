@@ -3,7 +3,6 @@ import { Types } from 'mongoose';
 import { conflict, forbidden, notFound, unauthorized } from '../../lib/http-error';
 import { StudentProfileModel } from '../profile/profile.model';
 import { UserModel } from '../users/user.model';
-import { campusMonth } from './campus-time';
 import {
   RideCounterModel,
   RideModel,
@@ -16,10 +15,9 @@ const SEAT_TAKEN = 'This seat is no longer available.';
 const OWN_RIDE = "You can't book a seat in your own ride.";
 const NOT_YOUR_RIDE = 'Only the driver can change this ride.';
 const SEAT_NOT_BOOKED = 'This seat is not booked.';
+const NO_PENDING_REQUEST = 'There is no pending request for this seat.';
+const NOT_YOUR_BOOKING = 'Only the driver or the student who booked can cancel this seat.';
 const RIDE_CHANGED = 'The ride was just updated. Please try again.';
-
-/** Used for a month that has no figures yet. */
-export const DEFAULT_MONTHLY_GOAL_KG = 2000;
 
 /** What the API sends for a ride (the shape the app's RideModel.fromJson reads). */
 export interface RideJson {
@@ -44,7 +42,8 @@ export interface RideJson {
     plate: string;
     isCarVerified: boolean;
   };
-  seats: { id: string; label: string; status: string }[];
+  /** `isMine`: the signed-in student booked (or asked for) this seat. */
+  seats: { id: string; label: string; status: string; isMine: boolean }[];
   amenities: string[];
   /** True for the student who published the ride (they can't book in it). */
   isMine: boolean;
@@ -84,7 +83,12 @@ export function toRideJson(ride: RideDocument, userId: string): RideJson {
       else if (seat.status === 'free') label = `Seat #${index + 1}`;
       else if (seat.passengerId?.equals(userId)) label = 'You';
       else label = seat.passengerName ?? 'Student';
-      return { id: seat.seatId, label, status: seat.status };
+      return {
+        id: seat.seatId,
+        label,
+        status: seat.status,
+        isMine: seat.passengerId?.equals(userId) ?? false,
+      };
     }),
     amenities: [...ride.amenities],
     isMine: ride.driverId?.equals(userId) ?? false,
@@ -101,6 +105,15 @@ export async function getRide(rideId: string, userId: string): Promise<RideJson>
   const ride = await RideModel.findById(rideId);
   if (!ride) throw notFound(RIDE_NOT_FOUND);
   return toRideJson(ride, userId);
+}
+
+/** The rides where the student has a seat (asked for or confirmed), soonest first. */
+export async function listMyBookings(userId: string): Promise<RideJson[]> {
+  const rides = await RideModel.find({ 'seats.passengerId': new Types.ObjectId(userId) }).sort({
+    departure: 1,
+    _id: 1,
+  });
+  return rides.map((ride) => toRideJson(ride, userId));
 }
 
 /** Published rides are numbered after the demo ones (ES-4091 to ES-4093). */
@@ -199,6 +212,10 @@ export async function createRide(userId: string, input: CreateRideInput): Promis
  * if every requested seat is still free, and MongoDB applies it atomically,
  * so of two students racing for one seat exactly one gets it. The driver
  * can't book a seat in their own ride.
+ *
+ * On a ride published by a student the seats become "pending": the driver
+ * accepts or refuses them. Demo rides have no driver account, so their
+ * seats are booked right away.
  */
 export async function reserveSeats(
   rideId: string,
@@ -209,6 +226,11 @@ export async function reserveSeats(
   // A valid token for a deleted account: treat it as an expired session.
   if (!student) throw unauthorized();
 
+  const target = await RideModel.findById(rideId).select('driverId');
+  if (!target) throw notFound(RIDE_NOT_FOUND);
+  if (target.driverId?.equals(student._id)) throw conflict(OWN_RIDE);
+  const status = target.driverId ? 'pending' : 'booked';
+
   const ride = await RideModel.findOneAndUpdate(
     {
       _id: rideId,
@@ -217,7 +239,7 @@ export async function reserveSeats(
     },
     {
       $set: {
-        'seats.$[seat].status': 'booked',
+        'seats.$[seat].status': status,
         'seats.$[seat].passengerId': new Types.ObjectId(userId),
         'seats.$[seat].passengerName': student.displayName,
       },
@@ -260,7 +282,10 @@ export async function updateRide(
 ): Promise<RideJson> {
   const ride = await findOwnRide(rideId, userId);
 
-  const booked = ride.seats.filter((seat) => seat.status === 'booked').length;
+  // Seats asked for count too: a student is waiting on them.
+  const booked = ride.seats.filter(
+    (seat) => seat.status === 'booked' || seat.status === 'pending',
+  ).length;
   if (input.seatCount < booked) {
     throw conflict(
       `${booked} ${booked === 1 ? 'place est déjà réservée' : 'places sont déjà réservées'} : ` +
@@ -321,19 +346,24 @@ export async function deleteRide(rideId: string, userId: string): Promise<void> 
 }
 
 /**
- * The driver cancels the booking of [seatId]: the seat is free again.
- * Atomic like [reserveSeats]: it only matches a seat that is still booked.
+ * Cancels the booking (or the pending request) of [seatId]: the seat is free
+ * again. Allowed to the ride's driver and to the student who booked it.
+ * Atomic like [reserveSeats]: it only matches a seat that is still taken.
  */
 export async function cancelReservation(
   rideId: string,
   userId: string,
   seatId: string,
 ): Promise<RideJson> {
+  const me = new Types.ObjectId(userId);
+  const taken = { $in: ['pending', 'booked'] };
   const ride = await RideModel.findOneAndUpdate(
     {
       _id: rideId,
-      driverId: new Types.ObjectId(userId),
-      seats: { $elemMatch: { seatId, status: 'booked' } },
+      $or: [
+        { driverId: me, seats: { $elemMatch: { seatId, status: taken } } },
+        { seats: { $elemMatch: { seatId, status: taken, passengerId: me } } },
+      ],
     },
     {
       $set: {
@@ -345,10 +375,51 @@ export async function cancelReservation(
     { arrayFilters: [{ 'seat.seatId': seatId }], returnDocument: 'after' },
   );
   if (!ride) {
-    await findOwnRide(rideId, userId); // 404 / 403
-    throw conflict(SEAT_NOT_BOOKED);
+    const existing = await RideModel.findById(rideId);
+    if (!existing) throw notFound(RIDE_NOT_FOUND);
+    const seat = existing.seats.find((s) => s.seatId === seatId);
+    if (!seat || seat.status === 'free' || seat.status === 'driver') throw conflict(SEAT_NOT_BOOKED);
+    throw forbidden(NOT_YOUR_BOOKING);
   }
   return toRideJson(ride, userId);
 }
 
+/**
+ * The driver answers a pending request: accepted (the seat is booked) or
+ * refused (the seat is free again). Only matches a seat still pending.
+ */
+async function answerRequest(
+  rideId: string,
+  userId: string,
+  seatId: string,
+  accept: boolean,
+): Promise<RideJson> {
+  const ride = await RideModel.findOneAndUpdate(
+    {
+      _id: rideId,
+      driverId: new Types.ObjectId(userId),
+      seats: { $elemMatch: { seatId, status: 'pending' } },
+    },
+    {
+      $set: accept
+        ? { 'seats.$[seat].status': 'booked' }
+        : {
+            'seats.$[seat].status': 'free',
+            'seats.$[seat].passengerId': null,
+            'seats.$[seat].passengerName': null,
+          },
+    },
+    { arrayFilters: [{ 'seat.seatId': seatId }], returnDocument: 'after' },
+  );
+  if (!ride) {
+    await findOwnRide(rideId, userId); // 404 / 403
+    throw conflict(NO_PENDING_REQUEST);
+  }
+  return toRideJson(ride, userId);
+}
 
+export const acceptReservation = (rideId: string, userId: string, seatId: string) =>
+  answerRequest(rideId, userId, seatId, true);
+
+export const refuseReservation = (rideId: string, userId: string, seatId: string) =>
+  answerRequest(rideId, userId, seatId, false);

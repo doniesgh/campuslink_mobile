@@ -1,7 +1,8 @@
 import { model, Schema, type HydratedDocument, type InferSchemaType } from 'mongoose';
 
 // Sent as-is to the app, which reads them as its SeatStatus / RideAmenity enum names.
-export const SEAT_STATUSES = ['driver', 'booked', 'free'] as const;
+// 'pending' = a student asked for the seat and the driver hasn't answered yet.
+export const SEAT_STATUSES = ['driver', 'pending', 'booked', 'free'] as const;
 export const AMENITIES = ['nonSmoking', 'airConditioned', 'musicOk'] as const;
 
 const seatSchema = new Schema(
@@ -10,7 +11,7 @@ const seatSchema = new Schema(
     seatId: { type: String, required: true },
     status: { type: String, enum: SEAT_STATUSES, required: true },
 
-    /** The student who booked it. Null for the driver, free seats and demo passengers. */
+    /** The student who booked (or asked for) it. Null for the driver, free seats and demo passengers. */
     passengerId: { type: Schema.Types.ObjectId, ref: 'User', default: null },
 
     /** Name shown to the other students (demo passengers have no account). */
@@ -82,5 +83,3 @@ const rideCounterSchema = new Schema({
 });
 
 export const RideCounterModel = model('RideCounter', rideCounterSchema);
-
-

@@ -44,6 +44,8 @@ abstract final class RideModel {
         id: json['id'] as String,
         label: json['label'] as String,
         status: SeatStatus.values.byName(json['status'] as String),
+        // Absent from older servers.
+        isMine: (json['isMine'] as bool?) ?? false,
       );
 }
 
@@ -65,4 +67,3 @@ abstract final class NewRideModel {
         if (ride.distanceKm != null) 'distanceKm': ride.distanceKm,
       };
 }
-

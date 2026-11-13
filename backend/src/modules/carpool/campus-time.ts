@@ -22,9 +22,3 @@ export function atCampusTime(now: Date, dayOffset: number, hour: number, minute:
   );
   return new Date(wallClock - CAMPUS_UTC_OFFSET_MS);
 }
-
-/** The campus month of [now], e.g. "2026-11". */
-export function campusMonth(now: Date): string {
-  const clock = campusClock(now);
-  return `${clock.getUTCFullYear()}-${String(clock.getUTCMonth() + 1).padStart(2, '0')}`;
-}
