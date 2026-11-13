@@ -9,6 +9,7 @@ import '../../data/repositories/forum_repository_impl.dart';
 import '../../data/repositories/mock_forum_repository.dart';
 import '../../domain/entities/forum_post.dart';
 import '../../domain/entities/lost_item.dart';
+import '../../domain/entities/lost_item_match.dart';
 import '../../domain/repositories/forum_repository.dart';
 
 /// The API (/api/forum), or in-memory demo data when USE_MOCK=true.
@@ -23,6 +24,11 @@ final highlightsProvider = FutureProvider.autoDispose<List<ForumPost>>(
 /// Lost & Found board of the forum, newest first.
 final lostItemsProvider = FutureProvider.autoDispose<List<LostItem>>(
   (ref) async => (await ref.watch(forumRepositoryProvider).getLostItems()).unwrap(),
+);
+
+/// "Correspondances possibles" of the notice with this id, best first.
+final lostItemMatchesProvider = FutureProvider.autoDispose.family<LostItemMatches, String>(
+  (ref, id) async => (await ref.watch(forumRepositoryProvider).getLostItemMatches(id)).unwrap(),
 );
 
 /// Ideas of the forum, most upvoted first, then newest. An idea published

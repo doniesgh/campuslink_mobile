@@ -29,7 +29,9 @@ TimetableDay timetableDayFromJson(Map<String, dynamic> json) => TimetableDay(
 /// Expected session JSON:
 /// { "id": "algo-2026-11-5", "course": "...", "room": "...", "teacher": "...",
 ///   "date": "2026-11-05", "start": "08:30", "end": "10:00", "kind": "lab",
-///   "lectureNumber": null, "lectureCount": null, "coefficient": null, "notes": null }
+///   "lectureNumber": null, "lectureCount": null, "coefficient": null, "notes": null,
+///   "mode": "online", "meetUrl": "https://meet.google.com/abc-defg-hij" }
+/// (`mode` and `meetUrl` are missing from older APIs: on campus.)
 ClassSession classSessionFromJson(Map<String, dynamic> json) {
   final day = parseApiDate(json['date'] as String);
   return ClassSession(
@@ -45,8 +47,14 @@ ClassSession classSessionFromJson(Map<String, dynamic> json) {
     lectureCount: (json['lectureCount'] as num?)?.toInt(),
     coefficient: (json['coefficient'] as num?)?.toDouble(),
     notes: json['notes'] as String?,
+    mode: sessionModeFromJson(json['mode']),
+    meetUrl: json['meetUrl'] as String?,
   );
 }
+
+/// 'online' or on campus (also for a missing or unknown mode).
+SessionMode sessionModeFromJson(Object? value) =>
+    value == 'online' ? SessionMode.online : SessionMode.onsite;
 
 /// [day] at the wall-clock time 'HH:mm'.
 DateTime _at(DateTime day, String hm) {

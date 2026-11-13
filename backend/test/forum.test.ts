@@ -6,7 +6,7 @@ import { seedForum } from '../src/modules/forum/forum.seed';
 import { HIGHLIGHTS_LIMIT } from '../src/modules/forum/forum.service';
 import { LostItemModel } from '../src/modules/forum/lost-item.model';
 import { LostItemRequestModel } from '../src/modules/forum/lost-item-request.model';
-import { clearTestDb, closeTestDb, connectTestDb, createStudent } from './helpers';
+import { clearTestDb, closeTestDb, connectTestDb, createStudent, validationError } from './helpers';
 
 const app = createApp();
 
@@ -149,6 +149,10 @@ describe('GET /api/forum/lost-items', () => {
       dropOffNote: null,
       pickupDesk: null,
       isSerialHidden: false,
+      status: 'active',
+      reporterId: null,
+      isMine: false,
+      canManage: false,
     });
     expect(res.body[1]).toMatchObject({ kind: 'lost', isUrgent: true, reward: 'Café offert ☕' });
   });
@@ -197,7 +201,7 @@ describe('POST /api/forum/lost-items/:id/requests', () => {
   test('answers 422 with a readable message for a blank or missing proof', async () => {
     const { auth } = await createStudent();
     await addItem('lf-409', ago(45));
-    const expected = { message: 'Please add a detail that identifies the item.' };
+    const expected = validationError('Please add a detail that identifies the item.');
 
     for (const body of [{ proof: '' }, { proof: '   \n ' }, {}, { proof: 42 }]) {
       await request(app)
@@ -210,7 +214,7 @@ describe('POST /api/forum/lost-items/:id/requests', () => {
       .post('/api/forum/lost-items/lf-409/requests')
       .set(auth)
       .send({ proof: 'x'.repeat(501) })
-      .expect(422, { message: 'Keep the detail under 500 characters.' });
+      .expect(422, validationError('Keep the detail under 500 characters.'));
     expect(await LostItemRequestModel.countDocuments()).toBe(0);
   });
 
@@ -303,6 +307,7 @@ describe('seedForum', () => {
         ['lf-409', '2026-11-06T12:15:00.000Z'], // 45 min ago
         ['lf-411', '2026-11-06T10:00:00.000Z'], // 3 h ago, on the hour (11h in Tunis)
         ['lf-406', '2026-11-05T15:30:00.000Z'], // yesterday 16h30 in Tunis
+        ['lf-407', '2026-11-05T10:00:00.000Z'], // yesterday 11h in Tunis
         ['lf-404', '2026-11-05T08:45:00.000Z'], // yesterday 9h45 in Tunis
         ['lf-402', '2026-11-04T12:00:00.000Z'], // 2 days ago 13h in Tunis
         ['lf-398', '2026-11-03T16:00:00.000Z'], // 3 days ago 17h in Tunis
@@ -314,6 +319,17 @@ describe('seedForum', () => {
       isSerialHidden: true,
       photoCount: 2,
     });
+    // The demo student reported one notice, so can manage it (and only it).
+    const mine = items.body.filter((i: { canManage: boolean }) => i.canManage);
+    expect(mine).toEqual([
+      expect.objectContaining({
+        id: 'lf-407',
+        reporterName: 'Dony Mansour',
+        reporterId: demo.user.id,
+        isMine: true,
+        status: 'active',
+      }),
+    ]);
   });
 
   test('is visible to a brand-new student too', async () => {
@@ -324,7 +340,8 @@ describe('seedForum', () => {
     const posts = await request(app).get('/api/forum/highlights').set(newcomer.auth).expect(200);
     const items = await request(app).get('/api/forum/lost-items').set(newcomer.auth).expect(200);
     expect(posts.body).toHaveLength(3);
-    expect(items.body).toHaveLength(6);
+    expect(items.body).toHaveLength(7);
+    expect(items.body.some((i: { canManage: boolean }) => i.canManage)).toBe(false);
   });
 
   test('is idempotent, refreshes the dates and resets only the demo requests', async () => {
@@ -343,7 +360,7 @@ describe('seedForum', () => {
     await seedForum(demo.user._id, later);
 
     expect(await ForumPostModel.countDocuments()).toBe(3);
-    expect(await LostItemModel.countDocuments()).toBe(6);
+    expect(await LostItemModel.countDocuments()).toBe(7);
     const first = await LostItemModel.findById('lf-409').lean();
     expect(first?.reportedAt.toISOString()).toBe('2026-11-07T12:15:00.000Z');
     expect(await LostItemRequestModel.countDocuments({ userId: demo.user._id })).toBe(0);

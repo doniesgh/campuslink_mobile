@@ -30,7 +30,7 @@ class ProfileHero extends StatelessWidget {
 
   final VoidCallback onEdit;
 
-  /// Null hides the button (teachers, admins and alumni have no student pass).
+  /// Null hides the button (teachers, admins, alumni and companies have no student pass).
   final VoidCallback? onNfcPass;
 
   @override

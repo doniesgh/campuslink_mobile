@@ -1,0 +1,17 @@
+{
+  "@@locale": "en",
+
+  "commonErrorTooManyRequests": "Too many attempts. Try again in a few minutes.",
+  "@commonErrorTooManyRequests": {
+    "description": "A rate limit was hit (HTTP 429, code TOO_MANY_REQUESTS)."
+  },
+
+  "accountLanguageTitle": "Language",
+  "@accountLanguageTitle": {
+    "description": "Settings row to choose the app's language (Profile tab, next to Appearance)."
+  },
+  "accountLanguageSubtitle": "App, emails and notifications",
+  "@accountLanguageSubtitle": {
+    "description": "Under the Language row: what the language applies to."
+  }
+}

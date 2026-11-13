@@ -77,8 +77,8 @@ void main() {
     expect(find.text("J'ai trouvé cet objet !"), findsWidgets);
     expect(find.text('Vérifier le numéro de série'), findsOneWidget);
     expect(find.text('Conseil étudiant'), findsOneWidget);
-    expect(_pillCount('Tous', 6), findsOneWidget);
-    expect(_pillCount('Objets Perdus', 3), findsOneWidget);
+    expect(_pillCount('Tous', 7), findsOneWidget);
+    expect(_pillCount('Objets Perdus', 4), findsOneWidget);
     expect(_pillCount('Objets Trouvés', 3), findsOneWidget);
   });
 

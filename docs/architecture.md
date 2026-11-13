@@ -85,13 +85,15 @@ The app uses a **feature-first Clean Architecture**. Code is grouped by feature 
 lib/
 ├── main.dart                 Entry point → bootstrap()
 ├── bootstrap.dart            Loads SharedPreferences, starts the ProviderScope
-├── app.dart                  MaterialApp.router: theme, dark mode, router
+├── app.dart                  MaterialApp.router: theme, dark mode, language, router
+├── l10n/                     The app's texts: app_en.arb, app_fr.arb (+ generated app_localizations*.dart)
 │
 ├── core/                     Infrastructure used by every feature (no feature code here)
 │   ├── config/env.dart           Build-time settings: ENV, API_BASE_URL, USE_MOCK
-│   ├── error/                    Result<T>, Failure types, guard() + Dio error mapping
-│   ├── network/                  Dio client, AuthInterceptor, ApiEndpoints (every API path)
-│   ├── providers/                dioProvider, secureStorageProvider, clockProvider, theme
+│   ├── error/                    Result<T>, Failure types, guard() + Dio error mapping, failureText()
+│   ├── l10n/                     AppLanguage (fr/en), context.l10n
+│   ├── network/                  Dio client, AuthInterceptor, LocaleInterceptor (Accept-Language), ApiEndpoints (every API path)
+│   ├── providers/                dioProvider, secureStorageProvider, clockProvider, theme, localeProvider
 │   ├── router/                   go_router config, route paths, bottom-tab shell
 │   ├── storage/                  SecureStorage (tokens), LocalPrefs (settings)
 │   ├── theme/                    Design tokens: colours, spacing, radius, shadows, fonts
@@ -101,7 +103,7 @@ lib/
 │                             CampusHeader, DetailTopBar, state views, showAppSnack…
 │
 └── features/                 One folder per feature
-    ├── auth/                 Login, register, verify email, password reset
+    ├── auth/                 Login, register, password reset
     ├── home/                 Home & Today hub (presentation only: reuses other features' data)
     ├── timetable/            Weekly timetable
     ├── courses/              Course mastery & lessons
@@ -225,10 +227,11 @@ Remote repositories wrap every call in `guard()` (`core/error/failure_mapper.dar
 | No connection | `NetworkFailure` | "No internet connection." |
 | HTTP 401 | `UnauthorizedFailure` | The server's message |
 | HTTP 400 / 422 | `ValidationFailure` | The server's message (e.g. "Use at least 8 characters") |
+| HTTP 429 | `TooManyRequestsFailure` (with `retryAfter`) | The server's message ("Too many attempts. Try again in a few minutes.") |
 | Other HTTP error | `ServerFailure` | The server's message |
 | Anything else | `UnknownFailure` | "Something went wrong." |
 
-The API always answers errors as `{ "message": "…" }` written for students, so the app can show them as-is. Inside `FutureProvider`s, `.unwrap()` turns an `Err` into a thrown `Failure`, and `failureMessage(error)` gets the text back for the `ErrorView`.
+The API always answers errors as `{ "message": "…", "code"?: "…" }` written for students, so the app can show them as-is; every `Failure` keeps the `code` too. Inside `FutureProvider`s, `.unwrap()` turns an `Err` into a thrown `Failure`, and `failureMessage(error)` gets the text back for the `ErrorView`. `failureText(context, error)` does the same but translates the codes the app knows (e.g. `TOO_MANY_REQUESTS`).
 
 ### 3.6 Networking and authentication
 
@@ -266,7 +269,6 @@ sequenceDiagram
 | `/auth/register` | `RegisterPage` | — |
 | `/auth/forgot-password` | `ForgotPasswordPage` | — |
 | `/auth/reset-password?email=` | `ResetPasswordPage` | — |
-| `/auth/verify-email` | `VerifyEmailPage` | — |
 | `/app/home` · tab | `HomePage` | 02 |
 | `/app/timetable` · tab | `TimetablePage` | 03 |
 | `/app/timetable/courses?course=` | `CoursesPage` | 04 |
@@ -282,15 +284,15 @@ sequenceDiagram
 | `/app/profile/admin/users/new` · `/:userId` | `UserFormPage` (add / edit an account) | — |
 | `/app/profile/admin/import` | `ImportUsersPage` (CSV or pasted cells) | — |
 | `/app/profile/admin/audit` | `AuditLogPage` | — |
+| `/app/profile/admin/timetable` | `TimetableAdminPage` (the weekly classes; the form is pushed over it) | — |
 
 **Redirect rules.** They live in `authRedirect()` in `app_router.dart` and are unit-tested:
 
 - While the session is being restored → stay where you are.
-- Signed out on an `/app/*` page or on verify-email → **login**.
-- Signed in with an unverified email → **verify-email**.
-- Signed in on an `/auth/*` page → **home**.
+- Signed out on an `/app/*` page → **login**.
+- Signed in on an `/auth/*` page → **home**. `isEmailVerified` is not checked: sign-up needs no email confirmation, so *Create account* lands on Home, and older unverified accounts sign in normally.
 - Signed in, not an admin, on an `/app/profile/admin/*` page → **profile**. (The API refuses them anyway: this only keeps the screens out of reach.)
-- Signed in as an admin or alumni on an `/app/timetable*` page → **home**. They have no timetable or courses: `User.hasClasses` is true only for students and teachers. `ShellScaffold` hides their Timetable tab, so they see four tabs.
+- Signed in as an admin, alumni or company on an `/app/timetable*` page → **home**. They have no timetable or courses: `User.hasClasses` is true only for students and teachers. `ShellScaffold` hides their Timetable tab, so they see four tabs.
 
 ### 3.8 UI system
 
@@ -318,7 +320,7 @@ sequenceDiagram
   participant P as PushController (app)
   participant F as FCM
   participant API as API
-  Note over P: a verified user is signed in
+  Note over P: a user is signed in
   P->>F: permission, then getToken()
   F-->>P: token
   P->>API: PUT /push/devices { token, platform }
@@ -373,13 +375,16 @@ backend/
 │   ├── config/env.ts        Reads and validates .env with Zod (the server refuses to start if invalid)
 │   ├── db/mongo.ts          connectMongo / disconnectMongo
 │   ├── lib/
-│   │   ├── http-error.ts        HttpError(status, message) + helpers (badRequest, unauthorized…)
-│   │   └── validate.ts          validateBody(zodSchema) middleware and parseQuery() → 422 { message }
+│   │   ├── http-error.ts        HttpError(status, message, details?, code?) + helpers (badRequest, unauthorized…)
+│   │   ├── validate.ts          validateBody(zodSchema) middleware and parseQuery() → 422 { message, code: VALIDATION_ERROR }
+│   │   ├── request-context.ts   requestContext(req, res): { actorId, ip, userAgent } for the audit log
+│   │   ├── i18n.ts              fr / en: pickLocale, localeOf(req) (Accept-Language)
+│   │   └── openrouter.ts        The AI client (OpenRouter): isAiConfigured(), chatJson()
 │   ├── middleware/
 │   │   ├── require-auth.ts      Checks the Bearer token, sets the current user id
 │   │   ├── require-role.ts      requireRole(['admin']): reads the role from the database, 403 otherwise
-│   │   ├── rate-limit.ts        Limits attempts on the auth routes
-│   │   └── error-handler.ts     Every error → { message } with the right status; JSON 404s
+│   │   ├── rate-limit.ts        createLimiter / authLimit / authIpLimit / userLimit → 429 TOO_MANY_REQUESTS
+│   │   └── error-handler.ts     Every error → { message, code?, ...details } with the right status; JSON 404s
 │   ├── modules/             One folder per feature (see 4.3)
 │   │   ├── auth/  users/  timetable/  courses/  carpool/
 │   │   ├── jobs/  forum/  grades/  profile/  notifications/
@@ -446,10 +451,11 @@ Routers are mounted in `app.ts`:
 | `/api/grades` | grades | `transcripts` |
 | `/api/profile` | profile | `studentprofiles` (and it reads grades, notifications and carpool) |
 | `/api/notifications` | notifications | `notifications` |
+| `/api/admin/timetable` | timetable (`timetable-admin.routes.ts`, admins only, mounted before `/api/admin`) | `timetabletemplates` |
 | `/api/admin` | admin | `auditlogs` (and it manages `users`, deleting an account's data in every module) |
 | `/api/push` | push | `pushdevices` (the notifications module pushes every notification it creates) |
 
-Every route except `/auth/*` and `/health` needs a signed-in user, and `/api/admin/*` needs an **admin** (`requireRole(['admin'])` on the whole router). `/api/timetable` and `/api/courses` need a **student or teacher** (`ROLES_WITH_CLASSES`): admins and alumni have no classes. Personal data (attendance, bookings, applications, votes, read states, grades, profile) is always filtered by the signed-in student's id, so one student can never read or change another's.
+Every route except `/auth/*` and `/health` needs a signed-in user, and `/api/admin/*` needs an **admin** (`requireRole(['admin'])` on the whole router). `/api/timetable` and `/api/courses` need a **student or teacher** (`ROLES_WITH_CLASSES`): admins, alumni and companies have no classes. Personal data (attendance, bookings, applications, votes, read states, grades, profile) is always filtered by the signed-in student's id, so one student can never read or change another's.
 
 ### 4.4 Authentication design
 
@@ -458,10 +464,11 @@ Every route except `/auth/*` and `/health` needs a signed-in user, and `/api/adm
 | Passwords | bcrypt hashes (`passwordHash` is never returned by queries unless asked for) |
 | Access token | JWT HS256, 15 minutes, carries the user id (`sub`) |
 | Refresh token | Random 48 bytes, stored as a SHA-256 hash, 30 days, **rotated on every refresh**. Reusing an old one ends all of that student's sessions (theft detection) |
-| Email verification and password reset | 6-digit codes, hashed, 15 minutes, locked after 5 wrong attempts |
+| Sign-up | No email confirmation: the account is created verified and signed in at once. Nothing checks `isEmailVerified` (admins can still see and change it) |
+| Password reset | 6-digit emailed codes, hashed, 15 minutes, locked after 5 wrong attempts |
 | Account discovery | Login errors and reset failures give the same message (and similar timing) whether the account exists or not |
-| Roles | `student` (every sign-up), `teacher`, `admin`, `alumni`. Only an admin changes a role. The role is **not** in the token: `requireRole` reads it from the database on each request, so a demoted admin loses access at once. An admin can't change their own role or password, or delete themselves, so there is always at least one admin |
-| Brute force | Rate limit on the auth routes (strict in production) |
+| Roles | `student` (every sign-up), `teacher`, `admin`, `alumni`, `company` (a recruiter). Only an admin changes a role. The role is **not** in the token: `requireRole` reads it from the database on each request, so a demoted admin loses access at once. An admin can't change their own role or password, or delete themselves, so there is always at least one admin |
+| Brute force | Rate limits on the auth routes: per route + IP + email, and per IP (strict in production, 5× looser elsewhere); `userLimit` for expensive signed-in actions. 429 `TOO_MANY_REQUESTS` with `retryAfter` |
 | Emails | SMTP via nodemailer when `SMTP_HOST` is set, printed in the console otherwise. A failing mail server never breaks the request |
 
 ### 4.5 API conventions
@@ -473,7 +480,7 @@ Every route except `/auth/*` and `/health` needs a signed-in user, and `/api/adm
   - Class times are wall-clock: `"date": "2026-11-05", "start": "08:30"`. 08:30 stays 08:30 on any phone, whatever its time zone.
   - Everything else (posted at, departure, received at…) is an ISO-8601 UTC instant, which the app converts with `DateTime.parse(s).toLocal()`.
 - **Campus time** is Tunis (UTC+1 all year, no daylight saving). The backend uses it for "today" and "tomorrow" and for the academic calendar.
-- **Errors** are `{ "message": "…" }` with:
+- **Errors** are `{ "message": "…", "code"?: "…", …details }` (the codes are listed in [api.md](api.md#conventions)) with:
 
   | Status | Meaning |
   |---|---|
@@ -483,14 +490,14 @@ Every route except `/auth/*` and `/health` needs a signed-in user, and `/api/adm
   | 404 | Unknown id |
   | 409 | Business conflict (seat taken, already applied…) |
   | 422 | Invalid data |
-  | 429 | Too many attempts |
+  | 429 | Too many attempts (`TOO_MANY_REQUESTS`, `retryAfter`) |
   | 500 | Server error |
 
 The full list of endpoints with examples is in [api.md](api.md).
 
 ### 4.6 Demo data (seeding)
 
-`npm run seed` creates the demo student `211JMT0428` / `CampusPulse2026!`, the demo admin `admin@campus.test` / `CampusPulseAdmin2026!` and nine demo accounts (teachers, students, an alumnus) for the admin's user list. Then it calls each module's `seed<Name>()` with that student's id. The seeded content is the same as the app's mock data.
+`npm run seed` creates the demo student `211JMT0428` / `CampusPulse2026!`, the demo admin `admin@campus.test` / `CampusPulseAdmin2026!` and eleven demo accounts (teachers, students, an alumnus and two companies) for the admin's user list. Then it calls each module's `seed<Name>()` with that student's id. The seeded content is the same as the app's mock data.
 
 Every seed is **idempotent**: running it again resets the demo student's own actions (bookings, applications, requests, votes, read states) and refreshes relative dates such as "today 13:15" and "15 min ago". Other students' data is left alone.
 

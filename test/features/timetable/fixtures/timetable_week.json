@@ -17,7 +17,9 @@
           "lectureNumber": 8,
           "lectureCount": 14,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "genie-logiciel-tp-2026-11-2",
@@ -31,7 +33,9 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "nosql-2026-11-2",
@@ -45,7 +49,9 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "cc-reseaux-2026-11-2",
@@ -59,7 +65,9 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": 2,
-          "notes": "Chapters 1–4 · Bring scientific calculator & Student ID"
+          "notes": "Chapters 1–4 · Bring scientific calculator & Student ID",
+          "mode": "onsite",
+          "meetUrl": null
         }
       ]
     },
@@ -79,7 +87,9 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "genie-logiciel-2026-11-3",
@@ -93,7 +103,9 @@
           "lectureNumber": 7,
           "lectureCount": 14,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "bases-de-donnees-2026-11-3",
@@ -107,7 +119,9 @@
           "lectureNumber": 9,
           "lectureCount": 12,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         }
       ]
     },
@@ -127,7 +141,9 @@
           "lectureNumber": 9,
           "lectureCount": 14,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "flutter-tp-2026-11-4",
@@ -141,7 +157,9 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "pi-2026-11-4",
@@ -155,7 +173,9 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         }
       ]
     },
@@ -164,7 +184,7 @@
       "semesterWeek": 8,
       "sessions": [
         {
-          "id": "algo-2026-11-5",
+          "id": "algo-thu-2026-11-5",
           "course": "Algorithmes & Complexité",
           "room": "Lab 14",
           "teacher": "Dr. Fersi",
@@ -175,10 +195,12 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
-          "id": "genie-logiciel-2026-11-5",
+          "id": "genie-logiciel-thu-2026-11-5",
           "course": "Génie Logiciel & Architecture",
           "room": "Amphi 3B",
           "teacher": "Prof. Ben Ali",
@@ -189,10 +211,12 @@
           "lectureNumber": 8,
           "lectureCount": 14,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
-          "id": "bases-de-donnees-2026-11-5",
+          "id": "bases-de-donnees-thu-2026-11-5",
           "course": "Bases de Données",
           "room": "Salle 208",
           "teacher": "Dr. Gharbi",
@@ -203,7 +227,9 @@
           "lectureNumber": 10,
           "lectureCount": 12,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "exam-flutter-2026-11-5",
@@ -217,7 +243,9 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": 1.5,
-          "notes": "Bring your laptop with the Flutter SDK installed"
+          "notes": "Bring your laptop with the Flutter SDK installed",
+          "mode": "onsite",
+          "meetUrl": null
         }
       ]
     },
@@ -237,7 +265,9 @@
           "lectureNumber": 10,
           "lectureCount": 14,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "reseaux-tp-2026-11-6",
@@ -251,12 +281,14 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "onsite",
+          "meetUrl": null
         },
         {
           "id": "entrepreneuriat-2026-11-6",
           "course": "Entrepreneuriat & Innovation",
-          "room": "Espace Coworking",
+          "room": "Online",
           "teacher": "Mme. Karoui",
           "date": "2026-11-06",
           "start": "13:30",
@@ -265,7 +297,9 @@
           "lectureNumber": null,
           "lectureCount": null,
           "coefficient": null,
-          "notes": null
+          "notes": null,
+          "mode": "online",
+          "meetUrl": "https://meet.google.com/xqd-fkzw-pnb"
         }
       ]
     },

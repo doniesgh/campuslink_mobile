@@ -35,7 +35,8 @@ const _ideas = _QuickAction('Idées', Icons.lightbulb_outline, BadgeTone.primary
     RoutePaths.forum, ForumSection.ideas);
 
 /// Row of 4 shortcut tiles under the "Up next" card. Without a timetable,
-/// "Planning" becomes the accounts (admins) or the job offers (alumni).
+/// "Planning" becomes the accounts (admins) or the job offers (alumni and
+/// companies).
 class QuickActions extends StatelessWidget {
   const QuickActions({super.key, this.role = UserRole.student});
 

@@ -24,10 +24,10 @@ void main() {
       final first = (await repo.getUsers(limit: 5)).unwrap();
       final second = (await repo.getUsers(page: 3, limit: 5)).unwrap();
 
-      expect(first.total, 12);
+      expect(first.total, 14);
       expect(first.items.map((u) => u.displayName).take(3), ['Amira Ben Salah', 'Campus Admin', 'Dony Mansour']);
       expect(first.hasMore, isTrue);
-      expect(second.items, hasLength(2));
+      expect(second.items, hasLength(4));
       expect(second.hasMore, isFalse);
     });
 
@@ -46,11 +46,12 @@ void main() {
       final stats = (await repo.getStats()).unwrap();
 
       expect(teachers.items.map((u) => u.displayName), ['Amira Ben Salah', 'Karim Trabelsi']);
-      expect(stats.total, 12);
+      expect(stats.total, 14);
       expect(stats.count(UserRole.student), 8);
       expect(stats.count(UserRole.teacher), 2);
       expect(stats.count(UserRole.admin), 1);
       expect(stats.count(UserRole.alumni), 1);
+      expect(stats.count(UserRole.company), 2);
     });
   });
 
@@ -177,11 +178,11 @@ void main() {
     test('is all or nothing', () async {
       final refused = (await repo.importUsers([fresh, taken])).unwrap();
       expect(refused, isA<ImportRefused>());
-      expect((await repo.getStats()).unwrap().total, 12);
+      expect((await repo.getStats()).unwrap().total, 14);
 
       final created = (await repo.importUsers([fresh])).unwrap();
       expect((created as ImportCreated).users.single.email, 'lina@campus.test');
-      expect((await repo.getStats()).unwrap().total, 13);
+      expect((await repo.getStats()).unwrap().total, 15);
       expect((await repo.getAuditActions()).unwrap(), ['user.import']);
     });
 

@@ -31,7 +31,7 @@ class _AdminAuth extends AuthController {
 }
 
 /// The admin screens with the app's nesting (Profile › admin/...), on the
-/// mock repository (12 demo accounts), at [width] dp with [textScale] text.
+/// mock repository (14 demo accounts), at [width] dp with [textScale] text.
 Future<MockAdminRepository> _pump(
   WidgetTester tester,
   String location, {
@@ -129,7 +129,7 @@ void main() {
       testWidgets('lists the accounts with their role at 360 dp ($brightness)', (tester) async {
         await _pump(tester, RoutePaths.adminUsers, brightness: brightness);
 
-        expect(find.text('12 accounts'), findsOneWidget);
+        expect(find.text('14 accounts'), findsOneWidget);
         expect(find.text('Campus Admin (you)'), findsOneWidget);
         expect(find.text('Amira Ben Salah'), findsOneWidget);
         expect(find.text('Email not verified'), findsNothing, reason: 'Rami is further down');
@@ -154,7 +154,7 @@ void main() {
 
       await tester.enterText(find.byType(TextField).first, 'helene');
       await tester.pump(const Duration(milliseconds: 100));
-      expect(find.text('12 accounts'), findsOneWidget, reason: 'not yet');
+      expect(find.text('14 accounts'), findsOneWidget, reason: 'not yet');
       await tester.pump(const Duration(milliseconds: 400));
       await tester.pumpAndSettle();
 
@@ -175,7 +175,7 @@ void main() {
       ]);
       await _pump(tester, RoutePaths.adminUsers, repo: repo, textScale: 1);
 
-      expect(find.text('37 accounts'), findsOneWidget);
+      expect(find.text('39 accounts'), findsOneWidget);
       // The last Scrollable is the list (the search field and the chips have one too).
       await tester.scrollUntilVisible(
         find.text('Zz Student 24'),
@@ -224,9 +224,31 @@ void main() {
       await _tap(tester, find.text('Done'));
 
       expect(find.text('Lina Bouazizi has been added.'), findsOneWidget);
-      expect(find.text('13 accounts'), findsOneWidget);
+      expect(find.text('15 accounts'), findsOneWidget);
       final created = (await repo.getUsers(query: 'lina')).unwrap().items.single;
       expect(created.role, UserRole.teacher);
+    });
+
+    testWidgets('creates a company account: the fifth role takes a whole row', (tester) async {
+      final repo = await _pump(tester, RoutePaths.newUser);
+      Size card(String role) =>
+          tester.getSize(find.ancestor(of: find.text(role), matching: find.byType(InkWell)).first);
+
+      await tester.ensureVisible(find.text('Recruiter / partner company'));
+      await tester.pumpAndSettle();
+      expect(card('Company').width, greaterThan(card('Student').width * 1.8));
+      expect(card('Teacher').width, card('Student').width);
+      expect(tester.takeException(), isNull);
+
+      await tester.enterText(_field('Name'), 'Nadia Kooli');
+      await tester.enterText(_field('Email'), 'nadia.k@medinasoft.test');
+      await tester.enterText(_field('Password'), 'Welcome-2026');
+      await _tap(tester, find.text('Company'));
+      await _tap(tester, find.text('Create'));
+
+      expect(find.text('Account created'), findsOneWidget);
+      final created = (await repo.getUsers(query: 'medinasoft')).unwrap().items.single;
+      expect(created.role, UserRole.company);
     });
 
     testWidgets('shows the server refusal', (tester) async {
@@ -296,8 +318,8 @@ void main() {
       await _tap(tester, find.widgetWithText(TextButton, 'Delete'));
 
       expect(find.text('Amira Ben Salah has been deleted.'), findsOneWidget);
-      expect(find.text('11 accounts'), findsOneWidget);
-      expect((await repo.getStats()).unwrap().total, 11);
+      expect(find.text('13 accounts'), findsOneWidget);
+      expect((await repo.getStats()).unwrap().total, 13);
     });
 
     testWidgets('an unknown account shows the error', (tester) async {
@@ -424,6 +446,14 @@ void main() {
         expect(find.text('Deleted the account of Selim Rekik (selim.rekik@campus.test)'), findsOneWidget);
       });
     }
+
+    test('names every action the API records', () {
+      expect(auditActionLabel('user.import.assist'), 'Import assist');
+      expect(auditActionLabel('auth.password_reset'), 'Password reset');
+      expect(auditActionLabel('auth.password_change'), 'Password changed');
+      expect(auditActionLabel('something.new'), 'something.new');
+      expect(auditActionIcon('auth.password_reset'), Icons.lock_reset_outlined);
+    });
 
     testWidgets('is empty before any change', (tester) async {
       await _pump(tester, RoutePaths.auditLog);

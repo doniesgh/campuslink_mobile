@@ -3,7 +3,8 @@ import type { TimetableSlot } from './timetable.model';
 // Demo weekly template, ported from the app's MockTimetableRepository.
 // Every weekday has classes at 08:30, 10:15 and 13:30 (the courses change
 // from day to day); Monday and Thursday end with an evaluation at 16:00.
-// No classes on weekends.
+// No classes on weekends. Friday's workshop is online (Google Meet).
+// Slot ids are unique: the admin screens edit a slot by its id.
 
 /** The only class group for now: every student is in it. */
 export const CLASS_GROUP = 'Tech Track 4BI';
@@ -17,8 +18,13 @@ const slot = (s: SlotInput): TimetableSlot => ({
   lectureCount: null,
   coefficient: null,
   notes: null,
+  mode: 'onsite',
+  meetUrl: null,
   ...s,
 });
+
+/** The (fake) Google Meet link of the demo's online class. */
+export const DEMO_MEET_URL = 'https://meet.google.com/xqd-fkzw-pnb';
 
 const MONDAY = 1;
 const TUESDAY = 2;
@@ -141,7 +147,7 @@ export const DEMO_TIMETABLE: TimetableSlot[] = [
 
   // Thursday
   slot({
-    slotId: 'algo',
+    slotId: 'algo-thu',
     weekday: THURSDAY,
     course: 'Algorithmes & Complexité',
     room: 'Lab 14',
@@ -151,7 +157,7 @@ export const DEMO_TIMETABLE: TimetableSlot[] = [
     kind: 'lab',
   }),
   slot({
-    slotId: 'genie-logiciel',
+    slotId: 'genie-logiciel-thu',
     weekday: THURSDAY,
     course: 'Génie Logiciel & Architecture',
     room: 'Amphi 3B',
@@ -162,7 +168,7 @@ export const DEMO_TIMETABLE: TimetableSlot[] = [
     lectureCount: 14,
   }),
   slot({
-    slotId: 'bases-de-donnees',
+    slotId: 'bases-de-donnees-thu',
     weekday: THURSDAY,
     course: 'Bases de Données',
     room: 'Salle 208',
@@ -211,10 +217,12 @@ export const DEMO_TIMETABLE: TimetableSlot[] = [
     slotId: 'entrepreneuriat',
     weekday: FRIDAY,
     course: 'Entrepreneuriat & Innovation',
-    room: 'Espace Coworking',
+    room: '',
     teacher: 'Mme. Karoui',
     start: '13:30',
     end: '15:30',
     kind: 'workshop',
+    mode: 'online',
+    meetUrl: DEMO_MEET_URL,
   }),
 ];

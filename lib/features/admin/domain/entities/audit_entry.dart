@@ -7,13 +7,15 @@ class AuditEntry {
     required this.createdAt,
     this.actorName,
     this.actorEmail,
+    this.targetType,
     this.targetId,
     this.ip,
+    this.userAgent,
   });
 
   final String id;
 
-  /// "area.verb", e.g. "user.update".
+  /// "area.verb", e.g. "user.update", "auth.password_reset".
   final String action;
 
   /// "Changed the role of Sarra Mansouri to Teacher"
@@ -23,10 +25,20 @@ class AuditEntry {
   final String? actorName;
   final String? actorEmail;
 
+  /// What [targetId] is: "user" (an account), or null for an entry about
+  /// no one thing (an import).
+  final String? targetType;
+
   /// The account the action was about.
   final String? targetId;
   final String? ip;
+
+  /// The app or browser that made the request (null for older entries).
+  final String? userAgent;
   final DateTime createdAt;
+
+  /// The entry is about an account (that may have been deleted since).
+  bool get isAboutUser => targetId != null && (targetType == null || targetType == 'user');
 }
 
 /// One page of the audit log, newest first.

@@ -1,9 +1,11 @@
+import '../../../../core/l10n/app_language.dart';
 import '../../domain/entities/user.dart';
 
 /// Expected backend user JSON (Mongo `_id` or `id` both accepted):
 /// { "_id": "...", "email": "...", "displayName": "...", "avatarUrl": null,
-///   "isEmailVerified": true, "role": "student" }
+///   "isEmailVerified": true, "role": "student", "locale": "fr" }
 /// A missing or unknown `role` reads as student, the least privileged role.
+/// A missing or unknown `locale` (an older API) reads as "fr", the default.
 class UserModel {
   const UserModel({
     required this.id,
@@ -12,6 +14,7 @@ class UserModel {
     this.avatarUrl,
     this.isEmailVerified = false,
     this.role = UserRole.student,
+    this.locale = 'fr',
   });
 
   factory UserModel.fromJson(Map<String, dynamic> json) => UserModel(
@@ -21,6 +24,7 @@ class UserModel {
         avatarUrl: json['avatarUrl'] as String?,
         isEmailVerified: (json['isEmailVerified'] as bool?) ?? false,
         role: UserRole.fromName(json['role']) ?? UserRole.student,
+        locale: AppLanguage.fromCode(json['locale'])?.code ?? AppLanguage.fallback.code,
       );
 
   final String id;
@@ -29,6 +33,7 @@ class UserModel {
   final String? avatarUrl;
   final bool isEmailVerified;
   final UserRole role;
+  final String locale;
 
   User toEntity() => User(
         id: id,
@@ -37,6 +42,7 @@ class UserModel {
         avatarUrl: avatarUrl,
         isEmailVerified: isEmailVerified,
         role: role,
+        locale: locale,
       );
 }
 

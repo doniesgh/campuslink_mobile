@@ -7,6 +7,10 @@ enum LostItemCategory { calculator, keys, audio, bag, card, bottle, other }
 /// Kind of place where the item was lost or found (drives the location icon).
 enum LostItemPlace { classroom, parking, library, cafeteria, other }
 
+/// `active`: listed and matched. `resolved`: back with its owner (still
+/// listed, without its action, and never matched).
+enum LostItemStatus { active, resolved }
+
 /// What a student can do with an item from the list.
 enum LostItemAction {
   /// Found item: "C'est à moi / Réclamer".
@@ -40,6 +44,9 @@ class LostItem {
     this.dropOffNote,
     this.pickupDesk,
     this.isSerialHidden = false,
+    this.status = LostItemStatus.active,
+    this.isMine = false,
+    this.canManage = false,
   });
 
   final String id;
@@ -79,7 +86,42 @@ class LostItem {
   /// The serial number is hidden so the owner can prove ownership.
   final bool isSerialHidden;
 
+  final LostItemStatus status;
+
+  /// The signed-in student reported it.
+  final bool isMine;
+
+  /// The signed-in user may edit, resolve or delete it (its reporter, or an admin).
+  final bool canManage;
+
   bool get isLost => kind == LostItemKind.lost;
+
+  bool get isResolved => status == LostItemStatus.resolved;
+
+  /// The same item with another [status].
+  LostItem withStatus(LostItemStatus status) => LostItem(
+        id: id,
+        kind: kind,
+        title: title,
+        category: category,
+        zone: zone,
+        location: location,
+        place: place,
+        reporterName: reporterName,
+        reportedAt: reportedAt,
+        reference: reference,
+        reporterIsStaff: reporterIsStaff,
+        photoCount: photoCount,
+        isUrgent: isUrgent,
+        reward: reward,
+        distinctiveDetail: distinctiveDetail,
+        dropOffNote: dropOffNote,
+        pickupDesk: pickupDesk,
+        isSerialHidden: isSerialHidden,
+        status: status,
+        isMine: isMine,
+        canManage: canManage,
+      );
 
   LostItemAction get action => isLost
       ? LostItemAction.reportFound

@@ -10,6 +10,7 @@ import { CLASS_GROUP } from './timetable.data';
 import {
   TimetableTemplateModel,
   type SessionKind,
+  type SessionMode,
   type TimetableSlot,
 } from './timetable.model';
 
@@ -20,6 +21,7 @@ import {
 export interface ClassSessionJson {
   id: string;
   course: string;
+  /** The room, or "Online" for an online class without one (older apps show it as is). */
   room: string;
   teacher: string;
   date: string;
@@ -30,7 +32,13 @@ export interface ClassSessionJson {
   lectureCount: number | null;
   coefficient: number | null;
   notes: string | null;
+  mode: SessionMode;
+  /** The Google Meet link of an online class, else null. */
+  meetUrl: string | null;
 }
+
+/** The text shown as the room of an online class that has none. */
+export const ONLINE_ROOM_LABEL = 'Online';
 
 export interface TimetableDayJson {
   date: string;
@@ -94,11 +102,13 @@ function buildDay(slots: TimetableSlot[], date: Date): TimetableDayJson {
   const day = formatCalendarDate(date);
   const sessions = slots
     .filter((s) => s.weekday === weekday)
-    .map(
-      (s): ClassSessionJson => ({
+    .map((s): ClassSessionJson => {
+      // Slots saved before online classes existed have no mode (lean reads skip defaults).
+      const mode: SessionMode = s.mode === 'online' ? 'online' : 'onsite';
+      return {
         id: `${s.slotId}-${key}`,
         course: s.course,
-        room: s.room,
+        room: s.room || (mode === 'online' ? ONLINE_ROOM_LABEL : ''),
         teacher: s.teacher,
         date: day,
         start: s.start,
@@ -108,8 +118,10 @@ function buildDay(slots: TimetableSlot[], date: Date): TimetableDayJson {
         lectureCount: s.lectureCount ?? null,
         coefficient: s.coefficient ?? null,
         notes: s.notes ?? null,
-      }),
-    )
+        mode,
+        meetUrl: mode === 'online' ? (s.meetUrl ?? null) : null,
+      };
+    })
     // 'HH:mm' strings sort like the times they hold.
     .sort((a, b) => a.start.localeCompare(b.start));
   return { date: day, semesterWeek: semesterWeek(date), sessions };

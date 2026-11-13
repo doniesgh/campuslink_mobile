@@ -10,6 +10,7 @@ import {
   createAdmin,
   createStudent,
   type TestAccount,
+  validationError,
 } from './helpers';
 
 const app = createApp();
@@ -80,7 +81,7 @@ describe('POST /api/admin/users/import (dry run)', () => {
         { row: 9, field: 'studentId', code: 'INVALID_STUDENT_ID', message: 'ENT ID: 3 to 20 letters or digits' },
         { row: 10, field: 'studentId', code: 'DUPLICATE_STUDENT_ID', message: 'ENT ID: already on another line of the file' },
         { row: 11, field: 'studentId', code: 'STUDENT_ID_TAKEN', message: 'ENT ID: an account already uses it' },
-        { row: 12, field: 'role', code: 'INVALID_ROLE', message: 'Role: not recognised (student, teacher, admin or alumni)' },
+        { row: 12, field: 'role', code: 'INVALID_ROLE', message: 'Role: not recognised (student, teacher, admin, alumni or company)' },
         { row: 13, field: 'password', code: 'REQUIRED', message: 'Password: missing' },
         { row: 14, field: 'password', code: 'PASSWORD_TOO_SHORT', message: 'Password: at least 8 characters' },
         // Several problems on one line: all of them, in column order.
@@ -88,7 +89,7 @@ describe('POST /api/admin/users/import (dry run)', () => {
         { row: 16, field: 'email', code: 'INVALID_EMAIL', message: 'Email: not a valid address' },
         { row: 16, field: 'password', code: 'PASSWORD_TOO_SHORT', message: 'Password: at least 8 characters' },
         { row: 16, field: 'studentId', code: 'INVALID_STUDENT_ID', message: 'ENT ID: 3 to 20 letters or digits' },
-        { row: 16, field: 'role', code: 'INVALID_ROLE', message: 'Role: not recognised (student, teacher, admin or alumni)' },
+        { row: 16, field: 'role', code: 'INVALID_ROLE', message: 'Role: not recognised (student, teacher, admin, alumni or company)' },
       ],
     });
     expect(await UserModel.countDocuments()).toBe(2);
@@ -127,9 +128,10 @@ describe('POST /api/admin/users/import (dry run)', () => {
     const res = await importUsers(admin.auth, true, thousand).expect(200);
     expect(res.body).toEqual({ dryRun: true, valid: 1000, problems: [] });
 
-    await importUsers(admin.auth, true, validRows(1001)).expect(422, {
-      message: 'At most 1000 lines per check.',
-    });
+    await importUsers(admin.auth, true, validRows(1001)).expect(
+      422,
+      validationError('At most 1000 lines per check.'),
+    );
   });
 });
 
@@ -193,12 +195,14 @@ describe('POST /api/admin/users/import', () => {
   });
 
   test('imports at most 50 accounts at once', async () => {
-    await importUsers(admin.auth, false, validRows(51)).expect(422, {
-      message: 'At most 50 accounts per import.',
-    });
-    await importUsers(admin.auth, false, validRows(1001)).expect(422, {
-      message: 'At most 50 accounts per import.',
-    });
+    await importUsers(admin.auth, false, validRows(51)).expect(
+      422,
+      validationError('At most 50 accounts per import.'),
+    );
+    await importUsers(admin.auth, false, validRows(1001)).expect(
+      422,
+      validationError('At most 50 accounts per import.'),
+    );
     expect(await UserModel.countDocuments()).toBe(1);
   });
 
@@ -239,7 +243,7 @@ describe('POST /api/admin/users/import', () => {
       .set(admin.auth)
       .send(body)
       .expect(422);
-    expect(res.body).toEqual({ message });
+    expect(res.body).toEqual(validationError(message));
   });
 
   test('is for admins only, even with a big body', async () => {

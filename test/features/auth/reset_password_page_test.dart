@@ -11,6 +11,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../helpers/localized_app.dart';
+
 /// Signed out; records reset and resend calls.
 class _FakeAuthRepository implements AuthRepository {
   final resets = <(String, String, String)>[];
@@ -41,7 +43,11 @@ class _FakeAuthRepository implements AuthRepository {
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
 }
 
-Future<_FakeAuthRepository> _pump(WidgetTester tester, {String email = 'sarra@campus.test'}) async {
+Future<_FakeAuthRepository> _pump(
+  WidgetTester tester, {
+  String email = 'sarra@campus.test',
+  Locale locale = const Locale('en'),
+}) async {
   tester.view.physicalSize = const Size(375, 900) * 3;
   tester.view.devicePixelRatio = 3;
   addTearDown(tester.view.reset);
@@ -69,6 +75,9 @@ Future<_FakeAuthRepository> _pump(WidgetTester tester, {String email = 'sarra@ca
         // Plain theme: the app theme pulls Google Fonts from the network.
         theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary)),
         routerConfig: router,
+        locale: locale,
+        supportedLocales: testSupportedLocales,
+        localizationsDelegates: testLocalizationsDelegates,
       ),
     ),
   );
@@ -113,6 +122,15 @@ void main() {
 
     expect(find.text('Invalid or expired code.'), findsOneWidget);
     expect(find.text('Choose a new password'), findsOneWidget);
+  });
+
+  testWidgets('too many attempts is said in the app language', (tester) async {
+    final repository = await _pump(tester, locale: const Locale('fr'));
+    repository.resetFailure =
+        const TooManyRequestsFailure('Too many attempts. Try again in a few minutes.');
+    await _fill(tester, code: '123456', password: 'new-password-456');
+
+    expect(find.text('Trop de tentatives. Réessaie dans quelques minutes.'), findsOneWidget);
   });
 
   testWidgets('"Send a new code" asks for another email', (tester) async {

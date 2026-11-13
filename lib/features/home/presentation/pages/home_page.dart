@@ -36,7 +36,7 @@ ForumSection _forumSectionFor(PostCategory category) => switch (category) {
 
 /// Stitch "02. Home & Today Hub".
 ///
-/// Admins and alumni have no timetable: no "Up next" or "Today's Schedule"
+/// Admins, alumni and companies have no timetable: no "Up next" or "Today's Schedule"
 /// for them. Admins get the [AdminOverviewCard] instead.
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});

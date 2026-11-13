@@ -429,7 +429,8 @@ class _UserFormState extends ConsumerState<_UserForm> {
       '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
 }
 
-/// The four roles as selectable cards (two per row).
+/// The roles as selectable cards, two per row (the last one alone takes the
+/// whole row).
 class _RolePicker extends StatelessWidget {
   const _RolePicker({required this.selected, required this.onChanged});
 
@@ -441,6 +442,7 @@ class _RolePicker extends StatelessWidget {
         UserRole.teacher => 'Teaching staff',
         UserRole.admin => 'Manages every account',
         UserRole.alumni => 'Former student',
+        UserRole.company => 'Recruiter / partner company',
       };
 
   @override
@@ -460,14 +462,17 @@ class _RolePicker extends StatelessWidget {
         const SizedBox(height: AppSpacing.sm),
         LayoutBuilder(
           builder: (context, constraints) {
-            final width = (constraints.maxWidth - AppSpacing.sm) / 2;
+            final half = (constraints.maxWidth - AppSpacing.sm) / 2;
+            const roles = UserRole.values;
             return Wrap(
               spacing: AppSpacing.sm,
               runSpacing: AppSpacing.sm,
               children: [
-                for (final role in UserRole.values)
+                for (final (i, role) in roles.indexed)
                   SizedBox(
-                    width: width,
+                    width: roles.length.isOdd && i == roles.length - 1
+                        ? constraints.maxWidth
+                        : half,
                     child: _RoleOption(
                       role: role,
                       hint: _hint(role),

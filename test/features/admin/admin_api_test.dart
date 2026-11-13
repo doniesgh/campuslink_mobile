@@ -8,6 +8,7 @@ import 'package:campuspulse/features/admin/data/models/admin_models.dart';
 import 'package:campuspulse/features/admin/data/repositories/admin_repository_impl.dart';
 import 'package:campuspulse/features/admin/domain/entities/managed_user.dart';
 import 'package:campuspulse/features/admin/domain/entities/user_import.dart';
+import 'package:campuspulse/features/admin/domain/import_assist.dart';
 import 'package:campuspulse/features/auth/data/models/auth_models.dart';
 import 'package:campuspulse/features/auth/domain/entities/user.dart';
 import 'package:campuspulse/features/notifications/data/models/app_notification_model.dart';
@@ -99,6 +100,30 @@ void main() {
       expect(audit.items[1].actorName, 'Campus Admin');
       expect(audit.items.first.targetId, isNull);
       expect(audit.items.first.ip, '127.0.0.1');
+    });
+
+    test('the account language, companies and the audit targets', () {
+      expect(UserModel.fromJson(_json('meWithLocale')).toEntity().locale, 'en');
+      // An API from before languages: French, the default.
+      expect(UserModel.fromJson(_json('sessionUser')).toEntity().locale, 'fr');
+
+      final stats = userStatsFromJson(_json('statsWithCompany'));
+      expect(stats.total, 5);
+      expect(stats.count(UserRole.company), 1);
+      expect(stats.count(UserRole.alumni), 0);
+
+      final reset = auditEntryFromJson(_json('auditPasswordReset'));
+      expect(reset.action, 'auth.password_reset');
+      expect(reset.actorName, 'Sarra Kefi');
+      expect(reset.targetType, 'user');
+      expect(reset.targetId, '6af709df8e4fa1e28731f78d');
+      expect(reset.userAgent, 'Dart/3.13 (dart:io)');
+      expect(reset.isAboutUser, isTrue);
+
+      // Entries from before targetType: about a user when they have a target.
+      final old = auditPageFromJson(_json('auditPage')).items;
+      expect(old.map((e) => (e.targetType, e.userAgent)).toSet(), {(null, null)});
+      expect(old.map((e) => e.isAboutUser), [false, true, true]);
     });
 
     test('account notifications open Profile and the new account', () {
@@ -239,6 +264,77 @@ void main() {
       test('other 422s stay failures', () async {
         final (repo, _) = _repo((_) => (422, {'message': 'At most 50 accounts per import.'}));
         expect(_failureOf(await repo.importUsers([row])).message, 'At most 50 accounts per import.');
+      });
+    });
+
+    group('import assist', () {
+      test('the status says whether the AI is available', () async {
+        final (on, api) = _repo((_) => (200, _json('importAssistStatus')));
+        final (off, _) = _repo((_) => (200, _json('importAssistStatusOff')));
+
+        final status = (await on.getImportAssistStatus()).unwrap();
+
+        expect(api.requests.single.method, 'GET');
+        expect(api.requests.single.path, '/admin/users/import/assist');
+        expect((status.available, status.model), (true, 'test/model-a'));
+        final none = (await off.getImportAssistStatus()).unwrap();
+        expect((none.available, none.model), (false, null));
+      });
+
+      test('sends the masked lines and values, and reads the mapping', () async {
+        final (repo, api) = _repo((_) => (200, _json('importAssist')));
+
+        final answer = (await repo.assistImport(const AssistRequest(
+          lines: [
+            ['Nom complet', 'Adresse', 'Profil', 'MDP'],
+            ['BEN ALI Ines', 'i…@campus.test', 'Étudiant(e)', '•••'],
+          ],
+          values: [(column: 2, values: ['Profil', 'Étudiant(e)'])],
+        )))
+            .unwrap();
+
+        final request = api.requests.single;
+        expect(request.method, 'POST');
+        expect(request.path, '/admin/users/import/assist');
+        expect(request.receiveTimeout, const Duration(seconds: 60));
+        expect(request.data, {
+          'lines': [
+            ['Nom complet', 'Adresse', 'Profil', 'MDP'],
+            ['BEN ALI Ines', 'i…@campus.test', 'Étudiant(e)', '•••'],
+          ],
+          'values': [
+            {'column': 2, 'values': ['Profil', 'Étudiant(e)']},
+          ],
+        });
+
+        expect(answer.model, 'test/model-a');
+        expect(answer.mapping.headerRow, 2);
+        expect(answer.mapping.columns, {
+          AssistField.fullName: 0,
+          AssistField.email: 1,
+          AssistField.role: 2,
+          AssistField.password: 3,
+        });
+        expect(answer.mapping.nameOrder, NameOrder.lastFirst);
+        expect(answer.mapping.roles, [
+          (text: 'Étudiant(e)', role: UserRole.student),
+          (text: 'Enseignant', role: UserRole.teacher),
+          (text: 'Directeur', role: null),
+        ]);
+      });
+
+      test('the AI errors keep their message and code (busy, not available)', () async {
+        final (busy, _) = _repo((_) => (429, _json('aiBusy')));
+        final (off, _) = _repo((_) => (503, _json('aiUnavailable')));
+        const request = AssistRequest(lines: [['a']], values: []);
+
+        final busyFailure = _failureOf(await busy.assistImport(request));
+        expect(busyFailure, isA<TooManyRequestsFailure>());
+        expect((busyFailure.message, busyFailure.code),
+            ('The AI service is busy. Try again in a few minutes.', 'AI_BUSY'));
+        final offFailure = _failureOf(await off.assistImport(request));
+        expect((offFailure.message, offFailure.code),
+            ('AI features are not available on this server.', 'AI_UNAVAILABLE'));
       });
     });
 

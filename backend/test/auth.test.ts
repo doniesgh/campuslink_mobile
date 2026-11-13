@@ -3,7 +3,7 @@ import request from 'supertest';
 import { createApp } from '../src/app';
 import { setMailer } from '../src/modules/auth/mailer';
 import { UserModel } from '../src/modules/users/user.model';
-import { captureMail, clearTestDb, closeTestDb, connectTestDb } from './helpers';
+import { captureMail, clearTestDb, closeTestDb, connectTestDb, validationError } from './helpers';
 
 const app = createApp();
 const mail = captureMail();
@@ -12,8 +12,8 @@ beforeAll(connectTestDb);
 afterAll(closeTestDb);
 beforeEach(async () => {
   await clearTestDb();
-  mail.codes.length = 0;
   mail.resets.length = 0;
+  mail.emails.length = 0;
 });
 
 const student = {
@@ -42,7 +42,7 @@ async function registerStudent(): Promise<SessionBody> {
 const bearer = (token: string) => ({ Authorization: `Bearer ${token}` });
 
 describe('POST /api/auth/register', () => {
-  test('creates an unverified account, emails a code and signs in', async () => {
+  test('creates a verified account and signs in, without sending any email', async () => {
     const body = await registerStudent();
 
     expect(body.user).toEqual({
@@ -51,14 +51,33 @@ describe('POST /api/auth/register', () => {
       studentId: null,
       displayName: 'Sarra Kefi',
       avatarUrl: null,
-      isEmailVerified: false,
+      isEmailVerified: true,
       role: 'student',
+      locale: 'fr',
     });
     expect(body.accessToken).toEqual(expect.any(String));
     expect(body.refreshToken).toEqual(expect.any(String));
-    expect(mail.codes).toEqual([
-      { to: 'sarra.kefi@campus.test', code: expect.stringMatching(/^\d{6}$/) },
-    ]);
+    expect(mail.emails).toEqual([]);
+    const saved = await UserModel.findById(body.user.id).lean();
+    expect(saved?.isEmailVerified).toBe(true);
+    expect(Object.keys(saved ?? {}).join()).not.toMatch(/verification/i);
+  });
+
+  test('the new account can use the app right away', async () => {
+    const { accessToken, user } = await registerStudent();
+    const me = await request(app).get('/api/users/me').set(bearer(accessToken)).expect(200);
+    expect(me.body).toEqual(user);
+    await request(app).get('/api/notifications').set(bearer(accessToken)).expect(200);
+  });
+
+  test('there is no email verification step any more', async () => {
+    const { accessToken } = await registerStudent();
+    await request(app)
+      .post('/api/auth/verify-email')
+      .set(bearer(accessToken))
+      .send({ code: '123456' })
+      .expect(404);
+    await request(app).post('/api/auth/resend-verification').set(bearer(accessToken)).expect(404);
   });
 
   test('rejects a second account with the same email, whatever the case', async () => {
@@ -75,19 +94,19 @@ describe('POST /api/auth/register', () => {
       .post('/api/auth/register')
       .send({ ...student, password: 'short' })
       .expect(422);
-    expect(short.body).toEqual({ message: 'Use at least 8 characters' });
+    expect(short.body).toEqual(validationError('Use at least 8 characters'));
 
     const missing = await request(app)
       .post('/api/auth/register')
       .send({ displayName: 'Sarra', password: 'password123' })
       .expect(422);
-    expect(missing.body).toEqual({ message: 'Enter your email' });
+    expect(missing.body).toEqual(validationError('Enter your email'));
 
     const invalid = await request(app)
       .post('/api/auth/register')
       .send({ ...student, email: 'sarra.kefi' })
       .expect(422);
-    expect(invalid.body).toEqual({ message: 'Enter a valid email' });
+    expect(invalid.body).toEqual(validationError('Enter a valid email'));
   });
 });
 
@@ -146,66 +165,6 @@ describe('GET /api/users/me', () => {
     const { accessToken } = await registerStudent();
     const res = await request(app).get('/api/users/me').set(bearer(accessToken)).expect(200);
     expect(JSON.stringify(res.body)).not.toMatch(/Hash|password|verification/i);
-  });
-});
-
-describe('POST /api/auth/verify-email', () => {
-  test('rejects a wrong code, then verifies with the emailed one', async () => {
-    const { accessToken } = await registerStudent();
-    const code = mail.codes[0].code;
-    const wrong = code === '000000' ? '111111' : '000000';
-
-    await request(app)
-      .post('/api/auth/verify-email')
-      .set(bearer(accessToken))
-      .send({ code: wrong })
-      .expect(400, { message: 'Invalid code. Check the email we sent you.' });
-
-    const res = await request(app)
-      .post('/api/auth/verify-email')
-      .set(bearer(accessToken))
-      .send({ code })
-      .expect(200);
-    expect(res.body.user.isEmailVerified).toBe(true);
-  });
-
-  test('locks the code after 5 wrong attempts until a new one is sent', async () => {
-    const { accessToken } = await registerStudent();
-    const code = mail.codes[0].code;
-    const wrong = code === '000000' ? '111111' : '000000';
-    for (let i = 0; i < 5; i++) {
-      await request(app)
-        .post('/api/auth/verify-email')
-        .set(bearer(accessToken))
-        .send({ code: wrong })
-        .expect(400);
-    }
-    await request(app)
-      .post('/api/auth/verify-email')
-      .set(bearer(accessToken))
-      .send({ code })
-      .expect(400, { message: 'This code has expired. Request a new one.' });
-
-    await request(app)
-      .post('/api/auth/resend-verification')
-      .set(bearer(accessToken))
-      .expect(204);
-    const fresh = mail.codes[1].code;
-    await request(app)
-      .post('/api/auth/verify-email')
-      .set(bearer(accessToken))
-      .send({ code: fresh })
-      .expect(200);
-  });
-
-  test('requires a signed-in user and a 6-digit code', async () => {
-    await request(app).post('/api/auth/verify-email').send({ code: '123456' }).expect(401);
-    const { accessToken } = await registerStudent();
-    await request(app)
-      .post('/api/auth/verify-email')
-      .set(bearer(accessToken))
-      .send({ code: '12ab56' })
-      .expect(422, { message: 'Enter the 6-digit code' });
   });
 });
 
@@ -301,22 +260,21 @@ describe('password reset', () => {
   });
 
   test('validates the code and the new password', async () => {
-    await reset({ email: student.email, code: '12ab56', password: 'new-password-456' }).expect(422, {
-      message: 'Enter the 6-digit code',
-    });
-    await reset({ email: student.email, code: '123456', password: 'short' }).expect(422, {
-      message: 'Use at least 8 characters',
-    });
+    await reset({ email: student.email, code: '12ab56', password: 'new-password-456' }).expect(
+      422,
+      validationError('Enter the 6-digit code'),
+    );
+    await reset({ email: student.email, code: '123456', password: 'short' }).expect(
+      422,
+      validationError('Use at least 8 characters'),
+    );
   });
 });
 
 describe('when the mail server fails', () => {
-  test('registration still succeeds and the student can ask for a new code', async () => {
+  test('sign-up is not affected and forgot-password still answers', async () => {
     const failing = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    setMailer({
-      sendVerificationCode: () => Promise.reject(new Error('SMTP down')),
-      sendPasswordResetCode: () => Promise.reject(new Error('SMTP down')),
-    });
+    setMailer({ sendPasswordResetCode: () => Promise.reject(new Error('SMTP down')) });
     try {
       await request(app).post('/api/auth/register').send(student).expect(201);
       await request(app).post('/api/auth/forgot-password').send({ email: student.email }).expect(200);

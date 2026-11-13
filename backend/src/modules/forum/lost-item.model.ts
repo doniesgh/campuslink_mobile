@@ -13,12 +13,16 @@ export const LOST_ITEM_CATEGORIES = [
 ] as const;
 export const LOST_ITEM_PLACES = ['classroom', 'parking', 'library', 'cafeteria', 'other'] as const;
 
+/** `active`: listed and matched · `resolved`: the item went back to its owner (still listed, never matched). */
+export const LOST_ITEM_STATUSES = ['active', 'resolved'] as const;
+export type LostItemStatus = (typeof LOST_ITEM_STATUSES)[number];
+
 /**
  * A post of the Lost & Found board: an item reported missing by its owner
  * (`lost`) or handed in by a finder (`found`). The reporter is shown as a
  * name; notices published from the app also keep the reporter's account id
- * (the demo items have none). Ids are strings so the demo items keep the
- * app's ids ("lf-409").
+ * (most demo items have none: only an admin can manage them). Ids are
+ * strings so the demo items keep the app's ids ("lf-409").
  */
 const lostItemSchema = new Schema(
   {
@@ -49,6 +53,9 @@ const lostItemSchema = new Schema(
 
     /** The serial number is hidden so the owner can prove ownership. */
     isSerialHidden: { type: Boolean, default: false },
+
+    /** Items saved before statuses existed have none: they are active. */
+    status: { type: String, enum: LOST_ITEM_STATUSES, default: 'active' },
   },
   { timestamps: true },
 );
@@ -79,25 +86,51 @@ export interface PublicLostItem {
   dropOffNote: string | null;
   pickupDesk: string | null;
   isSerialHidden: boolean;
+  status: LostItemStatus;
+  /** The reporter's account id, or null (demo items, desk notices). */
+  reporterId: string | null;
+  /** The viewer reported it. */
+  isMine: boolean;
+  /** The viewer may edit, resolve or delete it: the reporter, or an admin. */
+  canManage: boolean;
 }
 
-export const toPublicLostItem = (item: LostItem): PublicLostItem => ({
-  id: item._id,
-  kind: item.kind,
-  title: item.title,
-  category: item.category,
-  zone: item.zone,
-  location: item.location,
-  place: item.place,
-  reporterName: item.reporterName,
-  reporterIsStaff: item.reporterIsStaff,
-  reportedAt: item.reportedAt.toISOString(),
-  reference: item.reference ?? null,
-  photoCount: item.photoCount,
-  isUrgent: item.isUrgent,
-  reward: item.reward ?? null,
-  distinctiveDetail: item.distinctiveDetail ?? null,
-  dropOffNote: item.dropOffNote ?? null,
-  pickupDesk: item.pickupDesk ?? null,
-  isSerialHidden: item.isSerialHidden,
-});
+/** Who is looking at an item: decides `isMine` and `canManage`. */
+export interface LostItemViewer {
+  userId: string;
+  isAdmin: boolean;
+}
+
+/** The reporter's account id as a string, or null. */
+export const reporterIdOf = (item: Pick<LostItem, 'reporterId'>): string | null =>
+  item.reporterId ? String(item.reporterId) : null;
+
+/** [item] in the API shape, as [viewer] sees it (no viewer: nobody's, nobody can manage it). */
+export function toPublicLostItem(item: LostItem, viewer?: LostItemViewer): PublicLostItem {
+  const reporterId = reporterIdOf(item);
+  const isMine = viewer !== undefined && reporterId !== null && reporterId === viewer.userId;
+  return {
+    id: item._id,
+    kind: item.kind,
+    title: item.title,
+    category: item.category,
+    zone: item.zone,
+    location: item.location,
+    place: item.place,
+    reporterName: item.reporterName,
+    reporterIsStaff: item.reporterIsStaff,
+    reportedAt: item.reportedAt.toISOString(),
+    reference: item.reference ?? null,
+    photoCount: item.photoCount,
+    isUrgent: item.isUrgent,
+    reward: item.reward ?? null,
+    distinctiveDetail: item.distinctiveDetail ?? null,
+    dropOffNote: item.dropOffNote ?? null,
+    pickupDesk: item.pickupDesk ?? null,
+    isSerialHidden: item.isSerialHidden,
+    status: item.status ?? 'active',
+    reporterId,
+    isMine,
+    canManage: isMine || viewer?.isAdmin === true,
+  };
+}

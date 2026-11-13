@@ -16,6 +16,7 @@ What every screen does, where its code lives and which endpoints it uses. The nu
 | [Grades](#grades) | 11 | `grades/` | `grades/` |
 | [Notifications](#notifications) | 12 | `notifications/` | `notifications/` |
 | [Administration](#administration) (admins only) | — | `admin/` | `admin/` |
+| [Language](#language-french--english) (FR / EN) | — | `lib/core/l10n/`, `lib/l10n/`, `profile/` | `users/` (`PATCH /users/me`) |
 
 ---
 
@@ -23,16 +24,18 @@ What every screen does, where its code lives and which endpoints it uses. The nu
 
 **Screens:**
 - `LoginPage`: the purple hero is also the onboarding screen.
-- `RegisterPage`, `VerifyEmailPage`, `ForgotPasswordPage`, `ResetPasswordPage`.
+- `RegisterPage`, `ForgotPasswordPage`, `ResetPasswordPage`.
 
 All of them share the `AuthScaffold` layout.
 
 - **Login** takes an **ENT ID or an email** with a password. "Continue with University SSO" is not available yet.
-- **Register** creates an account, emails a 6-digit code, and opens *Check your inbox*. You can't reach the app until the email is verified.
+- **Register** creates the account and signs you in directly: *Create account* opens Home. No confirmation email is sent and there is no code to enter. Accounts created before this, with an unverified email, sign in normally too.
 - **Forgot password** emails a 6-digit code, then *Choose a new password* takes the code and the new password. All existing sessions are signed out.
 - **Session:** it is restored at start-up. Tokens refresh automatically, and Log out also ends the session on the server.
+- **Too many attempts:** the API limits sign-in, sign-up and password resets (per account and per network). Past the limit the app shows "Too many attempts. Try again in a few minutes." (`TooManyRequestsFailure`, code `TOO_MANY_REQUESTS`).
+- **Language:** a new account gets the language on screen. After a sign-in, if the account's language differs from the one on screen, the app updates the account (`PATCH /users/me`), so its emails come in the language the user reads the app in. See [Language](#language-french--english).
 
-**API:** `POST /auth/register`, `/login`, `/refresh`, `/logout`, `/forgot-password`, `/reset-password`, `/verify-email`, `/resend-verification`, and `GET /users/me`.
+**API:** `POST /auth/register`, `/login`, `/refresh`, `/logout`, `/forgot-password`, `/reset-password`, `GET /users/me` and `PATCH /users/me`.
 
 **Code:** `auth/presentation/pages/`, `auth/presentation/providers/auth_controller.dart` (`AuthController`, `currentUserIdProvider`). The redirect rules are in `core/router/app_router.dart` (`authRedirect`).
 
@@ -51,9 +54,11 @@ All of them share the `AuthScaffold` layout.
   - "C'est à moi" opens Lost & Found.
   - "Répondre" (messaging) is coming soon.
 
-**Admins and alumni** have no timetable, so their Home has no "Up next" and no "Today's schedule".
+**Admins, alumni and companies** have no timetable, so their Home has no "Up next" and no "Today's schedule".
 - **Admins** get an **Administration** card instead: the number of accounts per role, and links to Users, Import and Audit log (`AdminOverviewCard`). Their Planning shortcut becomes **Comptes** (the users).
-- **Alumni:** Planning becomes **Offres** (Jobs).
+- **Alumni and companies:** Planning becomes **Offres** (Jobs).
+
+**Online classes:** "Up next" shows "Online" and a **Join Google Meet** button; "Today's schedule" shows "Online" with a camera icon.
 
 **Data:** Home has no repository of its own. It reads `todayTimetableProvider` (students and teachers only), `highlightsProvider`, `ideaUpvotesProvider`, `unreadNotificationCountProvider` and, for admins, `userStatsProvider`.
 
@@ -63,16 +68,21 @@ All of them share the `AuthScaffold` layout.
 
 **Class reminders:** a push 15 minutes before each session (see Notifications › Push notifications).
 
-**Who:** students and teachers. Admins and alumni follow no classes. They don't get the tab, `authRedirect` sends them home from `/app/timetable*`, and the API answers 403. The same goes for **Courses**.
+**Who:** students and teachers. Admins, alumni and companies follow no classes. They don't get the tab, `authRedirect` sends them home from `/app/timetable*`, and the API answers 403. The same goes for **Courses**.
 
 - **Navigation:** previous/next week, and a Monday–Saturday day strip with dots for days that have classes or exams.
 - **Day summary:** the number of sessions, exams and hours.
 - **Timeline:** past sessions are faded, the current one is live with a progress bar, and the next one shows "Starts in …". Free periods and evaluations ("Major Evaluation · Coeff X") are highlighted.
 - **Tapping a session** opens its course in **Courses**.
+- **Online classes** (Google Meet): an **Online** chip and a **Join Google Meet** button that opens the link in the Meet app or the browser (`url_launcher`); not once the class is over. Home's "Up next" card has the button too, and "Today's schedule" says "Online". The demo's Friday workshop is online.
 
-**API:** `GET /timetable/day?date=`, `GET /timetable/week?date=`. The data is one weekly template per class group (everyone is in "Tech Track 4BI" for now).
+**Who edits it:** admins, in Administration › **Timetable** (see [Administration](#administration)). Every change notifies the students and teachers (a notification in their language, pushed to their phones), and the class reminders follow the new times.
 
-**Code:** `timetable/domain/schedule_logic.dart` holds the week maths, the statuses and the free periods, all unit-tested.
+**API:** `GET /timetable/day?date=`, `GET /timetable/week?date=`. The data is one weekly template per class group (everyone is in "Tech Track 4BI" for now). Sessions carry `mode` (`onsite` / `online`) and `meetUrl`.
+
+**Code:**
+- `timetable/domain/schedule_logic.dart` holds the week maths, the statuses and the free periods, all unit-tested.
+- `timetable/presentation/widgets/meet_link.dart`: the Online chip and the Join button (`meetLauncherProvider`, replaced in tests).
 
 ## Courses
 
@@ -121,10 +131,12 @@ All of them share the `AuthScaffold` layout.
   - **"J'ai trouvé cet objet !"** for lost items
   - **"Vérifier le numéro de série"** for items with a hidden serial number
 
-  The button opens a sheet where the student sends proof of ownership.
+  The button opens a sheet where the student sends proof of ownership. It is not shown on the student's own notices, nor on resolved ones ("Résolu · objet rendu à son propriétaire").
 - **"Publier une annonce"** opens a form to report a lost or found item.
+- **Managing a notice:** its reporter (or an admin) gets a ⋮ menu on the card: **Modifier** (the publish form, prefilled), **Marquer comme résolue** / **Réactiver l'annonce**, and **Supprimer** (after a confirmation). The demo student reported "Calculatrice graphique TI-84" (lf-407).
+- **"Correspondances possibles"** (on every active notice) opens a sheet with the active notices of the other kind that may be the same object: kind, zone, date, place, a score bar and why. The server scores them by rules (category, date, place and words) and, when AI is configured, re-ranks them with a short reason per match (an **IA** chip then shows). Tapping a match pins it above the board ("Correspondance sélectionnée"). The mock repository uses the same rules, without AI.
 
-**API:** `GET /forum/lost-items`, `POST /forum/lost-items`, `POST /forum/lost-items/:id/requests`.
+**API:** `GET /forum/lost-items`, `POST /forum/lost-items`, `PATCH` / `DELETE /forum/lost-items/:id`, `GET /forum/lost-items/:id/matches`, `POST /forum/lost-items/:id/requests`.
 
 ## Forum: Ideas
 
@@ -139,14 +151,19 @@ The *Experiences* section is still "coming soon".
 
 ## Jobs
 
-**Screens:** `JobsPage` (fourth tab), `JobDetailPage`.
+**Screens:** `JobsPage` (fourth tab), `JobDetailPage`, `JobFormPage` (new and edit), the AI summary sheet.
 
-- **Offers:** a searchable list. An **"Applied"** badge shows on offers you applied to.
-- **Offer detail:** the stats, workspace, mission and profile match.
-- **Applying:** **Apply Now** sends the application. Applying twice is refused.
+- **Offers:** a searchable list (title, company, location). Offers posted by companies come first, then the catalogue. An **"Applied"** badge shows on offers you applied to.
+- **Offer detail:** the stats, workspace, mission and profile match. Offers posted through the form only show what they have (no match, no workspace...).
+- **Applying:** students only (as in the PWA): **Apply Now** sends the application, and applying twice is refused. Other roles see "Students apply".
+- **Demo offers of the companies:** `npm run seed` gives Nadia Kooli (Medina Soft) and Walid Sassi (Carthage Data) one offer each, so a company account can show Edit / Delete right away.
 - **Save and share:** Save is local for now; Share copies a link.
+- **Posting an offer** (companies and admins): **New offer** on the Jobs tab opens the form: title, company, description (required), location, period, duration, stipend, skills and tags (comma-separated). The form checks the server's rules before sending; the offer opens once published.
+- **Editing and deleting:** the offer's author and admins (who can also edit the seeded offers) get **Edit** and **Delete** on the detail; Delete asks for confirmation and removes the offer's applications too.
+- **AI summary:** **AI summary** on any offer opens a sheet: a short summary, the key points, the skills asked for and who the offer is ideal for, in the account's language. The server caches it until the offer is edited. When AI isn't set up on the server (no OpenRouter key), when the AI is busy or out of credits, or after 30 summaries in an hour, the sheet says so (with the wait).
+- **Demo:** sign in as a company (`nadia.kooli@campus.test` or `walid.sassi@campus.test`, the demo student's password) or as the admin. With `USE_MOCK=true` the mock posts, edits and deletes in memory and answers a canned summary; sign in with an identifier containing "admin" to see the buttons.
 
-**API:** `GET /jobs`, `GET /jobs/:id`, `POST /jobs/:id/applications`.
+**API:** `GET /jobs`, `GET /jobs/:id`, `POST /jobs`, `PATCH /jobs/:id`, `DELETE /jobs/:id`, `POST /jobs/:id/summary`, `POST /jobs/:id/applications`.
 
 ## Profile & Digital ID
 
@@ -163,12 +180,13 @@ The *Experiences* section is still "coming soon".
   - covoiturage, which opens the Forum; its dot shows when you drive or booked a ride
   - notifications, with the unread count
   - **appearance**: Light, System or Dark
+  - **language**: FR or EN (see [Language](#language-french--english))
   - SSO and privacy (coming soon)
   - **Sign Out**
 
 **Roles:**
 - Admins also get an **Administration** section: Users, Import accounts, Audit log (see [Administration](#administration)).
-- Teachers, admins and alumni don't see the student card, the stats or the NFC pass: the hero shows their role instead ("Admin · CampusPulse").
+- Teachers, admins, alumni and companies don't see the student card, the stats or the NFC pass: the hero shows their role instead ("Admin · CampusPulse", "Company · CampusPulse").
 
 **API:** `GET /profile`. Credits, rank and honours come from the transcript; the unread count and the carpool dot come from their modules.
 
@@ -233,7 +251,7 @@ These rules also exist in `backend/src/modules/grades/grading.ts`, for the Profi
   - "(you)" on your own account, an "Email not verified" badge
   - **Add user**, and buttons to Import and the Audit log
 - **Add / edit user** (`UserFormPage`):
-  - name, email, optional ENT ID, role (four cards) and password, with **Generate**
+  - name, email, optional ENT ID, role (five cards: Student, Teacher, Admin, Alumni, Company) and password, with **Generate**
   - when editing: the password is optional (empty keeps it), and an "Email verified" switch
   - after creating an account or setting a password, a dialog shows the **sign-in details** once, with **Copy**
   - **Delete this account**, after a confirmation
@@ -244,18 +262,43 @@ These rules also exist in `backend/src/modules/grades/grading.ts`, for the Profi
   3. **Check the lines:** the app checks every line, then the server does a dry run ("an account already uses this email"). Lines with problems can be left out.
   4. **Import:** batches of 25, all or nothing per batch.
   5. **Copy the sign-in details** (a tab-separated sheet). Leaving without copying generated passwords asks first.
-- **Audit log** (`AuditLogPage`): every change made by an admin, newest first, filtered by action (Created, Updated, Deleted, Imported). Tapping an entry opens the account.
+- **Read with AI** (only when the server has an AI key, `GET /admin/users/import/assist`):
+  - Offered when the columns aren't found ("This file doesn't follow the template"), or as **Fix with AI** when some roles or names can't be read.
+  - What is sent: the first 12 lines, with emails masked (`i…@campus.test`) and the cells of a password column (found by its title: `MDP`, `Mot de passe`, `Password`…) replaced by `•••`, plus the distinct values of short columns (roles). The card says so, with the model.
+  - The AI says which line holds the titles, which column is which field (name, first / last name, or one full-name column, email, ENT ID, role, password) and what each role value means.
+  - The app rewrites the whole file as the template and checks it again as usual. A full name is split: the words in capitals are the family name (`BEN ALI Ines` → `Ines BEN ALI`), otherwise the first or last word with its particles (`Ben`, `El`, `de`…). Line numbers stay those of the file.
+  - A summary shows what the AI understood (title line, column letters, roles, values it couldn't read, the model), with **Undo**. Errors (not available, busy, failed, too many requests) are shown on the card. Nothing is imported until the admin taps **Import**.
+- **Timetable** (`TimetableAdminPage`, in `timetable/presentation/admin/`, route `/app/profile/admin/timetable`): the weekly classes, grouped by day.
+  - **Add a class** / tap a class to edit it (`SlotFormPage`): day, start and end (`HH:mm`, or the clock button), course, teacher, kind (Lecture, Lab, Workshop, Exam), **Online class** switch with the **Google Meet link**, room (optional online), coefficient for exams, notes.
+  - The form checks the server's rules first (end after start, 8 hours max, a room on site, an https `meet.google.com` link online).
+  - **Clashes** (same room or same teacher at overlapping times on that day) are listed in the form, one line per class in the way ("Same room: Algorithmes & Complexité, Monday 08:30–10:00 (Amphi A)"); nothing is saved.
+  - The bin icon removes a class, after a confirmation.
+  - Students and teachers are notified of every change (see [api.md](api.md#timetable-admin) for the texts).
+- **Audit log** (`AuditLogPage`): every change made by an admin, and the passwords users reset themselves, newest first, filtered by action (Created, Updated, Deleted, Imported, Password reset…). Tapping an entry about an account opens it.
 
 **What deleting an account removes:** its sessions, notifications, attendance, submissions, applications, votes, lost & found requests, transcript and profile; the rides it drives; its seats on other rides (freed). Its forum posts and notices stay, without a link to the account.
 
-**Not built** (they exist in the PWA `campuslink_v1`): reading Excel files directly, the AI import assistant (it needs an OpenRouter key), and groups and programs.
+**Roles:** `student` (every sign-up), `teacher`, `admin`, `alumni` and `company`. A **company** is a recruiter (a partner company): an admin creates it (or imports it: `company`, `entreprise`, `société`, `recruteur`, `partenaire`… in the role column). It has no timetable, courses or student card; what it does in Jobs comes with the job offers. The seed creates two: Nadia Kooli (Medina Soft) and Walid Sassi (Carthage Data).
 
-**API:** `/admin/users` (list, stats, get, create, edit, delete, import) and `/admin/audit`. See [api.md](api.md#admin).
+**Not built** (they exist in the PWA `campuslink_v1`): reading Excel files directly, and groups and programs. For the timetable: dated sessions (one-off classes, cancelling one date), several class groups, ICS export and CSV import (the app edits one weekly template).
+
+**API:** `/admin/users` (list, stats, get, create, edit, delete, import, import assist), `/admin/timetable/slots` (list, add, edit, remove) and `/admin/audit`. See [api.md](api.md#admin).
 
 **Code:**
 - The import rules are in `admin/domain/user_import_parser.dart`, unit-tested: CSV/TSV reading, title aliases, role synonyms, password generation, the line checks.
+- Read with AI: `admin/domain/import_assist.dart` (pure, unit-tested: `assistRequest` masking, `splitFullName`, `applyAssist`) and `backend/src/modules/admin/import-assist.service.ts` (prompt, schema, `sanitize`). In demo mode `MockAdminRepository` answers as `mock/import-assist` with a guess made from the lines.
 - The page-by-page lists are `userListProvider` and `auditListProvider` (`PagedState`, `loadMore()`).
 - `MockAdminRepository` follows the API's rules and messages, so the screens work the same in demo mode.
+- Timetable: the rules and clash detection are in `timetable/domain/timetable_slot_rules.dart` (same messages as `backend/src/modules/timetable/timetable-admin.*`). In demo mode `MockTimetableAdminRepository` edits the same in-memory week (`MockTimetableStore`) as the students' `MockTimetableRepository`.
+
+## Language (French / English)
+
+**Where:** Profile › Campus Services & Settings › **Language**, next to Appearance: **FR** or **EN**.
+
+- **The language on screen:** the one chosen, saved on the phone; until one is chosen, the phone's language when it is French or English, else French (`localeProvider`, `core/l10n/app_language.dart`).
+- **The account follows it:** changing the language while signed in, and signing in with an account in another language, update the account (`PATCH /users/me { locale }`, in the background; a failure is ignored). The server writes the account's emails (password-reset codes) and notifications in that language, French with "tu".
+- **Every request** says the language (`Accept-Language: fr` or `en`), so the server can answer in it before it knows the user.
+- **Texts:** new texts are in `lib/l10n/app_en.arb` and `app_fr.arb` (see [contributing.md](contributing.md#5-translations-french--english)). Most screens still show their original texts (mostly English, French on the forum and carpool screens) until they are moved there; Material's own texts (dialogs, date pickers) already follow the language.
 
 ---
 

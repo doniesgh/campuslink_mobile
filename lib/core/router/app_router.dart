@@ -11,7 +11,6 @@ import '../../features/auth/presentation/pages/forgot_password_page.dart';
 import '../../features/auth/presentation/pages/login_page.dart';
 import '../../features/auth/presentation/pages/register_page.dart';
 import '../../features/auth/presentation/pages/reset_password_page.dart';
-import '../../features/auth/presentation/pages/verify_email_page.dart';
 import '../../features/auth/presentation/providers/auth_controller.dart';
 import '../../features/carpooling/presentation/pages/new_ride_page.dart';
 import '../../features/carpooling/presentation/pages/ride_detail_page.dart';
@@ -19,7 +18,9 @@ import '../../features/courses/presentation/pages/courses_page.dart';
 import '../../features/forum/presentation/pages/forum_page.dart';
 import '../../features/grades/presentation/pages/grades_page.dart';
 import '../../features/jobs/presentation/pages/job_detail_page.dart';
+import '../../features/jobs/presentation/pages/job_form_page.dart';
 import '../../features/jobs/presentation/pages/jobs_page.dart';
+import '../../features/timetable/presentation/admin/timetable_admin_page.dart';
 import '../../features/timetable/presentation/pages/timetable_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/notifications/presentation/pages/notifications_page.dart';
@@ -42,20 +43,15 @@ String? authRedirect(AsyncValue<User?> auth, String location) {
   final inAuth = location.startsWith(RoutePaths.authPrefix);
   final inApp = location.startsWith(RoutePaths.appPrefix);
 
-  if (user == null) {
-    // Verify-email needs a signed-in user: it calls an authenticated endpoint.
-    final needsUser = inApp || location == RoutePaths.verifyEmail;
-    return needsUser ? RoutePaths.login : null;
-  }
-  if (!user.isEmailVerified) {
-    return location == RoutePaths.verifyEmail ? null : RoutePaths.verifyEmail;
-  }
+  if (user == null) return inApp ? RoutePaths.login : null;
+  // Signed in: straight to the app. Sign-up needs no email verification, so
+  // isEmailVerified is not checked (older unverified accounts get in too).
   if (inAuth) return RoutePaths.home;
   // Administration is for admins only (the API refuses everyone else too).
   final inAdmin = location == RoutePaths.adminPrefix ||
       location.startsWith('${RoutePaths.adminPrefix}/');
   if (inAdmin && !user.isAdmin) return RoutePaths.profile;
-  // Admins and alumni have no timetable or courses (the API refuses them too).
+  // Admins, alumni and companies have no timetable or courses (the API refuses them too).
   final inTimetable = location == RoutePaths.timetable ||
       location.startsWith('${RoutePaths.timetable}/');
   if (inTimetable && !user.hasClasses) return RoutePaths.home;
@@ -80,7 +76,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, state) =>
             ResetPasswordPage(email: state.uri.queryParameters['email'] ?? ''),
       ),
-      GoRoute(path: RoutePaths.verifyEmail, builder: (_, __) => const VerifyEmailPage()),
       GoRoute(
         path: RoutePaths.notifications,
         builder: (_, __) => const NotificationsPage(),
@@ -125,10 +120,19 @@ final routerProvider = Provider<GoRouter>((ref) {
               path: RoutePaths.jobs,
               builder: (_, __) => const JobsPage(),
               routes: [
+                // Before ':jobId', or "new" would be read as an offer id.
+                GoRoute(path: 'new', builder: (_, __) => const JobFormPage()),
                 GoRoute(
                   path: ':jobId',
                   builder: (_, state) =>
                       JobDetailPage(jobId: state.pathParameters['jobId']!),
+                  routes: [
+                    GoRoute(
+                      path: 'edit',
+                      builder: (_, state) =>
+                          JobFormPage(jobId: state.pathParameters['jobId']),
+                    ),
+                  ],
                 ),
               ],
             ),
@@ -154,6 +158,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 ),
                 GoRoute(path: 'admin/import', builder: (_, __) => const ImportUsersPage()),
                 GoRoute(path: 'admin/audit', builder: (_, __) => const AuditLogPage()),
+                GoRoute(path: 'admin/timetable', builder: (_, __) => const TimetableAdminPage()),
               ],
             ),
           ]),

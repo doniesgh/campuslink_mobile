@@ -1,5 +1,5 @@
 /**
- * CampusPulse mail relay: sends the API's emails (sign-up and password-reset
+ * CampusPulse mail relay: sends the API's emails (the password-reset
  * codes) from the Gmail of the Google account that owns this script.
  *
  * Why: Render's free plan blocks the SMTP ports Gmail uses (465, 587). The API

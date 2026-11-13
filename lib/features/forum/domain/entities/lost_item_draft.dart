@@ -37,4 +37,19 @@ class LostItemDraft {
   final String? pickupDesk;
 
   bool get isLost => kind == LostItemKind.lost;
+
+  /// The form prefilled with [item], to edit it.
+  factory LostItemDraft.fromItem(LostItem item) => LostItemDraft(
+        kind: item.kind,
+        title: item.title,
+        category: item.category,
+        zone: item.zone,
+        location: item.location,
+        place: item.place,
+        distinctiveDetail: item.distinctiveDetail,
+        reward: item.reward,
+        isUrgent: item.isUrgent,
+        dropOffNote: item.dropOffNote,
+        pickupDesk: item.pickupDesk,
+      );
 }

@@ -1,6 +1,11 @@
 import { z } from 'zod';
 
-import { LOST_ITEM_CATEGORIES, LOST_ITEM_KINDS, LOST_ITEM_PLACES } from './lost-item.model';
+import {
+  LOST_ITEM_CATEGORIES,
+  LOST_ITEM_KINDS,
+  LOST_ITEM_PLACES,
+  LOST_ITEM_STATUSES,
+} from './lost-item.model';
 
 // Messages are shown as-is in the app, so they are written for students.
 // The forum section is in French: messages added for publishing are too.
@@ -44,74 +49,99 @@ export const LOST_ITEM_LIMITS = {
 const L = LOST_ITEM_LIMITS;
 
 /**
- * A Lost & Found notice published by a student. The fields are checked in
- * the order of the form, so the first message is about the first field to
- * fix. Kind-specific fields are refused on the other kind rather than
- * silently dropped.
+ * The fields of a notice, in the order of the form, so the first message
+ * is about the first field to fix.
  */
-export const publishLostItemSchema = z
-  .object({
-    kind: z.enum(LOST_ITEM_KINDS, { error: "Indiquez si l'objet est perdu ou trouvé." }),
-    title: requiredText(
-      "Donnez un titre à l'annonce (ex : Calculatrice TI-84).",
-      L.title,
-      `Le titre ne doit pas dépasser ${L.title} caractères.`,
-    ),
-    category: z.enum(LOST_ITEM_CATEGORIES, { error: "Choisissez une catégorie d'objet." }),
-    zone: requiredText(
-      'Indiquez la zone (ex : Bloc C).',
-      L.zone,
-      `La zone ne doit pas dépasser ${L.zone} caractères.`,
-    ),
-    location: requiredText(
-      'Précisez le lieu (ex : Salle C12).',
-      L.location,
-      `Le lieu ne doit pas dépasser ${L.location} caractères.`,
-    ),
-    place: z.enum(LOST_ITEM_PLACES, { error: 'Choisissez le type de lieu.' }),
-    distinctiveDetail: optionalText(
-      'Le détail distinctif doit être un texte.',
-      L.distinctiveDetail,
-      `Le détail distinctif ne doit pas dépasser ${L.distinctiveDetail} caractères.`,
-    ),
-    reward: optionalText(
-      'La récompense doit être un texte.',
-      L.reward,
-      `La récompense ne doit pas dépasser ${L.reward} caractères.`,
-    ),
-    isUrgent: z
-      .boolean({ error: 'Indiquez si la recherche est urgente (oui ou non).' })
-      .nullish()
-      .transform((value) => value ?? false),
-    dropOffNote: optionalText(
-      'La note de dépôt doit être un texte.',
-      L.dropOffNote,
-      `La note de dépôt ne doit pas dépasser ${L.dropOffNote} caractères.`,
-    ),
-    pickupDesk: optionalText(
-      'Le lieu de retrait doit être un texte.',
-      L.pickupDesk,
-      `Le lieu de retrait ne doit pas dépasser ${L.pickupDesk} caractères.`,
-    ),
-  })
-  .superRefine((item, ctx) => {
-    const refuse = (path: string, message: string) =>
-      ctx.addIssue({ code: 'custom', path: [path], message });
+const lostItemFields = {
+  kind: z.enum(LOST_ITEM_KINDS, { error: "Indiquez si l'objet est perdu ou trouvé." }),
+  title: requiredText(
+    "Donnez un titre à l'annonce (ex : Calculatrice TI-84).",
+    L.title,
+    `Le titre ne doit pas dépasser ${L.title} caractères.`,
+  ),
+  category: z.enum(LOST_ITEM_CATEGORIES, { error: "Choisissez une catégorie d'objet." }),
+  zone: requiredText(
+    'Indiquez la zone (ex : Bloc C).',
+    L.zone,
+    `La zone ne doit pas dépasser ${L.zone} caractères.`,
+  ),
+  location: requiredText(
+    'Précisez le lieu (ex : Salle C12).',
+    L.location,
+    `Le lieu ne doit pas dépasser ${L.location} caractères.`,
+  ),
+  place: z.enum(LOST_ITEM_PLACES, { error: 'Choisissez le type de lieu.' }),
+  distinctiveDetail: optionalText(
+    'Le détail distinctif doit être un texte.',
+    L.distinctiveDetail,
+    `Le détail distinctif ne doit pas dépasser ${L.distinctiveDetail} caractères.`,
+  ),
+  reward: optionalText(
+    'La récompense doit être un texte.',
+    L.reward,
+    `La récompense ne doit pas dépasser ${L.reward} caractères.`,
+  ),
+  isUrgent: z
+    .boolean({ error: 'Indiquez si la recherche est urgente (oui ou non).' })
+    .nullish()
+    .transform((value) => value ?? false),
+  dropOffNote: optionalText(
+    'La note de dépôt doit être un texte.',
+    L.dropOffNote,
+    `La note de dépôt ne doit pas dépasser ${L.dropOffNote} caractères.`,
+  ),
+  pickupDesk: optionalText(
+    'Le lieu de retrait doit être un texte.',
+    L.pickupDesk,
+    `Le lieu de retrait ne doit pas dépasser ${L.pickupDesk} caractères.`,
+  ),
+};
 
-    if (item.kind === 'lost') {
-      if (item.dropOffNote || item.pickupDesk) {
-        refuse('pickupDesk', 'Le lieu de dépôt concerne uniquement les objets trouvés.');
-      }
-      return;
+type LostItemFields = z.infer<z.ZodObject<typeof lostItemFields>>;
+
+/**
+ * The rules between fields: kind-specific fields are refused on the other
+ * kind rather than silently dropped, and a found item says where it is.
+ */
+const checkKindFields = (item: LostItemFields, ctx: z.RefinementCtx): void => {
+  const refuse = (path: string, message: string) =>
+    ctx.addIssue({ code: 'custom', path: [path], message });
+
+  if (item.kind === 'lost') {
+    if (item.dropOffNote || item.pickupDesk) {
+      refuse('pickupDesk', 'Le lieu de dépôt concerne uniquement les objets trouvés.');
     }
-    if (item.reward) refuse('reward', 'Une récompense concerne uniquement les objets perdus.');
-    if (item.isUrgent) refuse('isUrgent', 'Seul un objet perdu peut être marqué urgent.');
-    if (!item.dropOffNote && !item.pickupDesk) {
-      refuse('pickupDesk', "Indiquez où l'objet a été déposé (ex : Accueil Bloc C).");
-    }
-  });
+    return;
+  }
+  if (item.reward) refuse('reward', 'Une récompense concerne uniquement les objets perdus.');
+  if (item.isUrgent) refuse('isUrgent', 'Seul un objet perdu peut être marqué urgent.');
+  if (!item.dropOffNote && !item.pickupDesk) {
+    refuse('pickupDesk', "Indiquez où l'objet a été déposé (ex : Accueil Bloc C).");
+  }
+};
+
+/** A Lost & Found notice published by a student. */
+export const publishLostItemSchema = z.object(lostItemFields).superRefine(checkKindFields);
 
 export type PublishLostItemInput = z.infer<typeof publishLostItemSchema>;
+
+/**
+ * An edit of a notice by its reporter (or an admin): any field of the form,
+ * and/or the status. A field sent as null is cleared; a field left out is
+ * kept. The edited notice is then checked whole with [publishLostItemSchema].
+ */
+export const updateLostItemSchema = z
+  .object({
+    ...z.object(lostItemFields).partial().shape,
+    status: z
+      .enum(LOST_ITEM_STATUSES, { error: 'Le statut doit être « active » ou « resolved ».' })
+      .optional(),
+  })
+  .refine((input) => Object.values(input).some((value) => value !== undefined), {
+    error: 'Rien à modifier : envoyez au moins un champ.',
+  });
+
+export type UpdateLostItemInput = z.infer<typeof updateLostItemSchema>;
 
 /** Limits shared with the app's form (lib/features/forum/domain/forum_rules.dart). */
 export const IDEA_LIMITS = { bodyMin: 10, bodyMax: 500, tag: 24 } as const;

@@ -1,6 +1,7 @@
 import { isObjectIdOrHexString, type Types } from 'mongoose';
 
 import { badRequest, conflict, notFound } from '../../lib/http-error';
+import type { RequestContext } from '../../lib/request-context';
 import { hashPassword, revokeAllSessions } from '../auth/auth.service';
 import { RefreshTokenModel } from '../auth/refresh-token.model';
 import { RideModel } from '../carpool/carpool.model';
@@ -33,11 +34,8 @@ export const STUDENT_ID_TAKEN = 'This ENT ID is already in use.';
 const OWN_ACCOUNT_FIELDS = 'On your own account, you can only change your name, email and ENT ID.';
 const OWN_ACCOUNT_DELETE = "You can't delete your own account.";
 
-/** Who is acting: the signed-in admin, and their IP address for the audit log. */
-export interface AdminContext {
-  actorId: string;
-  ip: string | null;
-}
+/** Who is acting: the signed-in admin, and their IP and User-Agent for the audit log. */
+export type AdminContext = RequestContext;
 
 /** What the API sends for an account in the admin screens. */
 export interface ManagedUserJson {
@@ -164,6 +162,7 @@ export async function createUser(
     ...ctx,
     action: 'user.create',
     summary: `Created the ${ROLE_LABELS[user.role].toLowerCase()} account ${user.email}`,
+    targetType: 'user',
     targetId: user.id as string,
     metadata: { role: user.role },
   });
@@ -264,6 +263,7 @@ export async function updateUser(
       changed.length === 1 && has('role')
         ? `Changed the role of ${previous.displayName} to ${ROLE_LABELS[user.role]}`
         : `Updated ${previous.displayName} (${changed.map((f) => FIELD_LABELS[f]).join(', ')})`,
+    targetType: 'user',
     targetId: user.id as string,
     metadata: {
       changes: changed,
@@ -322,6 +322,7 @@ export async function deleteUser(id: string, ctx: AdminContext): Promise<void> {
     ...ctx,
     action: 'user.delete',
     summary: `Deleted the account of ${user.displayName} (${user.email})`,
+    targetType: 'user',
     targetId: user.id as string,
     metadata: { email: user.email, role: user.role },
   });

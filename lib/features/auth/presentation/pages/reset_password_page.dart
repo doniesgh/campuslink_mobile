@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/validators.dart';
@@ -46,7 +47,7 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
     if (!mounted) return;
     setState(() => _loading = false);
     if (failure != null) {
-      showAppSnack(context, failure.message);
+      showAppSnack(context, failureText(context, failure));
       return;
     }
     showAppSnack(context, 'Password updated. Sign in with your new password.');
@@ -56,7 +57,12 @@ class _ResetPasswordPageState extends ConsumerState<ResetPasswordPage> {
   Future<void> _resend() async {
     final failure = await ref.read(authControllerProvider.notifier).forgotPassword(widget.email);
     if (!mounted) return;
-    showAppSnack(context, failure?.message ?? 'A new code is on its way to ${widget.email}.');
+    showAppSnack(
+      context,
+      failure == null
+          ? 'A new code is on its way to ${widget.email}.'
+          : failureText(context, failure),
+    );
   }
 
   @override

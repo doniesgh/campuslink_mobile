@@ -3,6 +3,7 @@ import '../../../auth/domain/entities/user.dart';
 import '../entities/audit_entry.dart';
 import '../entities/managed_user.dart';
 import '../entities/user_import.dart';
+import '../import_assist.dart';
 
 /// User management and the audit log (`/admin/*`, admins only).
 abstract interface class AdminRepository {
@@ -32,6 +33,14 @@ abstract interface class AdminRepository {
 
   /// Creates every account of [rows] (at most 50), or none of them.
   Future<Result<ImportOutcome>> importUsers(List<ImportRow> rows);
+
+  /// Whether the server can read an import file with AI ("Read with AI").
+  Future<Result<ImportAssistStatus>> getImportAssistStatus();
+
+  /// Asks the AI how a file is laid out, from its first lines (masked, see
+  /// [assistRequest]). Imports nothing. Fails with the server's message when
+  /// the AI isn't set up (503), busy (429) or couldn't answer (502).
+  Future<Result<ImportAssistAnswer>> assistImport(AssistRequest request);
 
   /// [action] is exact ("user.update") or a prefix ("user.*"); null for all.
   Future<Result<AuditPage>> getAudit({String? action, int page = 1, int limit = 30});

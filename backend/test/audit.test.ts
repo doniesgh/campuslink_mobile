@@ -10,6 +10,7 @@ import {
   createAdmin,
   createStudent,
   type TestAccount,
+  validationError,
 } from './helpers';
 
 const app = createApp();
@@ -25,9 +26,11 @@ interface AuditEntryBody {
   action: string;
   summary: string;
   actor: { id: string; displayName: string; email: string };
+  targetType: string | null;
   targetId: string | null;
   metadata: Record<string, unknown>;
   ip: string | null;
+  userAgent: string | null;
   createdAt: string;
 }
 
@@ -49,11 +52,15 @@ beforeEach(async () => {
   admin = await createAdmin({ displayName: 'Campus Admin', email: 'admin@campus.test' });
 });
 
+/** The User-Agent the admin's requests send (recorded in the audit log). */
+const USER_AGENT = 'CampusPulse/1.0.0 (Android 15)';
+
 /** One action of each kind, in this order: create, update, import, delete. */
 async function doOneOfEach(): Promise<string> {
   const created = await request(app)
     .post('/api/admin/users')
     .set(admin.auth)
+    .set('User-Agent', USER_AGENT)
     .send({
       displayName: 'Amira Ben Salah',
       email: 'amira.bensalah@campus.test',
@@ -65,17 +72,23 @@ async function doOneOfEach(): Promise<string> {
   await request(app)
     .patch(`/api/admin/users/${id}`)
     .set(admin.auth)
+    .set('User-Agent', USER_AGENT)
     .send({ role: 'admin' })
     .expect(200);
   await request(app)
     .post('/api/admin/users/import')
     .set(admin.auth)
+    .set('User-Agent', USER_AGENT)
     .send({
       dryRun: false,
       users: [{ row: 2, displayName: 'Omar', email: 'omar@import.test', password: 'password123' }],
     })
     .expect(201);
-  await request(app).delete(`/api/admin/users/${id}`).set(admin.auth).expect(204);
+  await request(app)
+    .delete(`/api/admin/users/${id}`)
+    .set(admin.auth)
+    .set('User-Agent', USER_AGENT)
+    .expect(204);
   return id;
 }
 
@@ -93,9 +106,11 @@ describe('GET /api/admin/audit', () => {
         action: 'user.delete',
         summary: 'Deleted the account of Amira Ben Salah (amira.bensalah@campus.test)',
         actor,
+        targetType: 'user',
         targetId,
         metadata: { email: 'amira.bensalah@campus.test', role: 'admin' },
         ip: '127.0.0.1',
+        userAgent: USER_AGENT,
         createdAt: expect.any(String),
       },
       {
@@ -103,9 +118,11 @@ describe('GET /api/admin/audit', () => {
         action: 'user.import',
         summary: 'Imported 1 account',
         actor,
+        targetType: null,
         targetId: null,
         metadata: { count: 1, emails: ['omar@import.test'] },
         ip: '127.0.0.1',
+        userAgent: USER_AGENT,
         createdAt: expect.any(String),
       },
       {
@@ -113,9 +130,11 @@ describe('GET /api/admin/audit', () => {
         action: 'user.update',
         summary: 'Changed the role of Amira Ben Salah to Admin',
         actor,
+        targetType: 'user',
         targetId,
         metadata: { changes: ['role'], role: { from: 'teacher', to: 'admin' } },
         ip: '127.0.0.1',
+        userAgent: USER_AGENT,
         createdAt: expect.any(String),
       },
       {
@@ -123,9 +142,11 @@ describe('GET /api/admin/audit', () => {
         action: 'user.create',
         summary: 'Created the teacher account amira.bensalah@campus.test',
         actor,
+        targetType: 'user',
         targetId,
         metadata: { role: 'teacher' },
         ip: '127.0.0.1',
+        userAgent: USER_AGENT,
         createdAt: expect.any(String),
       },
     ]);
@@ -213,7 +234,7 @@ describe('GET /api/admin/audit', () => {
     [{ action: 'x'.repeat(61) }, 'The action filter is too long'],
   ] as const)('answers 422 for %j', async (query, message) => {
     const res = await request(app).get('/api/admin/audit').query(query).set(admin.auth).expect(422);
-    expect(res.body).toEqual({ message });
+    expect(res.body).toEqual(validationError(message));
   });
 });
 

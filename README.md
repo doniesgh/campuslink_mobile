@@ -17,7 +17,7 @@ The **Flutter app** works on demo data out of the box. With the **Node.js API** 
 | **App** | Flutter 3.27+ · Riverpod · go_router · Dio · feature-first Clean Architecture |
 | **API** | Node.js 20+ · Express 5 · TypeScript · MongoDB (Mongoose) · Zod · JWT |
 | **Design** | Google Stitch ("CampusPulse Student Companion Mobile App"), 12 screens |
-| **Tests** | 555 app tests · 418 API tests |
+| **Tests** | 696 app tests · 611 API tests |
 
 ## Quick start (5 minutes, no server)
 
@@ -83,7 +83,12 @@ All 12 designed screens are built and connected to the API, including:
 - publishing rides, lost & found notices and ideas
 - password reset by email code
 - real email sending over SMTP
-- roles (student, teacher, admin, alumni) and administration: users, CSV import, audit log
+- roles (student, teacher, admin, alumni, company) and administration: users, CSV import, audit log
+- job offers: companies and admins create, edit and delete them; students apply
+- lost & found: edit, mark as resolved, delete
+- timetable management for admins (add, edit, delete classes, with room and teacher clash checks), online classes with a Google Meet link, and change notifications
+- **AI** (OpenRouter, optional): a summary of a job offer, possible matches for a lost or found item, and "Read with AI" for messy user import files
+- French and English: a language setting, kept on the account for its emails (most screens still to translate)
 - push notifications and class reminders (Firebase Cloud Messaging)
 
 Still to do (shown as "coming soon" in the app): university SSO, messaging, the NFC pass, calendar sync, video streaming and the Forum's *Experiences* section. The full list is in [features.md](docs/features.md#coming-soon-not-built-yet).

@@ -21,6 +21,12 @@ String auditActionLabel(String action) => switch (action) {
       'user.update' => 'Updated',
       'user.delete' => 'Deleted',
       'user.import' => 'Imported',
+      'user.import.assist' => 'Import assist',
+      'auth.password_reset' => 'Password reset',
+      'auth.password_change' => 'Password changed',
+      'timetable.slot.create' => 'Class added',
+      'timetable.slot.update' => 'Class changed',
+      'timetable.slot.delete' => 'Class removed',
       _ => action,
     };
 
@@ -29,6 +35,12 @@ IconData auditActionIcon(String action) => switch (action) {
       'user.update' => Icons.manage_accounts_outlined,
       'user.delete' => Icons.person_remove_outlined,
       'user.import' => Icons.upload_file_outlined,
+      'user.import.assist' => Icons.auto_awesome_outlined,
+      'auth.password_reset' => Icons.lock_reset_outlined,
+      'auth.password_change' => Icons.password_outlined,
+      'timetable.slot.create' => Icons.event_available_outlined,
+      'timetable.slot.update' => Icons.edit_calendar_outlined,
+      'timetable.slot.delete' => Icons.event_busy_outlined,
       _ => Icons.history,
     };
 
@@ -147,7 +159,7 @@ class _AuditLogPageState extends ConsumerState<AuditLogPage> {
                   entry: entry,
                   now: now,
                   // A deleted account has nothing left to open.
-                  onTap: target == null || entry.action == 'user.delete'
+                  onTap: target == null || !entry.isAboutUser || entry.action == 'user.delete'
                       ? null
                       : () => context.push(RoutePaths.adminUser(target)),
                 ),

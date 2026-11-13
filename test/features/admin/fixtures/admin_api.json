@@ -92,7 +92,7 @@
         "row": 4,
         "field": "role",
         "code": "INVALID_ROLE",
-        "message": "Role: not recognised (student, teacher, admin or alumni)"
+        "message": "Role: not recognised (student, teacher, admin, alumni or company)"
       },
       {
         "row": 5,
@@ -241,5 +241,83 @@
       "destination": "adminUsers",
       "id": "6af1b02912b4298dadccaecc"
     }
+  },
+  "meWithLocale": {
+    "id": "6af709df8e4fa1e28731f78d",
+    "email": "sarra.kefi@campus.test",
+    "studentId": null,
+    "displayName": "Sarra Kefi",
+    "avatarUrl": null,
+    "isEmailVerified": false,
+    "role": "student",
+    "locale": "en"
+  },
+  "statsWithCompany": {
+    "total": 5,
+    "byRole": {
+      "student": 2,
+      "teacher": 1,
+      "admin": 1,
+      "alumni": 0,
+      "company": 1
+    }
+  },
+  "auditPasswordReset": {
+    "id": "6af70a1e8e4fa1e28731f7a2",
+    "action": "auth.password_reset",
+    "summary": "Password reset with an emailed code for sarra.kefi@campus.test",
+    "actor": {
+      "id": "6af709df8e4fa1e28731f78d",
+      "displayName": "Sarra Kefi",
+      "email": "sarra.kefi@campus.test"
+    },
+    "targetType": "user",
+    "targetId": "6af709df8e4fa1e28731f78d",
+    "metadata": {},
+    "ip": "127.0.0.1",
+    "userAgent": "Dart/3.13 (dart:io)",
+    "createdAt": "2026-11-13T14:05:18.512Z"
+  },
+  "rateLimited": {
+    "message": "Too many attempts. Try again in a few minutes.",
+    "code": "TOO_MANY_REQUESTS",
+    "retryAfter": 873
+  },
+  "importAssistStatus": {
+    "available": true,
+    "model": "test/model-a"
+  },
+  "importAssistStatusOff": {
+    "available": false,
+    "model": null
+  },
+  "importAssist": {
+    "mapping": {
+      "headerRow": 2,
+      "columns": {
+        "lastName": null,
+        "firstName": null,
+        "fullName": 0,
+        "email": 1,
+        "studentId": null,
+        "role": 2,
+        "password": 3
+      },
+      "nameOrder": "LAST_FIRST",
+      "roles": [
+        { "text": "Étudiant(e)", "role": "student" },
+        { "text": "Enseignant", "role": "teacher" },
+        { "text": "Directeur", "role": null }
+      ]
+    },
+    "model": "test/model-a"
+  },
+  "aiBusy": {
+    "message": "The AI service is busy. Try again in a few minutes.",
+    "code": "AI_BUSY"
+  },
+  "aiUnavailable": {
+    "message": "AI features are not available on this server.",
+    "code": "AI_UNAVAILABLE"
   }
 }

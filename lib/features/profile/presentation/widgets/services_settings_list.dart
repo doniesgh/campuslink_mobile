@@ -1,14 +1,20 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/l10n/app_language.dart';
+import '../../../../core/l10n/l10n.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_badge.dart';
+import '../../../../shared/widgets/language_selector.dart';
 
-/// "Campus Services & Settings": grouped rows, the theme selector and sign out.
+/// "Campus Services & Settings": grouped rows, the theme and language
+/// selectors and sign out.
 class ServicesSettingsList extends StatelessWidget {
   const ServicesSettingsList({
     super.key,
     required this.themeMode,
     required this.onThemeModeChanged,
+    required this.language,
+    required this.onLanguageChanged,
     required this.onCurriculum,
     required this.onCarpool,
     required this.onNotifications,
@@ -21,6 +27,8 @@ class ServicesSettingsList extends StatelessWidget {
 
   final ThemeMode themeMode;
   final ValueChanged<ThemeMode> onThemeModeChanged;
+  final AppLanguage language;
+  final ValueChanged<AppLanguage> onLanguageChanged;
   final VoidCallback onCurriculum;
   final VoidCallback onCarpool;
   final VoidCallback onNotifications;
@@ -121,6 +129,13 @@ class ServicesSettingsList extends StatelessWidget {
                 title: 'Appearance',
                 subtitle: 'Theme preferences',
                 trailing: ThemeModeSelector(mode: themeMode, onChanged: onThemeModeChanged),
+              ),
+              _ServiceRow(
+                icon: Icons.translate,
+                tone: BadgeTone.neutral,
+                title: context.l10n.accountLanguageTitle,
+                subtitle: context.l10n.accountLanguageSubtitle,
+                trailing: LanguageSelector(language: language, onChanged: onLanguageChanged),
               ),
               _ServiceRow(
                 icon: Icons.lock_outline,

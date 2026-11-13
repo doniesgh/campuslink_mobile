@@ -53,6 +53,9 @@ Map<String, Object?> _itemFields(LostItem i) => {
       'pickupDesk': i.pickupDesk,
       'isSerialHidden': i.isSerialHidden,
       'action': i.action,
+      'status': i.status,
+      'isMine': i.isMine,
+      'canManage': i.canManage,
     };
 
 Map<String, Object?> _publishedItemFields(LostItem i) => _itemFields(i)..remove('id');
@@ -120,6 +123,7 @@ void main() {
         ('lf-409', DateTime.utc(2026, 11, 6, 12, 15)),
         ('lf-411', DateTime.utc(2026, 11, 6, 10)),
         ('lf-406', DateTime.utc(2026, 11, 5, 15, 30)),
+        ('lf-407', DateTime.utc(2026, 11, 5, 10)),
         ('lf-404', DateTime.utc(2026, 11, 5, 8, 45)),
         ('lf-402', DateTime.utc(2026, 11, 4, 12)),
         ('lf-398', DateTime.utc(2026, 11, 3, 16)),
@@ -130,6 +134,83 @@ void main() {
 
     test('keeps every action of the board', () {
       expect({for (final i in items) i.action}, LostItemAction.values.toSet());
+    });
+
+    test("the demo student can manage their own notice only, and it's active", () {
+      expect([for (final i in items) if (i.canManage) (i.id, i.isMine)], [('lf-407', true)]);
+      expect(items.every((i) => i.status == LostItemStatus.active), isTrue);
+    });
+  });
+
+  group('PATCH /forum/lost-items/:id response', () {
+    final edited = LostItemModel.fromJson(_decodeObject(editedLostItemResponse));
+    final resolved = LostItemModel.fromJson(_decodeObject(resolvedLostItemResponse));
+    const editDraft = LostItemDraft(
+      kind: LostItemKind.lost,
+      title: 'Calculatrice graphique TI-84 Plus',
+      category: LostItemCategory.calculator,
+      zone: 'Bloc C',
+      location: 'Salle C10 (Ghazela)',
+      place: LostItemPlace.classroom,
+      distinctiveDetail: 'Étiquette « D.M. » au dos',
+      reward: 'Café offert ☕',
+      isUrgent: true,
+    );
+
+    test('the edit body is stored as sent, the rest of the notice is kept', () {
+      final sent = editDraft.toUpdateJson();
+      for (final key in sent.keys) {
+        expect(_decodeObject(editedLostItemResponse)[key], sent[key], reason: key);
+      }
+      expect(edited.id, 'lf-407');
+      expect(edited.reporterName, 'Dony Mansour');
+      expect(edited.reportedAt.toUtc(), DateTime.utc(2026, 11, 5, 10));
+      expect((edited.isMine, edited.canManage, edited.status), (true, true, LostItemStatus.active));
+      expect(resolved.status, LostItemStatus.resolved);
+      expect(resolved.title, edited.title);
+    });
+
+    test('the mock edits and resolves the same way', () async {
+      final repo = MockForumRepository();
+      final mockEdited = (await repo.updateLostItem('lf-407', editDraft)).unwrap();
+      expect(_itemFields(mockEdited), _itemFields(edited));
+      final mockResolved =
+          (await repo.setLostItemStatus('lf-407', LostItemStatus.resolved)).unwrap();
+      expect(_itemFields(mockResolved), _itemFields(resolved));
+    });
+  });
+
+  group('GET /forum/lost-items/:id/matches response', () {
+    final rules = lostItemMatchesFromJson(_decodeObject(lostItemMatchesResponse));
+    final withAi = lostItemMatchesFromJson(_decodeObject(lostItemAiMatchesResponse));
+
+    test('parses the rules result', () {
+      expect(rules.ai, isFalse);
+      expect(rules.model, isNull);
+      final match = rules.items.single;
+      expect((match.item.id, match.score, match.ai), ('lf-409', 86, false));
+      expect(match.reasons, ['Même catégorie', "1 jour d'écart", 'Lieu proche', 'Description proche']);
+      expect(match.reason, match.reasons.join(' · '));
+      expect(match.item.action, LostItemAction.claim);
+    });
+
+    test('parses the AI result: mixed score and the AI reason', () {
+      expect(withAi.ai, isTrue);
+      expect(withAi.model, isNotNull);
+      final match = withAi.items.single;
+      expect((match.item.id, match.score, match.ai), ('lf-409', 90, true));
+      expect(match.reason, 'Même modèle TI-84, trouvée au Bloc C le lendemain.');
+      expect(match.reasons, contains('Même catégorie'));
+    });
+
+    test('the mock finds the same match by rules', () async {
+      final mock = (await MockForumRepository().getLostItemMatches('lf-407')).unwrap();
+      expect(mock.ai, isFalse);
+      final match = mock.items.single;
+      expect(match.item.id, 'lf-409');
+      // The date points follow the real "now" in the mock: 86 give or take one.
+      expect(match.score, inInclusiveRange(85, 88));
+      expect(match.reasons, containsAll(['Même catégorie', 'Lieu proche', 'Description proche']));
     });
   });
 

@@ -26,6 +26,7 @@ import {
   createAdmin,
   createStudent,
   type TestAccount,
+  validationError,
 } from './helpers';
 
 const app = createApp();
@@ -286,12 +287,12 @@ describe('GET /api/admin/users', () => {
     [{ page: 1.5 }, 'Pass a page number of 1 or more'],
     [{ limit: 0 }, 'Pass a limit between 1 and 100'],
     [{ limit: 101 }, 'Pass a limit between 1 and 100'],
-    [{ role: 'boss' }, 'Role: not recognised (student, teacher, admin or alumni)'],
+    [{ role: 'boss' }, 'Role: not recognised (student, teacher, admin, alumni or company)'],
     [{ q: 'x'.repeat(101) }, 'The search is too long'],
   ] as const)('answers 422 for %j', async (query, message) => {
     const { auth } = await createAdmin();
     const res = await request(app).get('/api/admin/users').query(query).set(auth).expect(422);
-    expect(res.body).toEqual({ message });
+    expect(res.body).toEqual(validationError(message));
   });
 
   test('answers 422 for a repeated search parameter', async () => {
@@ -299,7 +300,7 @@ describe('GET /api/admin/users', () => {
     await request(app)
       .get('/api/admin/users?q=a&q=b')
       .set(auth)
-      .expect(422, { message: 'Search with one piece of text' });
+      .expect(422, validationError('Search with one piece of text'));
   });
 });
 
@@ -309,11 +310,15 @@ describe('GET /api/admin/users/stats', () => {
     await createStudent();
     await createStudent();
     await createStudent({ role: 'teacher' });
+    await createStudent({ role: 'company' });
 
     await request(app)
       .get('/api/admin/users/stats')
       .set(auth)
-      .expect(200, { total: 4, byRole: { student: 2, teacher: 1, admin: 1, alumni: 0 } });
+      .expect(200, {
+        total: 5,
+        byRole: { student: 2, teacher: 1, admin: 1, alumni: 0, company: 1 },
+      });
   });
 });
 
@@ -392,7 +397,7 @@ describe('POST /api/admin/users', () => {
       .send({ displayName: 'Omar', email: 'omar@campus.test', password: 'password123', studentId: null })
       .expect(201);
     expect(res.body).toMatchObject({ role: 'student', studentId: null, isEmailVerified: true });
-    expect(mail.codes).toEqual([]);
+    expect(mail.emails).toEqual([]);
   });
 
   test('answers 409 for a taken email (whatever the case) or ENT ID', async () => {
@@ -422,7 +427,7 @@ describe('POST /api/admin/users', () => {
     [{ password: 'x'.repeat(129) }, 'Use at most 128 characters'],
     [{ studentId: 'AB' }, 'ENT ID: 3 to 20 letters or digits'],
     [{ studentId: '221-JMT' }, 'ENT ID: 3 to 20 letters or digits'],
-    [{ role: 'boss' }, 'Role: not recognised (student, teacher, admin or alumni)'],
+    [{ role: 'boss' }, 'Role: not recognised (student, teacher, admin, alumni or company)'],
   ])('answers 422 for %j', async (override, message) => {
     const { auth } = await createAdmin();
     const res = await request(app)
@@ -430,7 +435,7 @@ describe('POST /api/admin/users', () => {
       .set(auth)
       .send({ ...newTeacher, ...override })
       .expect(422);
-    expect(res.body).toEqual({ message });
+    expect(res.body).toEqual(validationError(message));
   });
 });
 
@@ -542,9 +547,10 @@ describe('PATCH /api/admin/users/:id', () => {
   test.each([{}, { unknown: 'field' }, { displayName: undefined }])(
     'answers 422 "There\'s nothing to save." for %j',
     async (body) => {
-      await patch(admin.auth, target.user.id, body).expect(422, {
-        message: "There's nothing to save.",
-      });
+      await patch(admin.auth, target.user.id, body).expect(
+        422,
+        validationError("There's nothing to save."),
+      );
     },
   );
 
@@ -553,10 +559,10 @@ describe('PATCH /api/admin/users/:id', () => {
     [{ email: 'nope' }, 'Enter a valid email'],
     [{ password: 'short' }, 'Use at least 8 characters'],
     [{ studentId: 'A' }, 'ENT ID: 3 to 20 letters or digits'],
-    [{ role: 'root' }, 'Role: not recognised (student, teacher, admin or alumni)'],
+    [{ role: 'root' }, 'Role: not recognised (student, teacher, admin, alumni or company)'],
     [{ isEmailVerified: 'yes' }, 'isEmailVerified must be true or false'],
   ])('answers 422 for %j', async (body, message) => {
-    await patch(admin.auth, target.user.id, body).expect(422, { message });
+    await patch(admin.auth, target.user.id, body).expect(422, validationError(message));
   });
 
   test('answers 404 for an unknown or invalid id', async () => {

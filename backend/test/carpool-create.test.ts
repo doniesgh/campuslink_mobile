@@ -5,7 +5,7 @@ import { createApp } from '../src/app';
 import { RideCounterModel, RideModel } from '../src/modules/carpool/carpool.model';
 import { seedCarpool } from '../src/modules/carpool/carpool.seed';
 import { StudentProfileModel } from '../src/modules/profile/profile.model';
-import { clearTestDb, closeTestDb, connectTestDb, createStudent } from './helpers';
+import { clearTestDb, closeTestDb, connectTestDb, createStudent, validationError } from './helpers';
 
 const app = createApp();
 
@@ -295,7 +295,7 @@ describe('POST /api/carpool/rides', () => {
 
       const res = await publish(auth, rideBody(overrides())).expect(422);
 
-      expect(res.body).toEqual({ message });
+      expect(res.body).toEqual(validationError(message));
       expect(await RideModel.countDocuments()).toBe(0);
     });
 

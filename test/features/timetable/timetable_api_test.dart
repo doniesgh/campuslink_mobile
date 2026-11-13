@@ -84,6 +84,26 @@ void main() {
       expect(exam.coefficient, 2.0);
       expect(exam.duration, const Duration(hours: 2));
       expect(exam.notes, 'Chapters 1–4 · Bring scientific calculator & Student ID');
+      expect(first.mode, SessionMode.onsite);
+      expect(first.isOnline, isFalse);
+      expect(first.meetUrl, isNull);
+
+      // Friday's workshop is online, with its Google Meet link.
+      final online = week.days[4].sessions.last;
+      expect(online.isOnline, isTrue);
+      expect(online.room, 'Online');
+      expect(online.meetUrl, 'https://meet.google.com/xqd-fkzw-pnb');
+    });
+
+    test('sessions of an older API (no mode) are on campus', () {
+      final json = (_weekFixture()['days'] as List).first as Map<String, dynamic>;
+      final session =
+          Map<String, dynamic>.of((json['sessions'] as List).first as Map<String, dynamic>)
+            ..remove('mode')
+            ..remove('meetUrl');
+      final parsed = classSessionFromJson(session);
+      expect(parsed.mode, SessionMode.onsite);
+      expect(parsed.meetUrl, isNull);
     });
 
     test('matches the mock repository session for session', () async {
@@ -130,9 +150,9 @@ void main() {
       expect(adapter.requests.single.uri.queryParameters, {'date': '2026-11-05'});
       expect(day.date, DateTime(2026, 11, 5));
       expect(day.sessions.map((s) => s.id), [
-        'algo-2026-11-5',
-        'genie-logiciel-2026-11-5',
-        'bases-de-donnees-2026-11-5',
+        'algo-thu-2026-11-5',
+        'genie-logiciel-thu-2026-11-5',
+        'bases-de-donnees-thu-2026-11-5',
         'exam-flutter-2026-11-5',
       ]);
     });
@@ -170,4 +190,6 @@ List<Object?> _describe(ClassSession s) => [
       s.lectureCount,
       s.coefficient,
       s.notes,
+      s.mode,
+      s.meetUrl,
     ];

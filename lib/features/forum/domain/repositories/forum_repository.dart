@@ -2,6 +2,7 @@ import '../../../../core/error/result.dart';
 import '../entities/forum_post.dart';
 import '../entities/lost_item.dart';
 import '../entities/lost_item_draft.dart';
+import '../entities/lost_item_match.dart';
 
 abstract interface class ForumRepository {
   /// Latest posts across all sections, newest first (Home "Campus Highlights").
@@ -20,6 +21,22 @@ abstract interface class ForumRepository {
   /// Sends a claim / "I found it" / serial-number check for [itemId] to the
   /// campus security desk. [proof] is the distinctive detail typed by the student.
   Future<Result<void>> sendLostItemRequest({required String itemId, required String proof});
+
+  /// Replaces the fields of notice [id] with [draft] (its reporter, or an
+  /// admin). Returns the edited item. A refused draft is a ValidationFailure,
+  /// someone else's notice or a deleted one a ServerFailure.
+  Future<Result<LostItem>> updateLostItem(String id, LostItemDraft draft);
+
+  /// Marks notice [id] resolved (back with its owner), or active again.
+  Future<Result<LostItem>> setLostItemStatus(String id, LostItemStatus status);
+
+  /// Deletes notice [id] (its reporter, or an admin).
+  Future<Result<void>> deleteLostItem(String id);
+
+  /// "Correspondances possibles": active notices of the other kind that may
+  /// be the same object, best first, scored by rules and, when the server
+  /// has it, by AI ([LostItemMatches.ai]).
+  Future<Result<LostItemMatches>> getLostItemMatches(String id);
 
   /// Ideas of the forum, most upvoted first, then newest.
   Future<Result<List<ForumPost>>> getIdeas();

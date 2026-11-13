@@ -17,9 +17,10 @@ import 'lost_found_visuals.dart';
 /// Central collection points, offered as quick picks for a found item.
 const lostFoundCollectionPoints = ['Accueil Bloc C (Ghazela)', 'Hall Central (Charguia)'];
 
-/// Opens the "Publier une annonce" form. Resolves to the published item, or
+/// Opens the "Publier une annonce" form, or the "Modifier l'annonce" form
+/// prefilled with [initial]. Resolves to the published (or edited) item, or
 /// null if the student closed the sheet.
-Future<LostItem?> showPublishLostItemSheet(BuildContext context) =>
+Future<LostItem?> showPublishLostItemSheet(BuildContext context, {LostItem? initial}) =>
     showModalBottomSheet<LostItem>(
       context: context,
       // Above the bottom navigation bar, like the request sheet.
@@ -29,14 +30,17 @@ Future<LostItem?> showPublishLostItemSheet(BuildContext context) =>
       showDragHandle: true,
       backgroundColor: Theme.of(context).colorScheme.surfaceContainerLowest,
       shape: const RoundedRectangleBorder(borderRadius: AppRadius.sheetTop),
-      builder: (_) => const LostItemPublishSheet(),
+      builder: (_) => LostItemPublishSheet(initial: initial),
     );
 
 /// Lost or found notice form. The Perdu / Trouvé toggle switches the
 /// kind-specific fields: detail, reward and urgency for a lost item, the
-/// drop-off desk for a found one.
+/// drop-off desk for a found one. With [initial], it edits that notice.
 class LostItemPublishSheet extends ConsumerStatefulWidget {
-  const LostItemPublishSheet({super.key});
+  const LostItemPublishSheet({super.key, this.initial});
+
+  /// The notice to edit, or null to publish a new one.
+  final LostItem? initial;
 
   @override
   ConsumerState<LostItemPublishSheet> createState() => _LostItemPublishSheetState();
@@ -62,6 +66,26 @@ class _LostItemPublishSheetState extends ConsumerState<LostItemPublishSheet> {
   String? _error;
 
   bool get _isLost => _kind == LostItemKind.lost;
+
+  bool get _isEdit => widget.initial != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final initial = widget.initial;
+    if (initial == null) return;
+    final draft = LostItemDraft.fromItem(initial);
+    _kind = draft.kind;
+    _category = draft.category;
+    _place = draft.place;
+    _urgent = draft.isUrgent;
+    _title.text = draft.title;
+    _zone.text = draft.zone;
+    _location.text = draft.location;
+    _detail.text = draft.distinctiveDetail ?? '';
+    _reward.text = draft.reward ?? '';
+    _desk.text = draft.pickupDesk ?? '';
+  }
 
   @override
   void dispose() {
@@ -94,7 +118,11 @@ class _LostItemPublishSheetState extends ConsumerState<LostItemPublishSheet> {
     if (!fieldsOk || _category == null || _place == null) return;
 
     setState(() => _sending = true);
-    final result = await ref.read(forumRepositoryProvider).publishLostItem(_draft());
+    final repository = ref.read(forumRepositoryProvider);
+    final initial = widget.initial;
+    final result = initial == null
+        ? await repository.publishLostItem(_draft())
+        : await repository.updateLostItem(initial.id, _draft());
     if (!mounted) return;
     result.when(
       success: (item) => Navigator.of(context).pop(item),
@@ -112,9 +140,9 @@ class _LostItemPublishSheetState extends ConsumerState<LostItemPublishSheet> {
     return ForumSheetScaffold(
       children: [
         ForumSheetHeader(
-          icon: Icons.campaign_outlined,
+          icon: _isEdit ? Icons.edit_outlined : Icons.campaign_outlined,
           iconColors: toneColors(scheme, BadgeTone.accent),
-          title: 'Publier une annonce',
+          title: _isEdit ? "Modifier l'annonce" : 'Publier une annonce',
           subtitle: 'Objets perdus & trouvés · ESPRIT',
           onClose: () => Navigator.of(context).pop(),
         ),
@@ -199,8 +227,8 @@ class _LostItemPublishSheetState extends ConsumerState<LostItemPublishSheet> {
         ],
         const SizedBox(height: AppSpacing.lg),
         AppButton(
-          label: "Publier l'annonce",
-          icon: Icons.campaign_outlined,
+          label: _isEdit ? 'Enregistrer les modifications' : "Publier l'annonce",
+          icon: _isEdit ? Icons.save_outlined : Icons.campaign_outlined,
           variant: AppButtonVariant.accent,
           isLoading: _sending,
           onPressed: _publish,

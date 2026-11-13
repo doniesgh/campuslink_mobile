@@ -7,6 +7,7 @@ import '../../../auth/domain/entities/user.dart';
 import '../../domain/entities/audit_entry.dart';
 import '../../domain/entities/managed_user.dart';
 import '../../domain/entities/user_import.dart';
+import '../../domain/import_assist.dart';
 import '../../domain/repositories/admin_repository.dart';
 import '../models/admin_models.dart';
 
@@ -102,6 +103,24 @@ class AdminRepositoryImpl implements AdminRepository {
           }
           rethrow;
         }
+      });
+
+  @override
+  Future<Result<ImportAssistStatus>> getImportAssistStatus() => guard(() async {
+        return importAssistStatusFromJson(
+          _map(await _dio.get<dynamic>(ApiEndpoints.adminUserImportAssist)),
+        );
+      });
+
+  /// The AI can take longer than the usual 20 s (the server stops at 45 s).
+  @override
+  Future<Result<ImportAssistAnswer>> assistImport(AssistRequest request) => guard(() async {
+        final r = await _dio.post<dynamic>(
+          ApiEndpoints.adminUserImportAssist,
+          data: assistRequestToJson(request),
+          options: Options(receiveTimeout: const Duration(seconds: 60)),
+        );
+        return importAssistAnswerFromJson(_map(r));
       });
 
   @override

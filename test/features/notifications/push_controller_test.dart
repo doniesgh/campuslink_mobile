@@ -33,6 +33,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/localized_app.dart';
+
 const _student = User(
   id: 'u1',
   email: 'student@campus.test',
@@ -133,6 +135,7 @@ class _Harness {
         authRepositoryProvider.overrideWithValue(auth),
         pushMessagingProvider.overrideWithValue(push),
         pushDeviceRepositoryProvider.overrideWithValue(devices),
+        localeOverride(),
       ];
 
   /// A container with push running, once the session is restored.
@@ -231,6 +234,9 @@ Future<(_Harness, _CountingNotifications)> _pumpApp(
             theme: ThemeData(colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary)),
             routerConfig: ref.watch(routerProvider),
             scaffoldMessengerKey: ref.watch(scaffoldMessengerKeyProvider),
+            locale: const Locale('en'),
+            supportedLocales: testSupportedLocales,
+            localizationsDelegates: testLocalizationsDelegates,
           );
         },
       ),
@@ -305,16 +311,20 @@ void main() {
       expect(container.read(pushTokenProvider), isNull);
     });
 
-    test('nothing is registered while signed out or before the email is verified', () async {
+    test('nothing is registered while signed out', () async {
       final signedOut = _Harness(user: null);
       await signedOut.start();
+
+      expect(signedOut.devices.registered, isEmpty);
+    });
+
+    test('an account whose email is not verified gets push like any other', () async {
       final unverified = _Harness(
         user: const User(id: 'u3', email: 'new@campus.test', displayName: 'New'),
       );
       await unverified.start();
 
-      expect(signedOut.devices.registered, isEmpty);
-      expect(unverified.devices.registered, isEmpty);
+      expect(unverified.devices.registered, [('token-1', PushPlatform.android)]);
     });
 
     test('the API being unreachable leaves no token to send at logout', () async {

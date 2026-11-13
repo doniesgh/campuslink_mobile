@@ -15,6 +15,7 @@ import '../../../../shared/widgets/bottom_action_bar.dart';
 import '../../../../shared/widgets/detail_top_bar.dart';
 import '../../../../shared/widgets/info_banner.dart';
 import '../../domain/entities/user_import.dart';
+import '../../domain/import_assist.dart';
 import '../../domain/user_import_parser.dart';
 import '../providers/admin_providers.dart';
 import '../providers/import_file_picker.dart';
@@ -27,6 +28,10 @@ enum _Check { checking, checked, unchecked }
 /// Administration › Import accounts: a CSV file (or cells pasted from a
 /// spreadsheet) → a review of every line, checked by the server → the
 /// accounts created in batches of [importBatchSize] → their sign-in details.
+///
+/// When the columns can't be found, or some roles or names can't be read,
+/// "Read with AI" asks the server's AI how the file is laid out (when it has
+/// one), rewrites the file as the template and reviews it again, with Undo.
 class ImportUsersPage extends ConsumerStatefulWidget {
   const ImportUsersPage({super.key});
 
@@ -45,6 +50,9 @@ class _ImportUsersPageState extends ConsumerState<ImportUsersPage> {
   String? _pickError;
 
   String _source = '';
+
+  /// The lines of the file under review, as read (before any AI rewrite).
+  List<ImportTableLine> _table = const [];
   ParsedImport _parsed = const ParsedImport();
   List<ImportProblem> _serverProblems = const [];
   _Check _check = _Check.unchecked;
@@ -63,6 +71,14 @@ class _ImportUsersPageState extends ConsumerState<ImportUsersPage> {
   String? _stopError;
   int _notSent = 0;
   bool _copied = false;
+
+  /// A file whose columns weren't found: offered to the AI on the first step.
+  ({String source, List<ImportTableLine> table})? _unread;
+
+  /// What the AI understood, applied to [_table] (Undo goes back).
+  ImportAssistAnswer? _assist;
+  bool _assisting = false;
+  String? _assistError;
 
   @override
   void dispose() {
@@ -103,6 +119,7 @@ class _ImportUsersPageState extends ConsumerState<ImportUsersPage> {
     setState(() {
       _picking = true;
       _pickError = null;
+      _unread = null;
     });
     try {
       final file = await ref.read(importFilePickerProvider)();
@@ -118,6 +135,7 @@ class _ImportUsersPageState extends ConsumerState<ImportUsersPage> {
 
   void _readPasted() {
     FocusScope.of(context).unfocus();
+    _unread = null;
     if (_paste.text.trim().isEmpty) {
       _showPickError('Paste the cells first, title line included.');
       return;
@@ -125,16 +143,28 @@ class _ImportUsersPageState extends ConsumerState<ImportUsersPage> {
     _read('Pasted cells', _paste.text);
   }
 
+  static String _notUsable(ParsedImport parsed) =>
+      parsed.error ??
+      'Columns not found: ${parsed.missingColumns.join(', ')}. '
+          'Put the column titles on the first line.';
+
   void _read(String source, String text) {
-    final parsed = parseUserImport(text);
+    final table = readImportTable(text);
+    final parsed = parseImportTable(table);
+    _assist = null;
+    _assistError = null;
     if (!parsed.isUsable) {
-      _showPickError(
-        parsed.error ??
-            'Columns not found: ${parsed.missingColumns.join(', ')}. '
-                'Put the column titles on the first line.',
-      );
+      // The AI may find columns with unknown titles (not in a file without accounts).
+      _unread = parsed.missingColumns.isEmpty ? null : (source: source, table: table);
+      _showPickError(_notUsable(parsed));
       return;
     }
+    _table = table;
+    _unread = null;
+    _review(source, parsed);
+  }
+
+  void _review(String source, ParsedImport parsed) {
     setState(() {
       _source = source;
       _parsed = parsed;
@@ -177,9 +207,96 @@ class _ImportUsersPageState extends ConsumerState<ImportUsersPage> {
     });
   }
 
+  // --- Read with AI -------------------------------------------------------
+
+  /// Asks the AI how [table] is laid out, then reviews it rewritten as the
+  /// template. Nothing is imported: the admin checks the lines as usual.
+  Future<void> _readWithAi(String source, List<ImportTableLine> table) async {
+    if (_assisting) return;
+    setState(() {
+      _assisting = true;
+      _assistError = null;
+    });
+    final result = await ref.read(adminRepositoryProvider).assistImport(assistRequest(table));
+    if (!mounted) return;
+    switch (result) {
+      case Err(:final failure):
+        setState(() {
+          _assisting = false;
+          _assistError = failure.message;
+        });
+      case Success(value: final answer):
+        final parsed = parseImportTable(applyAssist(table, answer.mapping));
+        if (!parsed.isUsable) {
+          setState(() {
+            _assisting = false;
+            _assistError = "The AI couldn't read this file either: ${_notUsable(parsed)} "
+                'Template: $importTemplateHeader';
+          });
+          return;
+        }
+        _assisting = false;
+        _table = table;
+        _assist = answer;
+        _unread = null;
+        _review(source, parsed);
+    }
+  }
+
+  /// Back to the file as it was read, before the AI.
+  void _undoAssist() {
+    final parsed = parseImportTable(_table);
+    _assist = null;
+    _assistError = null;
+    if (parsed.isUsable) {
+      _review(_source, parsed);
+      return;
+    }
+    // The AI had read a file the app couldn't: back to the first step.
+    _checkRun++;
+    setState(() {
+      _unread = (source: _source, table: _table);
+      _stage = _Stage.pick;
+      _parsed = const ParsedImport();
+      _serverProblems = const [];
+      _check = _Check.unchecked;
+      _pickError = _notUsable(parsed);
+    });
+  }
+
+  /// Some roles or names can't be read: the AI may know what they mean.
+  bool get _canFixWithAi =>
+      _assist == null &&
+      _parsed.problems.any(
+        (p) => p.code == 'INVALID_ROLE' || (p.field == 'displayName' && p.code == 'REQUIRED'),
+      );
+
+  /// The "Read with AI" card, only when the server has an AI.
+  Widget _assistOffer({
+    required String message,
+    required String action,
+    required VoidCallback onPressed,
+  }) {
+    final status = ref.watch(importAssistStatusProvider).valueOrNull;
+    if (status == null || !status.available) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: AppSpacing.md),
+      child: _AssistOffer(
+        message: message,
+        action: action,
+        model: status.model,
+        busy: _assisting,
+        error: _assistError,
+        onPressed: onPressed,
+      ),
+    );
+  }
+
   void _restart() {
     _checkRun++;
     setState(() {
+      _assist = null;
+      _assistError = null;
       _stage = _Stage.pick;
       _parsed = const ParsedImport();
       _serverProblems = const [];
@@ -255,6 +372,8 @@ class _ImportUsersPageState extends ConsumerState<ImportUsersPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Asked once on opening, so "Read with AI" shows at once when needed.
+    ref.watch(importAssistStatusProvider);
     final blockPop = _stage == _Stage.importing || (_stage == _Stage.done && _mustCopy);
     return PopScope(
       canPop: !blockPop,
@@ -315,6 +434,13 @@ class _ImportUsersPageState extends ConsumerState<ImportUsersPage> {
           _ErrorNote(pickError),
           const SizedBox(height: AppSpacing.lg),
         ],
+        if (_unread case final unread?)
+          _assistOffer(
+            message: "This file doesn't follow the template. "
+                'The AI can work out which column is which.',
+            action: 'Read with AI',
+            onPressed: () => _readWithAi(unread.source, unread.table),
+          ),
         _Section(
           icon: Icons.upload_file_outlined,
           title: 'From a CSV file',
@@ -407,6 +533,16 @@ class _ImportUsersPageState extends ConsumerState<ImportUsersPage> {
                 ],
               ),
               const SizedBox(height: AppSpacing.md),
+              if (_assist case final assist?) ...[
+                _AssistSummary(answer: assist, table: _table, onUndo: _undoAssist),
+                const SizedBox(height: AppSpacing.md),
+              ] else if (_canFixWithAi)
+                _assistOffer(
+                  message: "Some roles or names can't be read. "
+                      'The AI can work out what they mean.',
+                  action: 'Fix with AI',
+                  onPressed: () => _readWithAi(_source, _table),
+                ),
               _CheckStatus(check: _check, error: _checkError, onRetry: _checkWithServer),
               if (bad > 0) ...[
                 const SizedBox(height: AppSpacing.md),
@@ -639,6 +775,165 @@ class _ErrorNote extends StatelessWidget {
           Icon(Icons.error_outline, color: scheme.error),
           const SizedBox(width: AppSpacing.md),
           Expanded(child: Text(message, style: theme.textTheme.bodyMedium)),
+        ],
+      ),
+    );
+  }
+}
+
+/// The tinted box of the AI cards.
+BoxDecoration _assistDecoration(ColorScheme scheme) => BoxDecoration(
+      color: scheme.primaryContainer.withValues(alpha: 0.35),
+      borderRadius: AppRadius.lgAll,
+      border: Border.all(color: scheme.primary.withValues(alpha: 0.3)),
+    );
+
+/// "Read with AI": offered when a file doesn't follow the template, or some
+/// of its values can't be read. Says what is sent, and why it failed.
+class _AssistOffer extends StatelessWidget {
+  const _AssistOffer({
+    required this.message,
+    required this.action,
+    required this.model,
+    required this.busy,
+    required this.error,
+    required this.onPressed,
+  });
+
+  final String message;
+  final String action;
+  final String? model;
+  final bool busy;
+  final String? error;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final error = this.error;
+    return Container(
+      padding: const EdgeInsets.all(AppSpacing.lg),
+      decoration: _assistDecoration(scheme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Icon(Icons.auto_awesome_outlined, color: scheme.primary),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: Text(message, style: theme.textTheme.titleSmall)),
+            ],
+          ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'The first $assistLines lines (emails and passwords masked) and the short lists '
+            'of values, such as roles, are sent to ${model ?? 'an AI model'} through OpenRouter. '
+            'Nothing is imported before you check the lines.',
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
+          if (error != null) ...[
+            const SizedBox(height: AppSpacing.sm),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(Icons.error_outline, size: 18, color: scheme.error),
+                const SizedBox(width: AppSpacing.xs),
+                Expanded(
+                  child: Text(
+                    error,
+                    style: theme.textTheme.bodySmall?.copyWith(color: scheme.error),
+                  ),
+                ),
+              ],
+            ),
+          ],
+          const SizedBox(height: AppSpacing.md),
+          AppButton(
+            label: action,
+            icon: Icons.auto_awesome_outlined,
+            variant: AppButtonVariant.outlined,
+            isLoading: busy,
+            onPressed: onPressed,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// What the AI understood, now applied to the file, with Undo.
+class _AssistSummary extends StatelessWidget {
+  const _AssistSummary({required this.answer, required this.table, required this.onUndo});
+
+  final ImportAssistAnswer answer;
+  final List<ImportTableLine> table;
+  final VoidCallback onUndo;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final mapping = answer.mapping;
+    final header = mapping.headerRow;
+    final columns = [
+      for (final field in AssistField.values)
+        if (mapping.columns[field] case final column?)
+          field == AssistField.fullName
+              ? '${field.label} ${columnLetter(column)} (${mapping.nameOrder.label})'
+              : '${field.label} ${columnLetter(column)}',
+    ];
+    // A value the AI left out may still be read by the usual rules.
+    final understood = <String>[];
+    final unknown = <String>[];
+    for (final (:text, :role) in mapping.roles) {
+      final read = role ?? roleFromCell(text);
+      if (read == null) {
+        unknown.add('“$text”');
+      } else {
+        understood.add('“$text” → ${read.label}');
+      }
+    }
+    final points = [
+      header > 0 && header <= table.length
+          ? 'Titles on line ${table[header - 1].line}.'
+          : 'No title line in the file.',
+      if (columns.isNotEmpty) 'Columns: ${columns.join(' · ')}.',
+      if (understood.isNotEmpty) 'Roles: ${understood.join(', ')}.',
+      if (unknown.isNotEmpty) 'Not understood: ${unknown.join(', ')}.',
+      if (mapping.columns.containsKey(AssistField.fullName)) 'Check how the full names were split.',
+    ];
+    return Container(
+      padding: const EdgeInsets.fromLTRB(
+        AppSpacing.lg, AppSpacing.sm, AppSpacing.sm, AppSpacing.lg,
+      ),
+      decoration: _assistDecoration(scheme),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.auto_awesome_outlined, color: scheme.primary),
+              const SizedBox(width: AppSpacing.sm),
+              Expanded(child: Text('Read with AI', style: theme.textTheme.titleSmall)),
+              TextButton.icon(
+                onPressed: onUndo,
+                icon: const Icon(Icons.undo, size: 18),
+                label: const Text('Undo'),
+              ),
+            ],
+          ),
+          for (final point in points)
+            Padding(
+              padding: const EdgeInsets.only(top: AppSpacing.xs, right: AppSpacing.sm),
+              child: Text('• $point', style: theme.textTheme.bodySmall),
+            ),
+          const SizedBox(height: AppSpacing.sm),
+          Text(
+            'Model: ${answer.model}',
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          ),
         ],
       ),
     );

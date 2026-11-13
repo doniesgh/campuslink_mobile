@@ -8,6 +8,7 @@ import '../../../../shared/widgets/app_badge.dart';
 import '../../domain/entities/class_session.dart';
 import '../../domain/schedule_logic.dart';
 import '../timetable_format.dart';
+import 'meet_link.dart';
 import 'pulsing_dot.dart';
 
 /// A session of the day timeline. Evaluations and the session in progress
@@ -156,9 +157,11 @@ class _StandardContent extends StatelessWidget {
       _ => _Pill(label: formatSessionLength(s.duration), background: neutralBg, foreground: neutralFg),
     };
 
-    final (IconData roomIcon, Color roomColor) = status == SessionStatus.done
-        ? (Icons.location_on_outlined, scheme.primary)
-        : (Icons.domain, _accentText(scheme));
+    final (IconData roomIcon, Color roomColor) = s.isOnline
+        ? (Icons.videocam_outlined, scheme.primary)
+        : status == SessionStatus.done
+            ? (Icons.location_on_outlined, scheme.primary)
+            : (Icons.domain, _accentText(scheme));
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -171,7 +174,29 @@ class _StandardContent extends StatelessWidget {
           first: _Meta(icon: roomIcon, iconColor: roomColor, text: s.room),
           second: _Meta(icon: Icons.person_outline, text: s.teacher),
         ),
+        if (s.isOnline) _OnlineRow(session: s, canJoin: status != SessionStatus.done),
       ],
+    );
+  }
+}
+
+/// "Online" chip and "Join Google Meet" (not once the class is over).
+class _OnlineRow extends StatelessWidget {
+  const _OnlineRow({required this.session, required this.canJoin});
+
+  final ClassSession session;
+  final bool canJoin;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.only(top: AppSpacing.md),
+      child: _SpreadOrWrap(
+        children: [
+          const OnlineChip(),
+          if (canJoin) JoinMeetButton(url: session.meetUrl, compact: true),
+        ],
+      ),
     );
   }
 }
@@ -227,13 +252,14 @@ class _OngoingContent extends StatelessWidget {
         const SizedBox(height: AppSpacing.md),
         _MetaRow(
           first: _Meta(
-            icon: Icons.meeting_room_outlined,
+            icon: s.isOnline ? Icons.videocam_outlined : Icons.meeting_room_outlined,
             iconColor: _accentText(scheme),
             text: s.room,
             strong: true,
           ),
           second: _Meta(icon: Icons.school_outlined, text: s.teacher),
         ),
+        if (s.isOnline) _OnlineRow(session: s, canJoin: true),
       ],
     );
   }
@@ -288,15 +314,16 @@ class _ExamContent extends StatelessWidget {
         _SpreadOrWrap(
           children: [
             _Meta(
-              icon: Icons.pin_drop_outlined,
+              icon: s.isOnline ? Icons.videocam_outlined : Icons.pin_drop_outlined,
               iconColor: _accentText(scheme),
               iconSize: 18,
               text: s.room,
               strong: true,
             ),
-            if (!done && onFindSeat != null) _FindSeatButton(onTap: onFindSeat!),
+            if (!done && !s.isOnline && onFindSeat != null) _FindSeatButton(onTap: onFindSeat!),
           ],
         ),
+        if (s.isOnline) _OnlineRow(session: s, canJoin: !done),
       ],
     );
   }

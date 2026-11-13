@@ -5,7 +5,7 @@ import { createApp } from '../src/app';
 import { atCampusTime, campusMonth } from '../src/modules/carpool/campus-time';
 import { CarpoolImpactModel, RideModel } from '../src/modules/carpool/carpool.model';
 import { seedCarpool } from '../src/modules/carpool/carpool.seed';
-import { clearTestDb, closeTestDb, connectTestDb, createStudent } from './helpers';
+import { clearTestDb, closeTestDb, connectTestDb, createStudent, validationError } from './helpers';
 
 const app = createApp();
 
@@ -235,17 +235,17 @@ describe('POST /api/carpool/rides/:id/reservations', () => {
     const { auth } = await createStudent();
 
     const empty = await reserve(auth, []).expect(422);
-    expect(empty.body).toEqual({ message: 'Choose at least one seat' });
+    expect(empty.body).toEqual(validationError('Choose at least one seat'));
 
     const missing = await request(app)
       .post('/api/carpool/rides/es-4091/reservations')
       .set(auth)
       .send({})
       .expect(422);
-    expect(missing.body).toEqual({ message: 'Choose at least one seat' });
+    expect(missing.body).toEqual(validationError('Choose at least one seat'));
 
     const blank = await reserve(auth, ['  ']).expect(422);
-    expect(blank.body).toEqual({ message: 'Choose a valid seat' });
+    expect(blank.body).toEqual(validationError('Choose a valid seat'));
   });
 
   test('answers 404 for an unknown ride', async () => {

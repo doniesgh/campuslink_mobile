@@ -16,7 +16,7 @@ abstract final class Validators {
     return value.length < 8 ? 'Use at least 8 characters' : null;
   }
 
-  /// Email verification code: exactly 6 digits.
+  /// The emailed password-reset code: exactly 6 digits.
   static String? code(String? value) {
     final v = value?.trim() ?? '';
     return RegExp(r'^\d{6}$').hasMatch(v) ? null : 'Enter the 6-digit code';

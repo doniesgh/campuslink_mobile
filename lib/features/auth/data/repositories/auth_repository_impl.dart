@@ -29,8 +29,10 @@ class AuthRepositoryImpl implements AuthRepository {
     required String displayName,
     required String email,
     required String password,
+    String? locale,
   }) =>
-      guard(() async => _persist(await remote.register(displayName, email, password)));
+      guard(() async =>
+          _persist(await remote.register(displayName, email, password, locale: locale)));
 
   @override
   Future<Result<void>> forgotPassword(String email) =>
@@ -45,8 +47,8 @@ class AuthRepositoryImpl implements AuthRepository {
       guard(() => remote.resetPassword(email, code, password));
 
   @override
-  Future<Result<User>> verifyEmail(String code) =>
-      guard(() async => (await remote.verifyEmail(code)).toEntity());
+  Future<Result<User>> updateMe({String? locale}) =>
+      guard(() async => (await remote.updateMe(locale: locale)).toEntity());
 
   @override
   Future<Result<User?>> restoreSession() async {

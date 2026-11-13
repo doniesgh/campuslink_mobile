@@ -7,7 +7,7 @@ import type {
   TimetableDayJson,
   TimetableWeekJson,
 } from '../src/modules/timetable/timetable.service';
-import { clearTestDb, closeTestDb, connectTestDb, createStudent } from './helpers';
+import { clearTestDb, closeTestDb, connectTestDb, createStudent, validationError } from './helpers';
 
 const app = createApp();
 
@@ -69,7 +69,7 @@ describe('date validation', () => {
     const { auth } = await createStudent();
     for (const path of ['/api/timetable/day', '/api/timetable/week']) {
       const res = await request(app).get(path).query(query).set(auth).expect(422);
-      expect(res.body).toEqual({ message });
+      expect(res.body).toEqual(validationError(message));
     }
   });
 });
@@ -118,6 +118,8 @@ describe('GET /api/timetable/week', () => {
       lectureCount: 14,
       coefficient: null,
       notes: null,
+      mode: 'onsite',
+      meetUrl: null,
     });
     expect(monday.sessions.map((s) => s.kind)).toEqual(['lecture', 'lab', 'workshop', 'exam']);
     expect(monday.sessions[3]).toMatchObject({
@@ -159,11 +161,48 @@ describe('GET /api/timetable/day', () => {
     const week = await getWeek(auth, '2026-11-05');
     expect(day).toEqual(week.days[3]);
     expect(day.sessions.map((s) => [s.id, s.start, s.end])).toEqual([
-      ['algo-2026-11-5', '08:30', '10:00'],
-      ['genie-logiciel-2026-11-5', '10:15', '12:15'],
-      ['bases-de-donnees-2026-11-5', '13:30', '15:30'],
+      ['algo-thu-2026-11-5', '08:30', '10:00'],
+      ['genie-logiciel-thu-2026-11-5', '10:15', '12:15'],
+      ['bases-de-donnees-thu-2026-11-5', '13:30', '15:30'],
       ['exam-flutter-2026-11-5', '16:00', '17:30'],
     ]);
+  });
+
+  test("Friday's workshop is online, with its Google Meet link", async () => {
+    const { auth } = await seededStudent();
+    const friday = await getDay(auth, '2026-11-06');
+    expect(friday.sessions[2]).toMatchObject({
+      id: 'entrepreneuriat-2026-11-6',
+      kind: 'workshop',
+      // Older apps show the room as is.
+      room: 'Online',
+      mode: 'online',
+      meetUrl: 'https://meet.google.com/xqd-fkzw-pnb',
+    });
+    for (const s of friday.sessions.slice(0, 2)) {
+      expect(s).toMatchObject({ mode: 'onsite', meetUrl: null });
+    }
+  });
+
+  test('slots saved before online classes existed are on-site', async () => {
+    const { auth } = await createStudent();
+    await TimetableTemplateModel.collection.insertOne({
+      classGroup: 'Tech Track 4BI',
+      slots: [
+        {
+          slotId: 'old',
+          weekday: 1,
+          course: 'Old class',
+          room: 'B12',
+          teacher: 'Dr. Old',
+          start: '08:30',
+          end: '10:00',
+          kind: 'lecture',
+        },
+      ],
+    });
+    const monday = await getDay(auth, '2026-11-02');
+    expect(monday.sessions[0]).toMatchObject({ id: 'old-2026-11-2', mode: 'onsite', meetUrl: null });
   });
 
   test('weekends and holidays have no classes', async () => {

@@ -1,5 +1,7 @@
 import 'package:campuspulse/core/error/failures.dart';
 import 'package:campuspulse/core/error/result.dart';
+import 'package:campuspulse/core/l10n/app_language.dart';
+import 'package:campuspulse/core/providers/locale_provider.dart';
 import 'package:campuspulse/core/providers/theme_provider.dart';
 import 'package:campuspulse/core/router/route_names.dart';
 import 'package:campuspulse/core/theme/app_colors.dart';
@@ -16,6 +18,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
+
+import '../../helpers/localized_app.dart';
 
 class _FakeAuthController extends AuthController {
   _FakeAuthController({this.role = UserRole.student});
@@ -60,6 +64,8 @@ Future<_FakeAuthController> _pumpProfile(
   double width = 375,
   double textScale = 1,
   UserRole role = UserRole.student,
+  FakeLocaleNotifier? language,
+  AppLanguage appLanguage = AppLanguage.en,
 }) async {
   // 375 dp by default: the test font is much wider than the real ones, and the
   // shared CampusHeader overflows below that width with it.
@@ -93,6 +99,7 @@ Future<_FakeAuthController> _pumpProfile(
       overrides: [
         authControllerProvider.overrideWith(() => auth),
         themeModeProvider.overrideWith(_FakeThemeModeNotifier.new),
+        localeOverride(language),
         adminRepositoryProvider.overrideWithValue(MockAdminRepository(delay: Duration.zero)),
         profileRepositoryProvider.overrideWithValue(
           repository ??
@@ -111,6 +118,9 @@ Future<_FakeAuthController> _pumpProfile(
           ),
         ),
         routerConfig: router,
+        locale: appLanguage.locale,
+        supportedLocales: testSupportedLocales,
+        localizationsDelegates: testLocalizationsDelegates,
         builder: (context, child) => MediaQuery(
           data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
           child: child!,
@@ -172,6 +182,43 @@ void main() {
 
     await _tapVisible(tester, find.byTooltip('System'));
     expect(container.read(themeModeProvider), ThemeMode.system);
+  });
+
+  group('language', () {
+    testWidgets('the row sits next to Appearance and changes the language', (tester) async {
+      final language = FakeLocaleNotifier(AppLanguage.en);
+      await _pumpProfile(tester, language: language);
+
+      expect(find.text('Appearance'), findsOneWidget);
+      expect(find.text('Language'), findsOneWidget);
+      expect(find.text('App, emails and notifications'), findsOneWidget);
+      final french = find.bySemanticsLabel('Français');
+      expect(find.byTooltip('English'), findsOneWidget);
+
+      await _tapVisible(tester, french);
+      expect(language.changes, [AppLanguage.fr]);
+      final container = ProviderScope.containerOf(tester.element(find.byType(ProfilePage)));
+      expect(container.read(localeProvider), AppLanguage.fr);
+    });
+
+    for (final brightness in Brightness.values) {
+      testWidgets('shows in French, at 360 dp with large text ($brightness)', (tester) async {
+        await _pumpProfile(
+          tester,
+          language: FakeLocaleNotifier(AppLanguage.fr),
+          appLanguage: AppLanguage.fr,
+          brightness: brightness,
+          width: 360,
+          textScale: 1.3,
+        );
+        await tester.ensureVisible(find.text('Langue'));
+        await tester.pumpAndSettle();
+        expect(find.text('Appli, e-mails et notifications'), findsOneWidget);
+        expect(find.text('FR'), findsOneWidget);
+        expect(find.text('EN'), findsOneWidget);
+        expect(tester.takeException(), isNull);
+      });
+    }
   });
 
   testWidgets('sign out asks for confirmation, then logs out', (tester) async {
@@ -245,8 +292,8 @@ void main() {
 
         expect(find.text('Admin · CampusPulse'), findsOneWidget);
         expect(find.text('Administration'), findsOneWidget);
-        // The 12 demo accounts of the mock repository.
-        expect(find.text('12'), findsOneWidget);
+        // The 14 demo accounts of the mock repository.
+        expect(find.text('14'), findsOneWidget);
         expect(find.text('211JMT0428'), findsNothing);
         expect(find.text('NFC Student Pass'), findsNothing);
         expect(find.text('Sign Out'), findsOneWidget);
@@ -262,6 +309,16 @@ void main() {
       await _pumpProfile(tester, role: UserRole.admin);
       await _tapVisible(tester, find.text('Audit log'));
       expect(find.text('Audit screen'), findsOneWidget);
+    });
+
+    testWidgets('a company sees its role, no student card and no Administration',
+        (tester) async {
+      await _pumpProfile(tester, role: UserRole.company, width: 360, textScale: 1.3);
+      expect(find.text('Company · CampusPulse'), findsOneWidget);
+      expect(find.text('211JMT0428'), findsNothing);
+      expect(find.text('NFC Student Pass'), findsNothing);
+      expect(find.text('Administration'), findsNothing);
+      expect(tester.takeException(), isNull);
     });
 
     testWidgets('a teacher sees neither the student card nor Administration', (tester) async {

@@ -46,7 +46,7 @@ const MESSAGES: Record<string, string> = {
   'studentId:INVALID_STUDENT_ID': 'ENT ID: 3 to 20 letters or digits',
   'studentId:DUPLICATE_STUDENT_ID': 'ENT ID: already on another line of the file',
   'studentId:STUDENT_ID_TAKEN': 'ENT ID: an account already uses it',
-  'role:INVALID_ROLE': 'Role: not recognised (student, teacher, admin or alumni)',
+  'role:INVALID_ROLE': 'Role: not recognised (student, teacher, admin, alumni or company)',
 };
 
 const MAX_NAME_LENGTH = 80;

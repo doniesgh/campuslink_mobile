@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/validators.dart';
@@ -41,7 +42,7 @@ class _ForgotPasswordPageState extends ConsumerState<ForgotPasswordPage> {
     if (!mounted) return;
     setState(() => _loading = false);
     if (failure != null) {
-      showAppSnack(context, failure.message);
+      showAppSnack(context, failureText(context, failure));
       return;
     }
     // Step 2: enter the emailed code and a new password. Back goes to login.
