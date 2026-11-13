@@ -14,6 +14,10 @@ abstract interface class CarpoolRepository {
   /// The rides where the signed-in student booked or asked for a seat.
   Future<Result<List<Ride>>> getMyBookings();
 
+  /// The upcoming rides the signed-in student drives that have passengers:
+  /// seats asked for ([SeatStatus.pending]) or confirmed ([SeatStatus.booked]).
+  Future<Result<List<Ride>>> getMyRideRequests();
+
   /// Publishes [ride] with the signed-in student as its driver, and returns
   /// it as every student now sees it in [getRides].
   Future<Result<Ride>> createRide(NewRide ride);

@@ -47,6 +47,13 @@ class CarpoolRepositoryImpl implements CarpoolRepository {
         return RideModel.listFromJson(r.data as List<dynamic>);
       });
 
+  /// GET /carpool/rides/requests/mine
+  @override
+  Future<Result<List<Ride>>> getMyRideRequests() => guard(() async {
+        final r = await _dio.get<dynamic>('${ApiEndpoints.rides}/requests/mine');
+        return RideModel.listFromJson(r.data as List<dynamic>);
+      });
+
   /// POST /carpool/rides. A ride the server refuses (422) comes back as a
   /// validation failure whose message, in French like the form, is shown as-is.
   @override

@@ -46,6 +46,9 @@ class _FakeCarpoolRepository implements CarpoolRepository {
   }
 
   @override
+  Future<Result<List<Ride>>> getMyRideRequests() async => const Success([]);
+
+  @override
   Future<Result<List<Ride>>> getMyBookings() async => const Success([]);
 
   @override

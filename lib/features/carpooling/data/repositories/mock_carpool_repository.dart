@@ -181,6 +181,17 @@ class MockCarpoolRepository implements CarpoolRepository {
     return Success([for (final r in _rides) if (r.hasMyBooking) r]);
   }
 
+  @override
+  Future<Result<List<Ride>>> getMyRideRequests() async {
+    await Future<void>.delayed(_latency);
+    return Success([
+      for (final r in _rides)
+        if (r.isMine &&
+            r.seats.any((s) => s.status == SeatStatus.pending || s.status == SeatStatus.booked))
+          r,
+    ]);
+  }
+
   /// Like the server: the student drives (seat "s1", with their name), as a
   /// new driver (no rating yet) whose car isn't verified.
   @override

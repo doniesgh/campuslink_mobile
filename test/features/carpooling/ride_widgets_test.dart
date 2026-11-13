@@ -38,6 +38,8 @@ class _OneRideRepository implements CarpoolRepository {
   Future<Result<List<Ride>>> getRides() async => Success([ride]);
 
   @override
+  Future<Result<List<Ride>>> getMyRideRequests() async => const Success([]);
+  @override
   Future<Result<Ride>> reserveSeats({
     required String rideId,
     required List<String> seatIds,

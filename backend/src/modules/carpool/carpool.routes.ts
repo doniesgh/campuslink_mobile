@@ -31,6 +31,11 @@ carpoolRouter.get('/rides/bookings/mine', async (_req, res) => {
   res.json(await carpool.listMyBookings(currentUserId(res)));
 });
 
+/** The rides the student drives that received requests (or have passengers). Declared before "/rides/:id". */
+carpoolRouter.get('/rides/requests/mine', async (_req, res) => {
+  res.json(await carpool.listMyRideRequests(currentUserId(res)));
+});
+
 carpoolRouter.get('/rides/:id', async (req, res) => {
   res.json(await carpool.getRide(req.params.id, currentUserId(res)));
 });

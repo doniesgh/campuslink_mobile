@@ -116,6 +116,19 @@ export async function listMyBookings(userId: string): Promise<RideJson[]> {
   return rides.map((ride) => toRideJson(ride, userId));
 }
 
+/**
+ * The rides the student drives that have passengers: students who
+ * asked for a seat (pending, waiting for the answer) or who are confirmed
+ * (booked). Soonest first.
+ */
+export async function listMyRideRequests(userId: string): Promise<RideJson[]> {
+  const rides = await RideModel.find({
+    driverId: new Types.ObjectId(userId),
+    seats: { $elemMatch: { status: { $in: ['pending', 'booked'] } } },
+  }).sort({ departure: 1, _id: 1 });
+  return rides.map((ride) => toRideJson(ride, userId));
+}
+
 /** Published rides are numbered after the demo ones (ES-4091 to ES-4093). */
 const LAST_DEMO_RIDE_NUMBER = 4093;
 

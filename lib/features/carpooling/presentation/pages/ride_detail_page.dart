@@ -197,6 +197,7 @@ class _RideDetailPageState extends ConsumerState<RideDetailPage> {
       success: (_) {
         ref.invalidate(rideDetailProvider(ride.id));
         ref.invalidate(ridesProvider);
+        ref.invalidate(myRideRequestsProvider);
         _snack(accept ? '${seat.label} is confirmed.' : 'Request refused. The seat is free again.');
       },
       failure: (f) => _snack(f.message),
