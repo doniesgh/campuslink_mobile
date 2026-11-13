@@ -14,13 +14,13 @@ The **exact JSON** of every response is pinned by the app's contract tests. They
 - [Conventions](#conventions)
 - [Auth](#auth) · [Users](#users) · [Timetable](#timetable) · [Courses](#courses) · [Carpool](#carpool)
 - [Jobs](#jobs) · [Forum](#forum) · [Grades](#grades) · [Profile](#profile) · [Notifications](#notifications) · [Push](#push)
-- [Admin](#admin): user management and the audit log
+- [Admin](#admin): user management, the timetable and the audit log
 
 ---
 
 ## Conventions
 
-**Authentication.** Every route except `/health` and `/auth/*` (apart from the two marked 🔒) needs:
+**Authentication.** Every route except `/health` and `/auth/*` needs:
 
 ```http
 Authorization: Bearer <accessToken>
@@ -28,22 +28,53 @@ Authorization: Bearer <accessToken>
 
 Access tokens last 15 minutes. On a `401`, call `POST /auth/refresh` with the refresh token; the app does this automatically.
 
-**Errors** are always JSON with a message written for students:
+**Errors** are always JSON with a message written for students, and sometimes a machine-readable `code` and extra fields:
 
 ```json
 { "message": "This seat is no longer available." }
+{ "message": "Use at least 8 characters", "code": "VALIDATION_ERROR" }
+{ "message": "Too many attempts. Try again in a few minutes.", "code": "TOO_MANY_REQUESTS", "retryAfter": 873 }
 ```
+
+The app shows `message` as it is, or translates a `code` it knows (`failureText` in `lib/core/error/failure_text.dart`). Old app builds ignore `code`.
 
 | Status | When |
 |---|---|
 | 400 | Bad request: wrong or expired code, malformed JSON |
 | 401 | Not signed in, wrong credentials, or expired session |
-| 403 | Signed in, but not allowed: an `/admin` route used by someone who isn't an admin, or the timetable or courses used by an admin or alumni |
+| 403 | Signed in, but not allowed: an `/admin` route used by someone who isn't an admin, or the timetable or courses used by an admin, alumni or company |
 | 404 | Unknown id (`"Job not found."`), or a route that doesn't exist |
 | 409 | Conflict: seat taken, already applied, booking your own ride… |
-| 422 | Invalid data. The message names the first problem (`"Use at least 8 characters"`) |
-| 429 | Too many attempts on an auth route |
+| 422 | Invalid data. The message names the first problem (`"Use at least 8 characters"`). A body or query refused by its schema has `code: "VALIDATION_ERROR"` |
+| 429 | Too many requests (see **Rate limits** below): `code: "TOO_MANY_REQUESTS"`, `retryAfter` in seconds and a `Retry-After` header |
 | 500 | Server error (`"Something went wrong. Please try again."`) |
+| 502, 503 | An AI feature could not answer (see **AI** below) |
+
+**Error codes** (`code`, optional):
+
+| Code | Status | When |
+|---|---|---|
+| `VALIDATION_ERROR` | 422 | A body or query refused by its schema (`validateBody`, `parseQuery`) |
+| `TOO_MANY_REQUESTS` | 429 | A rate limit was hit. `retryAfter`: seconds to wait |
+| `AI_UNAVAILABLE` | 503 | AI is off on this server (no `OPENROUTER_API_KEY`), or the key is refused |
+| `AI_NO_CREDITS` | 503 | The OpenRouter account has no credits left |
+| `AI_BUSY` | 429 | Every AI model is busy or out of its daily quota |
+| `AI_FAILED` | 502 | The AI service is unreachable, too slow, or answered something that isn't JSON |
+| `TIMETABLE_CONFLICT` | 409 | A class of the timetable clashes with others (same room or teacher at overlapping times). `conflicts`: the clashing classes, see [Timetable (admin)](#timetable-admin) |
+
+**Rate limits** (in memory, per API instance; off in tests):
+
+| Routes | Counted per | Limit (production; 5× elsewhere) |
+|---|---|---|
+| `register`, `login`, `forgot-password`, `reset-password` (each its own counter) | route + IP + email (or `identifier`), lower-cased | 20 per 15 min |
+| the same four together | IP (not counted for a loopback caller without a proxy: the emulator, a dev on localhost) | 100 per 15 min |
+| `POST /jobs/:id/summary` (cached answers included) | signed-in user | 30 per hour (everywhere) |
+
+`refresh` and `logout` have no limit. Behind Render's proxy (`TRUST_PROXY=1`) the IP is the client's.
+
+**Language.** The app sends `Accept-Language: fr` or `en` on every request. The server writes a user's emails and notifications in their account's `locale` (see [Users](#users)). At sign-up the account's `locale` is the one in the body, else this header, else French.
+
+**AI** (`backend/src/lib/openrouter.ts`). Optional: without `OPENROUTER_API_KEY` every AI feature answers `503 AI_UNAVAILABLE` or falls back to rules. Used by the admin import assist ([Read with AI](#read-with-ai)) and the AI summary of a job offer ([Jobs](#jobs)).
 
 **Data formats:**
 - Keys are camelCase, and ids are strings in `id`.
@@ -64,14 +95,12 @@ Access tokens last 15 minutes. On a `401`, call `POST /auth/refresh` with the re
 
 | Method & path | Body | Success | Errors |
 |---|---|---|---|
-| `POST /auth/register` | `{ displayName, email, password }` (password ≥ 8) | `201` session (below) + emails a 6-digit code | 409 email taken · 422 |
-| `POST /auth/login` | `{ identifier, password }` | `200` session | 401 `"Invalid ENT ID/email or password."` |
+| `POST /auth/register` | `{ displayName, email, password, locale? }` (password ≥ 8, `locale` `fr`/`en`) | `201` session (below): the new account is signed in, already verified. No email is sent | 409 email taken · 422 · 429 |
+| `POST /auth/login` | `{ identifier, password }` | `200` session | 401 `"Invalid ENT ID/email or password."` · 429 |
 | `POST /auth/refresh` | `{ refreshToken }` | `200 { accessToken, refreshToken }` (the old one is revoked) | 401 |
 | `POST /auth/logout` | `{ refreshToken, pushToken? }` | `204`. With `pushToken`, that phone stops getting [pushes](#push) | 422 (missing `refreshToken`, `pushToken` not text or too long) |
-| `POST /auth/forgot-password` | `{ email }` | `200 { message }` + emails a 6-digit code | — (same answer for unknown emails) |
-| `POST /auth/reset-password` | `{ email, code, password }` | `200 { message }`, signs out everywhere | 400 `"Invalid or expired code…"` · 422 |
-| `POST /auth/verify-email` 🔒 | `{ code }` | `200 { user }` | 400 wrong / expired code · 401 · 422 |
-| `POST /auth/resend-verification` 🔒 | — | `204` | 401 |
+| `POST /auth/forgot-password` | `{ email }` | `200 { message }` + emails a 6-digit code, in the account's language | 429 (same answer for unknown emails) |
+| `POST /auth/reset-password` | `{ email, code, password }` | `200 { message }`, signs out everywhere, audit `auth.password_reset` | 400 `"Invalid or expired code…"` · 422 · 429 |
 
 `identifier` is the student's **ENT ID** (`211JMT0428`, any case) **or email**.
 
@@ -86,26 +115,34 @@ Access tokens last 15 minutes. On a `401`, call `POST /auth/refresh` with the re
     "displayName": "Dony Mansour",
     "avatarUrl": null,
     "isEmailVerified": true,
-    "role": "student"
+    "role": "student",
+    "locale": "fr"
   },
   "accessToken": "eyJhbGciOiJIUzI1NiIs…",
   "refreshToken": "1C95PsLEqH…"
 }
 ```
 
-`role` is `student`, `teacher`, `admin` or `alumni`. Sign-up always creates a `student`; only an admin can change a role (see [Admin](#admin)).
+`role` is `student`, `teacher`, `admin`, `alumni` or `company` (a recruiter: a partner company that posts job offers). Sign-up always creates a `student`; only an admin can change a role (see [Admin](#admin)). Students and teachers have classes; admins, alumni and companies don't (403 on the timetable and courses). Old app builds read `company` as `student`.
 
-**Codes** have 6 digits, are valid for 15 minutes and are locked after 5 wrong tries. Without SMTP configured, the server prints them in its console (`[mail] Verification code for …: 042917`).
+`locale` is the account's language, `fr` (the default) or `en`: the server writes this user's emails in it (French says "tu"). The app keeps it equal to the language on screen: it sends it at sign-up and, after a sign-in or a change in Profile, `PATCH /users/me` when it differs.
+
+Sign-up needs no email confirmation: `isEmailVerified` is `true` for a new account, and nothing in the API checks it. Admins can still see and change it ([Admin](#admin)).
+
+**Password-reset codes** have 6 digits, are valid for 15 minutes and are locked after 5 wrong tries. Without email settings, the server prints them in its console (`[mail] Password reset code for … (fr): 042917`).
 
 ## Users
 
-| | |
-|---|---|
-| `GET /users/me` | `200 user` (the same `user` object as above, not wrapped) |
+| Method & path | Body | Success | Errors |
+|---|---|---|---|
+| `GET /users/me` | — | `200 user` (the same `user` object as above, not wrapped) | 401 |
+| `PATCH /users/me` | `{ locale }` (`fr` or `en`, any case) | `200 user`, updated | 401 · 422 (`"Language: choose fr or en"`, `"There's nothing to save."`) |
+
+`PATCH /users/me` changes the signed-in user's own settings. Other fields (`email`, `role`…) are ignored: only an admin changes them.
 
 ## Timetable
 
-Only students and teachers have a timetable. Admins and alumni get `403 { "message": "Only students and teachers have a timetable." }`.
+Only students and teachers have a timetable. Admins, alumni and companies get `403 { "message": "Only students and teachers have a timetable." }`.
 
 | Method & path | Success |
 |---|---|
@@ -127,15 +164,19 @@ Missing or invalid date → `422 "Pass the date as YYYY-MM-DD"`. A session:
   "lectureNumber": null,
   "lectureCount": null,
   "coefficient": null,
-  "notes": null
+  "notes": null,
+  "mode": "onsite",
+  "meetUrl": null
 }
 ```
 
-`kind` is one of `lecture`, `lab`, `exam`, `workshop`. Exams carry a `coefficient` and `notes`.
+- `kind` is one of `lecture`, `lab`, `exam`, `workshop`. Exams carry a `coefficient` and `notes`.
+- `mode` is `onsite` or `online`. An online class has its Google Meet link in `meetUrl` (else `null`), and `room` is `"Online"` when it has no room (older apps show it as is).
+- The `id` is `<slot id>-<Y>-<M>-<D>` (one per class and date). Admins edit the classes: see [Timetable (admin)](#timetable-admin).
 
 ## Courses
 
-Only students and teachers have courses. Admins and alumni get `403 { "message": "Only students and teachers have courses." }` on every route below.
+Only students and teachers have courses. Admins, alumni and companies get `403 { "message": "Only students and teachers have courses." }` on every route below.
 
 | Method & path | Body | Success | Errors |
 |---|---|---|---|
@@ -213,28 +254,72 @@ A `Ride` looks like this:
 
 ## Jobs
 
-| Method & path | Success | Errors |
-|---|---|---|
-| `GET /jobs` | `Job[]`, best match first | |
-| `GET /jobs/:id` | `Job` | 404 |
-| `POST /jobs/:id/applications` | `201 { jobId, appliedAt }` | 404 · 409 `"You already applied to this offer."` |
+Every signed-in user reads offers. **Companies** (role `company`) and **admins** post them; a company edits and deletes its own offers, an admin every offer (the seeded catalogue included).
+
+| Method & path | Who | Success | Errors |
+|---|---|---|---|
+| `GET /jobs` | anyone | `Job[]`: posted offers first (newest first), then the catalogue, best match first | |
+| `GET /jobs/:id` | anyone | `Job` | 404 `"Job not found."` |
+| `POST /jobs` | company, admin | `201 Job` | 403 `"Only companies and administrators can post offers."` · 422 |
+| `PATCH /jobs/:id` | its author (company), admin | `Job` (only the fields sent change; clears the cached AI summary) | 403 (role, as above) · 403 `"This offer isn't yours."` · 404 · 422 |
+| `DELETE /jobs/:id` | its author (company), admin | `204` (its applications are deleted too) | 403 · 404 |
+| `POST /jobs/:id/summary` | anyone | `{ summary, keyPoints[], skills[], idealFor, model, cached }` | 404 · 422 `"This offer is too short to summarise."` · 429 · 502 · 503 (see below) |
+| `POST /jobs/:id/applications` | students | `201 { jobId, appliedAt }` | 403 `"Only students can apply to offers."` · 404 · 409 `"You already applied to this offer."` |
+
+**Body of `POST /jobs`** (`PATCH`: any of these fields, at least one; `422 "Nothing to update."` otherwise). The app's form checks the same rules (`lib/features/jobs/domain/job_form_rules.dart`); a refused body is a 422 `VALIDATION_ERROR` naming the first problem:
+
+| Field | Rule |
+|---|---|
+| `title` | required, 3–120 characters |
+| `description` | required, 20–5000 characters (stored and sent as `mission` too) |
+| `company` | 2–100 characters; default: the author's display name |
+| `location` · `period` | at most 100 · 60 characters; default `""` |
+| `durationMonths` · `stipendTnd` | whole numbers, 1–36 · 0–100000, or `null` (default) |
+| `skills[]` · `tags[]` | at most 15 · 6 labels of 40 characters; trimmed, blanks and duplicates dropped |
+
+```json
+{ "title": "Flutter Mobile Intern", "company": "Medina Soft", "location": "Lac 1, Tunis",
+  "description": "Build the Flutter app our clients use to book appointments every day.",
+  "period": "Feb – Jul 2026", "durationMonths": 6, "stipendTnd": null, "skills": ["Flutter", "Dart"], "tags": ["PFE 2026"] }
+```
 
 The `Job` fields are:
-- `id`, `featuredLabel`, `title`, `company`, `location`, `tags[]`
+- `id` (readable for the catalogue, e.g. `"instadeep-ml"`; an ObjectId string for posted offers), `featuredLabel`, `title`, `company`, `location`, `tags[]`
 - `stipendTnd`, `durationMonths`, `period`
 - `labGroup`, `labGroupNote`, `workspaceTitle`, `workspaceBadges[]`
-- `mission`, `missionItems[{ title, description }]`
+- `mission` and `description` (the same text), `missionItems[{ title, description }]`
 - `matchPercent`, `criteria[]`, `skills[]`
 - **`hasApplied`**, for the signed-in student.
+- **`authorId`**: the company or admin who posted it, `null` for the seeded catalogue.
+- **`canEdit`**: whether the signed-in user may edit and delete it (its author, or an admin).
+
+Posted offers only have what the form asks for: `stipendTnd`, `durationMonths`, `matchPercent`, `labGroup`, `labGroupNote` and `workspaceTitle` are `null`, `location` and `period` may be `""`, and the lists may be empty. The app hides what is missing.
+
+**AI summary** (`POST /jobs/:id/summary`, no body), a port of the PWA's offer summary: 2–3 sentences, 3–5 key points, the skills asked for and the student it suits, written in the user's `locale` (French or English). The offer text is sent as data, never as instructions.
+
+```json
+{ "summary": "A 6-month research internship in reinforcement learning at InstaDeep, in Tunis.",
+  "keyPoints": ["Benchmark new RL exploration strategies", "Work with the London research team"],
+  "skills": ["PyTorch", "JAX"], "idealFor": "A 5th-year student who enjoys research and Python.",
+  "model": "anthropic/claude-haiku-5.5", "cached": false }
+```
+
+- **Cached** on the offer, per language, until the offer is edited (`cached: true`, no AI call).
+- **Limit:** 30 calls per user and hour (cached ones included): then `429 TOO_MANY_REQUESTS` `"Too many summaries. Try again later."` with `retryAfter`.
+- **Errors of the AI** (see **AI** above): `503 AI_UNAVAILABLE` (no `OPENROUTER_API_KEY`: there is no fallback summary), `503 AI_NO_CREDITS`, `429 AI_BUSY`, `502 AI_FAILED` (also for an answer without a summary). The app explains each one.
+- `422` when the description (with its mission items and criteria) has fewer than 80 characters.
 
 ## Forum
 
 | Method & path | Body | Success | Errors |
 |---|---|---|---|
 | `GET /forum/highlights` | — | `ForumPost[]`, newest first (Home feed) | |
-| `GET /forum/lost-items` | — | `LostItem[]`, newest first | |
+| `GET /forum/lost-items` | — | `LostItem[]`, newest first (resolved ones included) | |
 | `POST /forum/lost-items` | notice (below) | `201 LostItem` with a reference `LF-412`, `LF-413`… | 422 (French messages) |
-| `POST /forum/lost-items/:id/requests` | `{ proof }` | `201 { id, itemId, proof, createdAt }` | 404 · 409 already asked · 422 |
+| `PATCH /forum/lost-items/:id` | notice fields and/or `status` (below) | `LostItem`, edited | 403 not its reporter nor an admin · 404 · 422 |
+| `DELETE /forum/lost-items/:id` | — | `204` (the requests about it are deleted too) | 403 · 404 |
+| `GET /forum/lost-items/:id/matches` | — | possible matches (below) | 404 |
+| `POST /forum/lost-items/:id/requests` | `{ proof }` | `201 { id, itemId, proof, createdAt }` | 404 · 409 already asked, or the notice is resolved · 422 |
 | `GET /forum/ideas` | — | idea `ForumPost[]`, most upvoted first | |
 | `POST /forum/ideas` | `{ body (10–500 chars), tag? }` | `201 ForumPost` | 422 |
 | `POST /forum/ideas/:id/upvote` | — | `{ upvotes, isUpvotedByMe }` (toggles your vote) | 404 |
@@ -281,9 +366,17 @@ The `Job` fields are:
   "distinctiveDetail": null,
   "dropOffNote": "Déposé à l'accueil Bloc C",
   "pickupDesk": "Accueil Bloc C - Salle C12",
-  "isSerialHidden": false
+  "isSerialHidden": false,
+  "status": "active",
+  "reporterId": null,
+  "isMine": false,
+  "canManage": false
 }
 ```
+
+- `status` is `active` or `resolved` (the object went back to its owner: still listed, never matched, no new requests).
+- `reporterId` is the reporter's account id, or `null` for the demo and desk notices.
+- `isMine` (you reported it) and `canManage` (you may edit, resolve or delete it: its reporter, or an admin) are the signed-in user's.
 
 **New notice body:**
 - `{ kind, title, category, zone, location, place, distinctiveDetail?, reward?, isUrgent?, dropOffNote?, pickupDesk? }`.
@@ -291,6 +384,35 @@ The `Job` fields are:
 - `category` is one of `calculator`, `keys`, `audio`, `bag`, `card`, `bottle`, `other`.
 - `place` is one of `classroom`, `parking`, `library`, `cafeteria`, `other`.
 - A found item needs a `dropOffNote` or a `pickupDesk`. `reward` and `isUrgent` are for lost items only.
+
+**Editing a notice** (`PATCH /forum/lost-items/:id`, its reporter or an admin):
+- Any field of the new notice body, and/or `status` (`active` or `resolved`). At least one field (else 422 `"Rien à modifier : envoyez au moins un champ."`).
+- A field sent replaces the stored one, `null` clears an optional field, a field left out is kept. The notice is then checked whole, with the messages of a new notice.
+- Switching `kind` drops the other kind's fields (`reward`/`isUrgent`, or `dropOffNote`/`pickupDesk`): a lost item turned found needs a `pickupDesk`.
+- 403 `"Seul l'auteur de l'annonce (ou un administrateur) peut la modifier ou la supprimer."`, 404 `"Cette annonce n'existe plus."` (also for `DELETE` and `/matches`).
+
+**Possible matches** (`GET /forum/lost-items/:id/matches`, any signed-in user), a port of the PWA's lost & found matching:
+
+```json
+{
+  "items": [
+    {
+      "item": { "id": "lf-409", "kind": "found", "...": "a LostItem" },
+      "score": 90,
+      "reason": "Même modèle TI-84, trouvée au Bloc C le lendemain.",
+      "reasons": ["Même catégorie", "1 jour d'écart", "Lieu proche", "Description proche"],
+      "ai": true
+    }
+  ],
+  "ai": true,
+  "model": "anthropic/claude-haiku-4.5"
+}
+```
+
+- **Candidates:** active notices of the other kind (lost ↔ found), the 200 newest. A resolved notice has no matches.
+- **Rules** (0–100): +40 same `category` (+20 when both are `other`); +25 the same day down to 0 at 14 days apart (more than 30 days apart: never a match); +20 × shared place words (`zone` + `location`), at least +10 for the same `place`; +15 × shared words of `title` + `distinctiveDetail`. Words: lowercase, no accents, longer than 2 letters. `reasons` are the rules that matched, in the user's `locale` (French or English); without AI, `reason` joins them.
+- **AI** (when `OPENROUTER_API_KEY` is set, see **AI** above): the 8 best by rules are sent (as data, scrubbed of e-mails and phone numbers) for a 0–100 score and a short reason in the user's language. Score = 0.3 × rules + 0.7 × AI, `reason` = the AI's, `ai: true` on the match and the answer, `model` = the model that answered. 15 s at most, 10 analyses per user and minute, cached 15 minutes. **Any AI error falls back to the rules** (`ai: false`, `model: null`): the route never fails because of the AI.
+- Matches under 50 are dropped; the 5 best are sent, best first.
 
 ## Grades
 
@@ -363,6 +485,8 @@ A new student's first `GET` creates a "Welcome to CampusPulse" notification.
 
 Account notifications are also sent to the user's phones as [push notifications](#push).
 
+**Timetable notifications** (category `academic`, label `"Timetable"` / `"Emploi du temps"`, link `timetable`): when an admin adds, changes or removes a class, every student and teacher gets one, also pushed. See [Timetable (admin)](#timetable-admin).
+
 ## Push
 
 Push notifications go through Firebase Cloud Messaging (FCM). The app registers the FCM token of each phone, and the server pushes to every registered phone of the user.
@@ -388,8 +512,8 @@ Push notifications go through Firebase Cloud Messaging (FCM). The app registers 
 - **FCM no longer knows the token** (app uninstalled, token replaced): that phone is removed on the next push.
 
 **What is pushed:**
-- Every [account notification](#notifications), when it is created. Sending never delays or fails the request. When an admin sets a new password, the push goes out before the phones are signed out, so the user learns why.
-- **Class reminders**, 15 minutes before each session of the timetable, to every student and teacher with a phone (never to admins or alumni). See below.
+- Every [account notification](#notifications) and timetable notification, when it is created. Sending never delays or fails the request. When an admin sets a new password, the push goes out before the phones are signed out, so the user learns why.
+- **Class reminders**, 15 minutes before each session of the timetable, to every student and teacher with a phone (never to admins, alumni or companies). See below.
 
 Without `FIREBASE_SERVICE_ACCOUNT_FILE` on the server, push is off: the routes above still store the phones, but nothing is sent. To test a phone, run `npm run push:test -- <email or ENT ID>` (see [backend/README.md](../backend/README.md#scripts)).
 
@@ -454,12 +578,14 @@ Every `/admin/*` route needs a signed-in user whose `role` is `admin`. Others ge
 | Method & path | Body / query | Success | Errors |
 |---|---|---|---|
 | `GET /admin/users` | `?q=&role=&page=&limit=` | `200 { items: ManagedUser[], total, page, limit }` | 422 bad query |
-| `GET /admin/users/stats` | — | `200 { total, byRole: { student, teacher, admin, alumni } }` (all four keys, 0 when none) | |
+| `GET /admin/users/stats` | — | `200 { total, byRole: { student, teacher, admin, alumni, company } }` (every role, 0 when none) | |
 | `GET /admin/users/:id` | — | `200 ManagedUser` | 404 `"User not found."` |
 | `POST /admin/users` | `{ displayName, email, password, studentId?, role? }` | `201 ManagedUser` | 409 email or ENT ID taken · 422 |
 | `PATCH /admin/users/:id` | any of `{ displayName, email, studentId, role, password, isEmailVerified }` | `200 ManagedUser` | 400 · 404 · 409 · 422 |
 | `DELETE /admin/users/:id` | — | `204` | 400 own account · 404 |
 | `POST /admin/users/import` | `{ dryRun, users: ImportRow[] }` | see [Import](#import) | 422 |
+| `GET /admin/users/import/assist` | — | `200 { available, model }` (see [Read with AI](#read-with-ai)) | |
+| `POST /admin/users/import/assist` | `{ lines, values? }` | `200 { mapping, model }` | 422 · 429 · 502 · 503 |
 
 A `ManagedUser`:
 
@@ -532,7 +658,7 @@ Every row is checked. A problem is `{ row, field, code, message }`:
 | `INVALID_STUDENT_ID` | `studentId` | `"ENT ID: 3 to 20 letters or digits"` |
 | `DUPLICATE_STUDENT_ID` | `studentId` | `"ENT ID: already on another line of the file"` |
 | `STUDENT_ID_TAKEN` | `studentId` | `"ENT ID: an account already uses it"` |
-| `INVALID_ROLE` | `role` | `"Role: not recognised (student, teacher, admin or alumni)"` |
+| `INVALID_ROLE` | `role` | `"Role: not recognised (student, teacher, admin, alumni or company)"` |
 | `PASSWORD_TOO_SHORT` | `password` | `"Password: at least 8 characters"` |
 | `TOO_LONG` | `password` | `"Password: too long (at most 128 characters)"` |
 
@@ -543,9 +669,122 @@ Answers:
 - **Import, no problems:** `201 { "dryRun": false, "created": [ ManagedUser, … ] }`. The accounts are verified, and no email is sent.
 - **Import with problems:** `422 { "message": "The file has errors, so nothing was imported.", "problems": [ … ] }`.
 
+### Read with AI
+
+When the app can't read an import file (no known titles, roles written loosely), the server's AI says how it is laid out. Nothing is imported: the app rewrites the file as the template and checks it as usual (`backend/src/modules/admin/import-assist.service.ts`).
+
+`GET /admin/users/import/assist` → `200 { "available": true, "model": "nvidia/nemotron-3.5-lightning:free" }`. `available` is false (and `model` null) without `OPENROUTER_API_KEY`.
+
+`POST /admin/users/import/assist`, limited to **20 per admin per hour** (`429 TOO_MANY_REQUESTS`):
+
+```json
+{
+  "lines": [
+    ["Nom complet", "Adresse", "Profil", "MDP"],
+    ["BEN ALI Ines", "i…@campus.test", "Étudiant(e)", "•••"]
+  ],
+  "values": [{ "column": 2, "values": ["Profil", "Étudiant(e)", "Enseignant"] }]
+}
+```
+
+- `lines`: the first lines of the file, as cells (text, number or null). The app masks emails (`i…@domain`) and replaces the cells of a password column by `•••`. The server keeps 12 lines, 15 cells and 80 characters per cell, and masks emails again. 1 to 50 lines, else `422`.
+- `values` (optional): the distinct values of short columns (roles), at most 40 per column, columns 0–14.
+
+```json
+{
+  "mapping": {
+    "headerRow": 1,
+    "columns": { "lastName": null, "firstName": null, "fullName": 0, "email": 1,
+                 "studentId": null, "role": 2, "password": 3 },
+    "nameOrder": "LAST_FIRST",
+    "roles": [{ "text": "Étudiant(e)", "role": "student" }, { "text": "Enseignant", "role": "teacher" }]
+  },
+  "model": "nvidia/nemotron-3.5-lightning:free"
+}
+```
+
+- `headerRow`: the 1-based line (of `lines`) holding the titles, 0 when there is none.
+- `columns`: the 0-based column of each field, or null. `fullName` is one column with both names, split by the app using `nameOrder` (`LAST_FIRST` or `FIRST_LAST`).
+- `roles`: what each value of the role column means (`student`, `teacher`, `admin`, `alumni`, `company`, or null when the AI can't tell).
+
+The answer is checked before it is sent (no free text of the model is kept):
+- A column must exist and be used once; a column claimed twice keeps the first meaning in this order: email, lastName, firstName, fullName, studentId, role, password. With both lastName and firstName, fullName is null.
+- `headerRow` outside `0…lines.length` becomes 0; `nameOrder` defaults to `LAST_FIRST`.
+- Corrections: a lone last (or first) name column whose cells mostly hold 2 words or more becomes `fullName`; without a password column, the first free column whose filled cells are all `•••` becomes `password`.
+- A role pair is kept only for a value that was sent and isn't the column's title; an unknown role becomes null.
+
+Errors: the AI codes above (`503 AI_UNAVAILABLE` without a key, `503 AI_NO_CREDITS`, `429 AI_BUSY`, `502 AI_FAILED`), with their messages. The audit log records each answered request (`user.import.assist`); the file's content is never stored.
+
+### Timetable (admin)
+
+Admins manage the weekly timetable of the class group (one for now: "Tech Track 4BI"): the same classes every week. Students and teachers see the changes at once in `GET /timetable/*`, and the [class reminders](#push) follow them.
+
+| Method & path | Body | Success | Errors |
+|---|---|---|---|
+| `GET /admin/timetable/slots` | — | `200 { classGroup, items: Slot[] }`, by weekday then start time | |
+| `POST /admin/timetable/slots` | a slot without `id` | `201 Slot` | 409 · 422 |
+| `PATCH /admin/timetable/slots/:id` | the fields to change | `200 Slot` | 404 · 409 · 422 |
+| `DELETE /admin/timetable/slots/:id` | — | `204` | 404 `"This class is not in the timetable."` |
+
+```json
+{
+  "id": "entrepreneuriat",
+  "weekday": 5,
+  "start": "13:30",
+  "end": "15:30",
+  "course": "Entrepreneuriat & Innovation",
+  "room": "",
+  "teacher": "Mme. Karoui",
+  "kind": "workshop",
+  "mode": "online",
+  "meetUrl": "https://meet.google.com/xqd-fkzw-pnb",
+  "notes": null,
+  "coefficient": null,
+  "lectureNumber": null,
+  "lectureCount": null
+}
+```
+
+**Rules** (`422 VALIDATION_ERROR`, the app checks the same: `timetable/domain/timetable_slot_rules.dart`):
+- Required on `POST`: `weekday` (1 = Monday … 7 = Sunday), `start`, `end` (`HH:mm`), `course` (≤ 120), `teacher` (≤ 80). Optional: `room` (≤ 60), `kind` (default `lecture`), `mode` (default `onsite`), `meetUrl`, `notes` (≤ 1000), `coefficient`.
+- The class ends after it starts, the same day, and lasts at most 8 hours (`"The class must end after it starts"`, `"A class lasts at most 8 hours"`).
+- On site: a `room` is required. Online: the room is optional, and `meetUrl` is required and must be an https Google Meet link (`https://meet.google.com/abc-defg-hij`, ≤ 200). An on-site class drops its `meetUrl`.
+- `coefficient` (0 < c ≤ 10) is kept for exams only. `lectureNumber` / `lectureCount` are kept as they are.
+- `PATCH` changes only the fields sent (at least one, else `"Nothing to update"`); the result is checked like a new class. The `id` never changes.
+
+**Clashes:** a class clashes with another one on the same weekday at overlapping times (back to back is fine) in the same room (case ignored) or with the same teacher. Nothing is saved, and the answer lists every clash (a class can appear twice, once per reason):
+
+```json
+{
+  "message": "This class clashes with another class of the timetable",
+  "code": "TIMETABLE_CONFLICT",
+  "conflicts": [{ "reason": "room", "slot": { "id": "algo-cm", "weekday": 1, "start": "08:30", "end": "10:00", "...": "..." } }]
+}
+```
+
+`reason` is `room` or `teacher`.
+
+**Ids:** a new class gets a readable id that never changes: the course in lower case plus 4 random hex digits (`cloud-computing-3f1a`). Classes that shared an id in an older template get a new one the first time an admin opens the list.
+
+**Notifications:** every add, change and removal notifies every student and teacher (not admins, alumni or companies), in their language (French with "tu"), and pushes it to their phones. One notification per person and class: the newest replaces the previous one about the same class (`id`: `timetable-<slot id>`). Category `academic`, label `"Timetable"` / `"Emploi du temps"`, link `timetable`. Saving a class without any change notifies nobody.
+
+| Change | Title (EN) | Body (EN) |
+|---|---|---|
+| Added | `"Cloud Computing: new class on Saturdays, 09:00–11:00"` | `"A new class is in your timetable: **Cloud Computing** on Saturdays, 09:00–11:00, in room C201."` |
+| New time, same day | `"Algo: time changed 08:30 → 08:00 (Mondays)"` | `"From now on, your class takes place on Mondays, 08:00–09:30, in room Amphi A."` |
+| Another day | `"Algo: class moved Mondays, 08:30 → Saturdays, 08:30"` | same |
+| Room or online | `"Algo: room changed Amphi A → Online (Mondays, 08:30)"` | `"Your class on Mondays, 08:30–10:00 now takes place online."` |
+| New Meet link | `"Algo: new Google Meet link (Mondays, 08:30)"` | `"Your online class on … has a new Google Meet link: open the timetable to join it."` |
+| Other details (course, teacher, kind, notes…) | `"Algo: class updated (Mondays, 08:30)"` | `"The details of your class on … changed: open the timetable to see them."` |
+| Removed | `"Algo: class removed (Mondays, 08:30)"` | `"Your class on Mondays, 08:30–10:00 is no longer in your timetable."` |
+
+In French: `"Algo : horaire changé 08:30 → 08:00 (lundi)"`, `"Désormais, ton cours a lieu le lundi de 08:00 à 09:30, en salle Amphi A."`… A notification that fails is logged, never fails the request.
+
+**Audit:** `timetable.slot.create`, `timetable.slot.update`, `timetable.slot.delete` with a summary such as `"Added Cloud Computing on Saturday 09:00–11:00"` and `metadata: { slotId, course, weekday, notified }` (`targetType` null).
+
 ### Audit log
 
-Every change an admin makes is recorded.
+Every change an admin makes is recorded, and so is a password a user resets themselves.
 
 | Method & path | Query | Success |
 |---|---|---|
@@ -561,14 +800,18 @@ Every change an admin makes is recorded.
   "action": "user.update",
   "summary": "Changed the role of Sarra Mansouri to Teacher",
   "actor": { "id": "6aee283c10aef9a35cb4bcc0", "displayName": "Campus Admin", "email": "admin@campus.test" },
+  "targetType": "user",
   "targetId": "6aee283c10aef9a35cb4bcc9",
   "metadata": { "changes": ["role"], "role": { "from": "student", "to": "teacher" } },
   "ip": "127.0.0.1",
+  "userAgent": "Dart/3.13 (dart:io)",
   "createdAt": "2026-11-09T10:42:00.000Z"
 }
 ```
 
 - `actor` is a copy taken when the action happened, so it survives the actor's deletion.
+- `targetType` says what `targetId` is (`user`), or is null with `targetId` for an entry about no one thing (an import).
+- `userAgent` is the request's `User-Agent` (at most 512 characters, null when missing). Both are null in entries recorded before they existed.
 - `metadata` never contains a password.
 
 | Action | Summary example | Metadata |
@@ -577,3 +820,7 @@ Every change an admin makes is recorded.
 | `user.update` | `"Changed the role of Sarra Mansouri to Teacher"`, `"Updated Sarra Mansouri (name, password)"` (the name before the change) | `{ changes, role?: { from, to } }`; `changes` lists field names (`displayName`, `email`, `studentId`, `role`, `password`, `isEmailVerified`) |
 | `user.delete` | `"Deleted the account of Sarra Mansouri (sarra.mansouri@campus.test)"` | `{ email, role }` |
 | `user.import` | `"Imported 12 accounts"` | `{ count, emails }` (the first 20) |
+| `auth.password_reset` | `"Password reset with an emailed code for sarra.kefi@campus.test"` (the actor is the user) | `{}` |
+| `auth.password_change` | reserved for the change of password (signed in) | |
+| `user.import.assist` | `"Asked the AI (nvidia/nemotron-3.5-lightning:free) how an import file is laid out"` | `{ model, lines, columns }` (no file content) |
+| `timetable.slot.create` · `.update` · `.delete` | `"Added Cloud Computing on Saturday 09:00–11:00"`, `"Changed …"`, `"Removed …"` | `{ slotId, course, weekday, notified }` |

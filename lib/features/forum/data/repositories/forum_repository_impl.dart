@@ -6,6 +6,7 @@ import '../../../../core/network/api_endpoints.dart';
 import '../../domain/entities/forum_post.dart';
 import '../../domain/entities/lost_item.dart';
 import '../../domain/entities/lost_item_draft.dart';
+import '../../domain/entities/lost_item_match.dart';
 import '../../domain/repositories/forum_repository.dart';
 import '../models/forum_models.dart';
 
@@ -48,6 +49,41 @@ class ForumRepositoryImpl implements ForumRepository {
           ApiEndpoints.lostItemRequests(Uri.encodeComponent(itemId)),
           data: {'proof': proof},
         );
+      });
+
+  /// 403 (not the reporter nor an admin) and 404 (deleted) become a
+  /// ServerFailure, 422 a ValidationFailure, each with the API's message.
+  @override
+  Future<Result<LostItem>> updateLostItem(String id, LostItemDraft draft) =>
+      guard<LostItem>(() async {
+        final r = await _dio.patch<dynamic>(
+          ApiEndpoints.lostItem(Uri.encodeComponent(id)),
+          data: draft.toUpdateJson(),
+        );
+        return LostItemModel.fromJson(_object(r));
+      });
+
+  @override
+  Future<Result<LostItem>> setLostItemStatus(String id, LostItemStatus status) =>
+      guard<LostItem>(() async {
+        final r = await _dio.patch<dynamic>(
+          ApiEndpoints.lostItem(Uri.encodeComponent(id)),
+          data: {'status': status.name},
+        );
+        return LostItemModel.fromJson(_object(r));
+      });
+
+  /// 204. 403 and 404 become a ServerFailure with the API's message.
+  @override
+  Future<Result<void>> deleteLostItem(String id) => guard<void>(() async {
+        await _dio.delete<dynamic>(ApiEndpoints.lostItem(Uri.encodeComponent(id)));
+      });
+
+  @override
+  Future<Result<LostItemMatches>> getLostItemMatches(String id) =>
+      guard<LostItemMatches>(() async {
+        final r = await _dio.get<dynamic>(ApiEndpoints.lostItemMatches(Uri.encodeComponent(id)));
+        return lostItemMatchesFromJson(_object(r));
       });
 
   @override

@@ -1,0 +1,8 @@
+{
+  "@@locale": "fr",
+
+  "commonErrorTooManyRequests": "Trop de tentatives. Réessaie dans quelques minutes.",
+
+  "accountLanguageTitle": "Langue",
+  "accountLanguageSubtitle": "Appli, e-mails et notifications"
+}

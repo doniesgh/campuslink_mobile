@@ -80,7 +80,7 @@ void main() {
 
       final board = (await repo.getLostItems()).unwrap();
       expect([for (final i in board.take(2)) i.id], [umbrella.id, keys.id]);
-      expect(board, hasLength(8));
+      expect(board, hasLength(9));
     });
 
     test('a published item can be claimed', () async {
@@ -99,7 +99,7 @@ void main() {
         _failure(await repo.publishLostItem(_found(title: ' '))),
         "Donnez un titre à l'annonce (ex : Calculatrice TI-84).",
       );
-      expect((await repo.getLostItems()).unwrap(), hasLength(6));
+      expect((await repo.getLostItems()).unwrap(), hasLength(7));
     });
   });
 
@@ -156,6 +156,85 @@ void main() {
         expect((result as Err<IdeaUpvote>).failure, isA<ServerFailure>());
         expect(_failure(result), "Cette idée n'existe plus.");
       }
+    });
+  });
+
+  group('managing a notice', () {
+    const notMine =
+        "Seul l'auteur de l'annonce (ou un administrateur) peut la modifier ou la supprimer.";
+
+    test("the student's own notices are lf-407 and the ones they publish", () async {
+      final repo = MockForumRepository();
+      final umbrella = (await repo.publishLostItem(_found())).unwrap();
+      final board = (await repo.getLostItems()).unwrap();
+      expect([for (final i in board) if (i.canManage) i.id], [umbrella.id, 'lf-407']);
+      expect(board.where((i) => i.isMine), hasLength(2));
+    });
+
+    test('edits a notice: the form replaces its fields, the rest is kept', () async {
+      final repo = MockForumRepository();
+      final before = (await repo.getLostItems()).unwrap().singleWhere((i) => i.id == 'lf-407');
+      final edited = (await repo.updateLostItem('lf-407', _keys)).unwrap();
+
+      expect(edited.title, 'Clés Peugeot');
+      expect(edited.category, LostItemCategory.keys);
+      expect(edited.reward, 'Café offert ☕');
+      expect(edited.distinctiveDetail, isNull);
+      expect(edited.reportedAt, before.reportedAt);
+      expect(edited.reporterName, 'Dony Mansour');
+      final board = (await repo.getLostItems()).unwrap();
+      expect(board.singleWhere((i) => i.id == 'lf-407').title, 'Clés Peugeot');
+      expect(board, hasLength(7));
+    });
+
+    test("refuses an invalid edit, and anyone else's notice", () async {
+      final repo = MockForumRepository();
+      final invalid = await repo.updateLostItem('lf-407', _found(desk: ' '));
+      expect((invalid as Err<LostItem>).failure, isA<ValidationFailure>());
+
+      for (final result in [
+        await repo.updateLostItem('lf-409', _keys),
+        await repo.setLostItemStatus('lf-409', LostItemStatus.resolved),
+        await repo.deleteLostItem('lf-409'),
+      ]) {
+        expect(_failure(result), notMine);
+      }
+      expect(_failure(await repo.deleteLostItem('nope')), "Cette annonce n'existe plus.");
+    });
+
+    test('resolves a notice (no more matches), and makes it active again', () async {
+      final repo = MockForumRepository();
+      final resolved = (await repo.setLostItemStatus('lf-407', LostItemStatus.resolved)).unwrap();
+      expect(resolved.isResolved, isTrue);
+      expect((await repo.getLostItemMatches('lf-407')).unwrap().items, isEmpty);
+      // Nor is it a match of the found calculator any more.
+      expect((await repo.getLostItemMatches('lf-409')).unwrap().items, isEmpty);
+
+      await repo.setLostItemStatus('lf-407', LostItemStatus.active);
+      final board = (await repo.getLostItems()).unwrap();
+      expect(board.singleWhere((i) => i.id == 'lf-407').isResolved, isFalse);
+    });
+
+    test('deletes a notice', () async {
+      final repo = MockForumRepository();
+      expect(await repo.deleteLostItem('lf-407'), isA<Success<void>>());
+      final board = (await repo.getLostItems()).unwrap();
+      expect(board.map((i) => i.id), isNot(contains('lf-407')));
+      expect(board, hasLength(6));
+    });
+
+    test('matches by rules, both ways, without AI', () async {
+      final repo = MockForumRepository();
+      final lost = (await repo.getLostItemMatches('lf-407')).unwrap();
+      expect(lost.ai, isFalse);
+      expect([for (final m in lost.items) m.item.id], ['lf-409']);
+      expect(lost.items.single.score, greaterThanOrEqualTo(80));
+
+      final found = (await repo.getLostItemMatches('lf-409')).unwrap();
+      expect([for (final m in found.items) m.item.id], ['lf-407']);
+      // Nothing else on the demo board looks alike.
+      expect((await repo.getLostItemMatches('lf-406')).unwrap().items, isEmpty);
+      expect(_failure(await repo.getLostItemMatches('nope')), "Cette annonce n'existe plus.");
     });
   });
 }

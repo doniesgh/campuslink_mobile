@@ -11,7 +11,6 @@ class HomeGreeting extends StatelessWidget {
     super.key,
     required this.name,
     required this.now,
-    required this.onSearch,
     required this.onNotifications,
     this.semesterWeek,
     this.hasUnreadNotifications = false,
@@ -20,7 +19,6 @@ class HomeGreeting extends StatelessWidget {
   final String name;
   final DateTime now;
   final int? semesterWeek;
-  final VoidCallback onSearch;
   final VoidCallback onNotifications;
 
   /// Shows the coral dot on the bell.
@@ -80,7 +78,6 @@ class HomeGreeting extends StatelessWidget {
           ),
         ),
         const SizedBox(width: AppSpacing.sm),
-        _RoundIconButton(icon: Icons.search, tooltip: 'Search', onTap: onSearch),
         const SizedBox(width: AppSpacing.xs),
         _RoundIconButton(
           icon: Icons.notifications_outlined,

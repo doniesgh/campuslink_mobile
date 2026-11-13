@@ -2,6 +2,7 @@ import '../../../auth/domain/entities/user.dart';
 import '../../domain/entities/audit_entry.dart';
 import '../../domain/entities/managed_user.dart';
 import '../../domain/entities/user_import.dart';
+import '../../domain/import_assist.dart';
 
 /// JSON of the `/admin` API (docs/api.md, "Admin"). A missing or unknown
 /// role reads as student.
@@ -32,7 +33,7 @@ UserPage userPageFromJson(Map<String, dynamic> json) => UserPage(
       limit: json['limit'] as int,
     );
 
-/// `{ total, byRole: { student, teacher, admin, alumni } }`
+/// `{ total, byRole: { student, teacher, admin, alumni, company } }`
 UserStats userStatsFromJson(Map<String, dynamic> json) {
   final byRole = json['byRole'] as Map<String, dynamic>;
   return UserStats(
@@ -92,12 +93,51 @@ ImportCheck importCheckFromJson(Map<String, dynamic> json) => ImportCheck(
       problems: importProblemsFromJson(json['problems']),
     );
 
+/// `GET /admin/users/import/assist`: `{ available, model }` (model null when off).
+ImportAssistStatus importAssistStatusFromJson(Map<String, dynamic> json) => ImportAssistStatus(
+      available: (json['available'] as bool?) ?? false,
+      model: json['model'] as String?,
+    );
+
+/// `POST /admin/users/import/assist` body: `{ lines, values: [{ column, values }] }`.
+Map<String, dynamic> assistRequestToJson(AssistRequest r) => {
+      'lines': r.lines,
+      'values': [
+        for (final v in r.values) {'column': v.column, 'values': v.values},
+      ],
+    };
+
+/// `{ mapping: { headerRow, columns: { lastName, firstName, fullName, email,
+/// studentId, role, password }, nameOrder, roles: [{ text, role }] }, model }`.
+/// Columns that are null or unknown are left out.
+ImportAssistAnswer importAssistAnswerFromJson(Map<String, dynamic> json) {
+  final mapping = json['mapping'] as Map<String, dynamic>;
+  final columns = (mapping['columns'] as Map<String, dynamic>?) ?? const {};
+  return ImportAssistAnswer(
+    model: json['model'] as String,
+    mapping: AssistMapping(
+      headerRow: (mapping['headerRow'] as int?) ?? 0,
+      columns: {
+        for (final field in AssistField.values)
+          if (columns[field.name] is int) field: columns[field.name] as int,
+      },
+      nameOrder: NameOrder.fromApi(mapping['nameOrder']),
+      roles: [
+        for (final r in (mapping['roles'] as List<dynamic>?) ?? const [])
+          (text: (r as Map<String, dynamic>)['text'] as String, role: UserRole.fromName(r['role'])),
+      ],
+    ),
+  );
+}
+
 /// `AuditEntry`:
 /// ```json
 /// { "id": "...", "action": "user.update", "summary": "...",
 ///   "actor": { "id": "...", "displayName": "Campus Admin", "email": "admin@campus.test" },
-///   "targetId": "...", "metadata": {...}, "ip": "127.0.0.1", "createdAt": "..." }
+///   "targetType": "user", "targetId": "...", "metadata": {...}, "ip": "127.0.0.1",
+///   "userAgent": "Dart/3.13 (dart:io)", "createdAt": "..." }
 /// ```
+/// `targetType` and `userAgent` are missing from older APIs (read as null).
 AuditEntry auditEntryFromJson(Map<String, dynamic> json) {
   final actor = json['actor'] as Map<String, dynamic>?;
   return AuditEntry(
@@ -106,8 +146,10 @@ AuditEntry auditEntryFromJson(Map<String, dynamic> json) {
     summary: json['summary'] as String,
     actorName: actor?['displayName'] as String?,
     actorEmail: actor?['email'] as String?,
+    targetType: json['targetType'] as String?,
     targetId: json['targetId'] as String?,
     ip: json['ip'] as String?,
+    userAgent: json['userAgent'] as String?,
     createdAt: DateTime.parse(json['createdAt'] as String).toLocal(),
   );
 }

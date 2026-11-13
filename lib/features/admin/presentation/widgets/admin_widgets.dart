@@ -11,6 +11,7 @@ IconData roleIcon(UserRole role) => switch (role) {
       UserRole.teacher => Icons.co_present_outlined,
       UserRole.admin => Icons.admin_panel_settings_outlined,
       UserRole.alumni => Icons.workspace_premium_outlined,
+      UserRole.company => Icons.business_outlined,
     };
 
 /// "Students", "Teachers"... for the filter chips.
@@ -19,6 +20,7 @@ String rolePlural(UserRole role) => switch (role) {
       UserRole.teacher => 'Teachers',
       UserRole.admin => 'Admins',
       UserRole.alumni => 'Alumni',
+      UserRole.company => 'Companies',
     };
 
 /// The role of an account. Admins stand out (solid purple).
@@ -36,6 +38,7 @@ class RoleBadge extends StatelessWidget {
           UserRole.admin || UserRole.student => BadgeTone.primary,
           UserRole.teacher => BadgeTone.accent,
           UserRole.alumni => BadgeTone.neutral,
+          UserRole.company => BadgeTone.success,
         },
       );
 }

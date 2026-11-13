@@ -70,8 +70,96 @@ void main() {
     final items = (await repo.getLostItems()).unwrap();
 
     expect(api.requests.single.uri.toString(), 'http://api.test/api/forum/lost-items');
-    expect(items, hasLength(6));
+    expect(items, hasLength(7));
     expect(items.first.id, 'lf-409');
+    expect([for (final i in items) if (i.canManage) i.id], ['lf-407']);
+  });
+
+  group('managing a notice', () {
+    const draft = LostItemDraft(
+      kind: LostItemKind.lost,
+      title: ' Calculatrice graphique TI-84 Plus ',
+      category: LostItemCategory.calculator,
+      zone: 'Bloc C',
+      location: 'Salle C10 (Ghazela)',
+      place: LostItemPlace.classroom,
+      distinctiveDetail: 'Étiquette « D.M. » au dos',
+      reward: '  ',
+      isUrgent: true,
+    );
+
+    test('updateLostItem patches the encoded item with the whole form', () async {
+      api.body = editedLostItemResponse;
+
+      final item = (await repo.updateLostItem('lf/407', draft)).unwrap();
+
+      final request = api.requests.single;
+      expect(request.method, 'PATCH');
+      expect(request.uri.toString(), 'http://api.test/api/forum/lost-items/lf%2F407');
+      // A blank optional field of the form is sent as null, so the API clears it.
+      expect(request.data, {
+        'kind': 'lost',
+        'title': 'Calculatrice graphique TI-84 Plus',
+        'category': 'calculator',
+        'zone': 'Bloc C',
+        'location': 'Salle C10 (Ghazela)',
+        'place': 'classroom',
+        'distinctiveDetail': 'Étiquette « D.M. » au dos',
+        'reward': null,
+        'isUrgent': true,
+      });
+      expect(item.id, 'lf-407');
+      expect(item.canManage, isTrue);
+    });
+
+    test('setLostItemStatus patches the status only', () async {
+      api.body = resolvedLostItemResponse;
+
+      final item = (await repo.setLostItemStatus('lf-407', LostItemStatus.resolved)).unwrap();
+
+      expect(api.requests.single.method, 'PATCH');
+      expect(api.requests.single.data, {'status': 'resolved'});
+      expect(item.isResolved, isTrue);
+    });
+
+    test('deleteLostItem sends DELETE and accepts the empty 204', () async {
+      api
+        ..status = 204
+        ..body = '';
+
+      final result = await repo.deleteLostItem('lf-407');
+
+      expect(result, isA<Success<void>>());
+      expect(api.requests.single.method, 'DELETE');
+      expect(api.requests.single.uri.toString(), 'http://api.test/api/forum/lost-items/lf-407');
+    });
+
+    test("someone else's notice (403) is a server failure with the API message", () async {
+      const message =
+          "Seul l'auteur de l'annonce (ou un administrateur) peut la modifier ou la supprimer.";
+      api
+        ..status = 403
+        ..body = jsonEncode({'message': message});
+
+      final failure = failureOf(await repo.deleteLostItem('lf-409'));
+
+      expect(failure, isA<ServerFailure>());
+      expect(failure.message, message);
+    });
+
+    test('getLostItemMatches reads the matches, with the AI flag', () async {
+      api.body = lostItemAiMatchesResponse;
+
+      final matches = (await repo.getLostItemMatches('lf-407')).unwrap();
+
+      expect(
+        api.requests.single.uri.toString(),
+        'http://api.test/api/forum/lost-items/lf-407/matches',
+      );
+      expect(matches.ai, isTrue);
+      expect(matches.items.single.item.id, 'lf-409');
+      expect(matches.items.single.ai, isTrue);
+    });
   });
 
   test('an unexpected body is a failure, not a crash', () async {

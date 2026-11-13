@@ -41,7 +41,7 @@ final pushControllerProvider = Provider<PushController?>((ref) {
 });
 
 /// Push notifications on this phone:
-/// - registers it with the API while a verified user is signed in (after
+/// - registers it with the API while a user is signed in (after
 ///   asking for the permission), and again when Firebase renews the token;
 /// - on sign-out, the token goes with the logout request (see
 ///   [pushTokenProvider]) and is then deleted, so nothing reaches the phone;
@@ -82,7 +82,7 @@ class PushController {
   Future<void> _onAuth(AsyncValue<User?> auth) async {
     if (auth.isLoading) return;
     final user = auth.valueOrNull;
-    if (user == null || !user.isEmailVerified) {
+    if (user == null) {
       if (_userId != null) await _signedOut();
       return;
     }

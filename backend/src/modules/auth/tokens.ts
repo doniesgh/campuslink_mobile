@@ -25,7 +25,7 @@ export function verifyAccessToken(token: string): string | null {
 /** Opaque random token (refresh tokens, password reset links). */
 export const randomToken = (bytes = 48): string => randomBytes(bytes).toString('base64url');
 
-/** 6-digit email verification code, e.g. "042917". */
+/** 6-digit code (the emailed password-reset code), e.g. "042917". */
 export const randomCode = (): string => randomInt(0, 1_000_000).toString().padStart(6, '0');
 
 export const sha256 = (value: string): string => createHash('sha256').update(value).digest('hex');

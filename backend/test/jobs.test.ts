@@ -52,6 +52,7 @@ describe('GET /api/jobs', () => {
       workspaceTitle: 'Carthage Robotics Lab',
       workspaceBadges: ['6 Current Interns'],
       mission: 'Prototype perception pipelines for autonomous warehouse robots.',
+      description: 'Prototype perception pipelines for autonomous warehouse robots.',
       missionItems: [
         {
           title: 'Perception Prototyping',
@@ -62,6 +63,8 @@ describe('GET /api/jobs', () => {
       criteria: ['Experience with OpenCV or PyTorch.', 'Interest in robotics.'],
       skills: ['Python', 'OpenCV', 'PyTorch'],
       hasApplied: false,
+      authorId: null,
+      canEdit: false,
     });
   });
 
@@ -151,9 +154,34 @@ describe('POST /api/jobs/:id/applications', () => {
     const res = await apply(auth, 'unknown-offer').expect(404);
     expect(res.body).toEqual({ message: 'Job not found.' });
   });
+
+  test.each(['teacher', 'admin', 'alumni', 'company'] as const)(
+    'answers 403 to a %s: only students apply',
+    async (role) => {
+      await seed();
+      const { auth } = await createStudent({ role });
+      const res = await apply(auth).expect(403);
+      expect(res.body).toMatchObject({ message: 'Only students can apply to offers.' });
+      expect(await JobApplicationModel.countDocuments()).toBe(0);
+    },
+  );
 });
 
 describe('seedJobs', () => {
+  test('gives the demo companies their own offers, when their accounts exist', async () => {
+    const nadia = await createStudent({ email: 'nadia.kooli@campus.test', role: 'company' });
+    await seed();
+
+    const posted = await JobModel.find({ authorId: { $ne: null } }).lean();
+    // Walid Sassi's account doesn't exist here: his offer is skipped.
+    expect(posted.map((job) => [job._id, String(job.authorId)])).toEqual([
+      ['medina-soft-flutter', nadia.user.id],
+    ]);
+
+    const res = await request(app).get('/api/jobs/medina-soft-flutter').set(nadia.auth).expect(200);
+    expect(res.body).toMatchObject({ company: 'Medina Soft', authorId: nadia.user.id, canEdit: true });
+  });
+
   test('is idempotent and keeps the students\' applications', async () => {
     await seed();
     const { auth } = await createStudent();

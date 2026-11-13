@@ -2,25 +2,39 @@ import '../../../../core/error/result.dart';
 import '../../domain/entities/class_session.dart';
 import '../../domain/entities/timetable_week.dart';
 import '../../domain/repositories/timetable_repository.dart';
+import 'mock_timetable_store.dart';
 
-/// In-memory fake. Replace with a Dio-based implementation when the API exists.
+/// In-memory fake of the timetable API, on the weekly classes of [store]
+/// (which the admin screens edit in demo mode).
 ///
 /// Every weekday has classes at 08:30, 10:15 and 13:30 (the courses change
-/// from day to day); Monday and Thursday end with an evaluation at 16:00.
-/// No classes on weekends.
+/// from day to day); Monday and Thursday end with an evaluation at 16:00;
+/// Friday's workshop is online. No classes on weekends.
 class MockTimetableRepository implements TimetableRepository {
+  MockTimetableRepository({MockTimetableStore? store, this.latency = _latency})
+      : store = store ?? MockTimetableStore();
+
   static const _latency = Duration(milliseconds: 400);
-  static const _classGroup = 'Tech Track 4BI';
+  static const _classGroup = MockTimetableStore.classGroup;
+
+  final MockTimetableStore store;
+
+  /// Fake network latency (zero: answers without a timer).
+  final Duration latency;
+
+  Future<void> _wait() async {
+    if (latency > Duration.zero) await Future<void>.delayed(latency);
+  }
 
   @override
   Future<Result<TimetableDay>> getDay(DateTime day) async {
-    await Future<void>.delayed(_latency);
+    await _wait();
     return Success(_day(day));
   }
 
   @override
   Future<Result<TimetableWeek>> getWeek(DateTime day) async {
-    await Future<void>.delayed(_latency);
+    await _wait();
     final monday = DateTime(day.year, day.month, day.day - (day.weekday - DateTime.monday));
     final dates = [
       for (var i = 0; i < 7; i++) DateTime(monday.year, monday.month, monday.day + i),
@@ -35,31 +49,36 @@ class MockTimetableRepository implements TimetableRepository {
     );
   }
 
-  static TimetableDay _day(DateTime day) => TimetableDay(
+  TimetableDay _day(DateTime day) => TimetableDay(
         date: DateTime(day.year, day.month, day.day),
         semesterWeek: _semesterWeek(day),
         sessions: _sessions(day),
       );
 
-  static List<ClassSession> _sessions(DateTime day) {
-    final slots = _week[day.weekday] ?? const <_Slot>[];
+  List<ClassSession> _sessions(DateTime day) {
     final key = '${day.year}-${day.month}-${day.day}';
-    DateTime at((int, int) hm) => DateTime(day.year, day.month, day.day, hm.$1, hm.$2);
+    DateTime at(String hm) => DateTime(
+          day.year, day.month, day.day, int.parse(hm.substring(0, 2)), int.parse(hm.substring(3)),
+        );
     return [
-      for (final s in slots)
-        ClassSession(
-          id: '${s.id}-$key',
-          course: s.course,
-          room: s.room,
-          teacher: s.teacher,
-          start: at(s.start),
-          end: at(s.end),
-          kind: s.kind,
-          lectureNumber: s.lectureNumber,
-          lectureCount: s.lectureCount,
-          coefficient: s.coefficient,
-          notes: s.notes,
-        ),
+      for (final s in store.slots)
+        if (s.weekday == day.weekday)
+          ClassSession(
+            id: '${s.id}-$key',
+            course: s.course,
+            // Like the API: "Online" for an online class without a room.
+            room: s.room.isEmpty && s.isOnline ? 'Online' : s.room,
+            teacher: s.teacher,
+            start: at(s.start),
+            end: at(s.end),
+            kind: s.kind,
+            lectureNumber: s.lectureNumber,
+            lectureCount: s.lectureCount,
+            coefficient: s.coefficient,
+            notes: s.notes,
+            mode: s.mode,
+            meetUrl: s.isOnline ? s.meetUrl : null,
+          ),
     ]..sort((a, b) => a.start.compareTo(b.start));
   }
 
@@ -83,93 +102,4 @@ class MockTimetableRepository implements TimetableRepository {
     if (_semesterWeek(day) == null) return null;
     return day.month >= 9 || day.month < 2 ? 1 : 2;
   }
-
-  /// Weekly template, by [DateTime.weekday].
-  static const _week = <int, List<_Slot>>{
-    DateTime.monday: [
-      _Slot('algo-cm', 'Algorithmes & Complexité', 'Amphi A', 'Prof. Trabelsi', (8, 30), (10, 0),
-          lectureNumber: 8, lectureCount: 14),
-      _Slot('genie-logiciel-tp', 'Génie Logiciel & Architecture', 'Lab 204', 'Prof. Ben Ali',
-          (10, 15), (12, 15),
-          kind: SessionKind.lab),
-      _Slot('nosql', 'Bases de Données Avancées (NoSQL)', 'Salle B12', 'Prof. Mansour', (13, 30),
-          (15, 30),
-          kind: SessionKind.workshop),
-      _Slot('cc-reseaux', 'Contrôle Continu : Réseaux & Télécom', 'Grand Amphi C', 'Dr. Hammami',
-          (16, 0), (18, 0),
-          kind: SessionKind.exam,
-          coefficient: 2.0,
-          notes: 'Chapters 1–4 · Bring scientific calculator & Student ID'),
-    ],
-    DateTime.tuesday: [
-      _Slot('algo', 'Algorithmes & Complexité', 'Lab 14', 'Dr. Fersi', (8, 30), (10, 0),
-          kind: SessionKind.lab),
-      _Slot('genie-logiciel', 'Génie Logiciel & Architecture', 'Amphi 3B', 'Prof. Ben Ali',
-          (10, 15), (12, 15),
-          lectureNumber: 7, lectureCount: 14),
-      _Slot('bases-de-donnees', 'Bases de Données', 'Salle 208', 'Dr. Gharbi', (13, 30), (15, 30),
-          lectureNumber: 9, lectureCount: 12),
-    ],
-    DateTime.wednesday: [
-      _Slot('reseaux', 'Réseaux & Télécom', 'Amphi B', 'Dr. Hammami', (8, 30), (10, 0),
-          lectureNumber: 9, lectureCount: 14),
-      _Slot('flutter-tp', 'Développement Mobile (Flutter)', 'Lab 204', 'Ing. Jlassi', (10, 15),
-          (12, 15),
-          kind: SessionKind.lab),
-      _Slot('pi', 'Projet Intégré (PI)', 'Salle B12', 'Prof. Mansour', (13, 30), (15, 30),
-          kind: SessionKind.workshop),
-    ],
-    DateTime.thursday: [
-      _Slot('algo', 'Algorithmes & Complexité', 'Lab 14', 'Dr. Fersi', (8, 30), (10, 0),
-          kind: SessionKind.lab),
-      _Slot('genie-logiciel', 'Génie Logiciel & Architecture', 'Amphi 3B', 'Prof. Ben Ali',
-          (10, 15), (12, 15),
-          lectureNumber: 8, lectureCount: 14),
-      _Slot('bases-de-donnees', 'Bases de Données', 'Salle 208', 'Dr. Gharbi', (13, 30), (15, 30),
-          lectureNumber: 10, lectureCount: 12),
-      _Slot('exam-flutter', 'Examen TP : Développement Mobile', 'Lab 204', 'Ing. Jlassi', (16, 0),
-          (17, 30),
-          kind: SessionKind.exam,
-          coefficient: 1.5,
-          notes: 'Bring your laptop with the Flutter SDK installed'),
-    ],
-    DateTime.friday: [
-      _Slot('stats', 'Probabilités & Statistiques', 'Amphi A', 'Dr. Ayari', (8, 30), (10, 0),
-          lectureNumber: 10, lectureCount: 14),
-      _Slot('reseaux-tp', 'Réseaux & Télécom', 'Lab 12', 'Dr. Hammami', (10, 15), (12, 15),
-          kind: SessionKind.lab),
-      _Slot('entrepreneuriat', 'Entrepreneuriat & Innovation', 'Espace Coworking', 'Mme. Karoui',
-          (13, 30), (15, 30),
-          kind: SessionKind.workshop),
-    ],
-  };
-}
-
-/// A session of the weekly template; times are (hour, minute).
-class _Slot {
-  const _Slot(
-    this.id,
-    this.course,
-    this.room,
-    this.teacher,
-    this.start,
-    this.end, {
-    this.kind = SessionKind.lecture,
-    this.lectureNumber,
-    this.lectureCount,
-    this.coefficient,
-    this.notes,
-  });
-
-  final String id;
-  final String course;
-  final String room;
-  final String teacher;
-  final (int, int) start;
-  final (int, int) end;
-  final SessionKind kind;
-  final int? lectureNumber;
-  final int? lectureCount;
-  final double? coefficient;
-  final String? notes;
 }

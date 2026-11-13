@@ -8,6 +8,7 @@ import '../../features/auth/presentation/providers/auth_controller.dart';
 import '../network/dio_client.dart';
 import '../storage/local_prefs.dart';
 import '../storage/secure_storage.dart';
+import 'locale_provider.dart';
 
 /// Overridden in bootstrap.dart once SharedPreferences is loaded.
 final sharedPrefsProvider = Provider<SharedPreferences>(
@@ -36,5 +37,6 @@ final dioProvider = Provider<Dio>((ref) {
     storage: ref.watch(secureStorageProvider),
     onSessionExpired: () =>
         ref.read(authControllerProvider.notifier).onSessionExpired(),
+    languageCode: () => ref.read(localeProvider).code,
   );
 });

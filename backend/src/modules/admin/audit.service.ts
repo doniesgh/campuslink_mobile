@@ -1,9 +1,15 @@
 import type { Types } from 'mongoose';
 
 import { unauthorized } from '../../lib/http-error';
+import type { RequestContext } from '../../lib/request-context';
 import { UserModel } from '../users/user.model';
 import type { AuditQuery } from './admin.schemas';
-import { AuditLogModel, type AuditAction, type AuditLog } from './audit-log.model';
+import {
+  AuditLogModel,
+  type AuditAction,
+  type AuditLog,
+  type AuditTargetType,
+} from './audit-log.model';
 import { escapeRegex } from './search';
 
 /** What the API sends for an audit entry. */
@@ -12,9 +18,11 @@ export interface AuditEntryJson {
   action: string;
   summary: string;
   actor: { id: string; displayName: string; email: string };
+  targetType: string | null;
   targetId: string | null;
   metadata: Record<string, unknown>;
   ip: string | null;
+  userAgent: string | null;
   createdAt: string;
 }
 
@@ -36,34 +44,45 @@ export const toAuditEntryJson = (entry: StoredAuditLog): AuditEntryJson => ({
     displayName: entry.actor.displayName,
     email: entry.actor.email,
   },
+  targetType: entry.targetType ?? null,
   targetId: entry.targetId ?? null,
   metadata: (entry.metadata as Record<string, unknown> | null) ?? {},
   ip: entry.ip ?? null,
+  userAgent: entry.userAgent ?? null,
   createdAt: entry.createdAt.toISOString(),
 });
 
-export interface AuditRecord {
-  /** The admin who acted (their name and email are copied into the entry). */
-  actorId: string;
+/**
+ * One entry to record. Spread the request's context into it:
+ * `recordAudit({ ...requestContext(req, res), action, summary, targetType: 'user', targetId })`.
+ */
+export interface AuditRecord extends Partial<Pick<RequestContext, 'userAgent'>> {
+  /** Who acted (an admin, or a user on their own account): their name and email are copied into the entry. */
+  actorId: RequestContext['actorId'];
   action: AuditAction;
+  /** One English sentence for the audit screen. */
   summary: string;
+  /** What [targetId] is. Null (the default) when the entry is about no one thing. */
+  targetType?: AuditTargetType | null;
   targetId?: string | null;
   metadata?: Record<string, unknown>;
-  ip: string | null;
+  ip: RequestContext['ip'];
 }
 
-/** Records one change made by an admin. Never put a password in [metadata]. */
+/** Records one change. Never put a password in [metadata]. */
 export async function recordAudit(record: AuditRecord): Promise<void> {
   const actor = await UserModel.findById(record.actorId).select('displayName email');
-  // The admin was checked by requireRole a moment ago: missing now means deleted meanwhile.
+  // The actor was checked (requireRole, or the reset code) a moment ago: missing now means deleted meanwhile.
   if (!actor) throw unauthorized();
   await AuditLogModel.create({
     action: record.action,
     summary: record.summary,
     actor: { id: actor.id as string, displayName: actor.displayName, email: actor.email },
+    targetType: record.targetType ?? null,
     targetId: record.targetId ?? null,
     metadata: record.metadata ?? {},
     ip: record.ip,
+    userAgent: record.userAgent ?? null,
   });
 }
 

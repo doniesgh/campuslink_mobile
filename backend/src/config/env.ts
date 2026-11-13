@@ -3,6 +3,16 @@ import { z } from 'zod';
 
 config({ quiet: true });
 
+/**
+ * The OpenRouter models used when OPENROUTER_MODEL is empty: free ones (50
+ * requests a day without credits), the first tried first. They need
+ * OPENROUTER_ALLOW_DATA_COLLECTION=true.
+ */
+export const DEFAULT_OPENROUTER_MODELS = [
+  'nvidia/nemotron-3.5-lightning:free',
+  'google/gemma-4-31b-it:free',
+];
+
 /** Environment variables, validated once at startup. See .env.example. */
 const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -42,6 +52,31 @@ const schema = z.object({
 
   // Push notifications. Without FIREBASE_SERVICE_ACCOUNT_FILE, push is off.
   FIREBASE_SERVICE_ACCOUNT_FILE: z.string().trim().optional(),
+
+  // AI through OpenRouter (lib/openrouter.ts). Without OPENROUTER_API_KEY, AI is off.
+  OPENROUTER_API_KEY: z.string().trim().optional(),
+  /** One model, or several separated by commas: tried in order (free models are often busy). */
+  OPENROUTER_MODEL: z
+    .string()
+    .trim()
+    .optional()
+    .transform((value) => {
+      const models = (value ?? '')
+        .split(',')
+        .map((model) => model.trim())
+        .filter(Boolean);
+      return models.length > 0 ? models : DEFAULT_OPENROUTER_MODELS;
+    }),
+  /**
+   * false (default): only providers that neither store nor train on what is
+   * sent. The free models need true.
+   */
+  OPENROUTER_ALLOW_DATA_COLLECTION: z.preprocess(
+    (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+    z
+      .stringbool({ error: 'OPENROUTER_ALLOW_DATA_COLLECTION must be true or false' })
+      .default(false),
+  ),
 }).refine(
   (vars) => !vars.MAIL_RELAY_URL || (vars.MAIL_RELAY_SECRET ?? '').length >= 16,
   { path: ['MAIL_RELAY_SECRET'], message: 'MAIL_RELAY_SECRET (at least 16 characters) is required with MAIL_RELAY_URL' },

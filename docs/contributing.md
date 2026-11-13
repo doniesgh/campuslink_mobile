@@ -44,7 +44,7 @@ npm test                   # all green
 - **Features without a backend yet:** show `showAppSnack(context, '… is coming soon.')` and leave a `// TODO:` comment.
 - **Text:**
   - Comments in English.
-  - On-screen text follows the design. The forum and carpool screens are in French, the others mostly in English.
+  - **New on-screen text goes through `AppLocalizations`**, in French and English (see [5. Translations](#5-translations-french--english)). Older screens still have hard-coded text (the forum and carpool screens in French, the others mostly in English) until they are moved.
 
 ### Backend (backend/src/)
 
@@ -52,7 +52,12 @@ npm test                   # all green
 - **Thin route handlers:** validate with `validateBody(schema)`, call one service function, send the result. Handlers use block bodies.
 - **Errors:**
   - Throw `HttpError` (`notFound()`, `conflict()`, `badRequest()`…) with a message a student can read.
+  - Give it a machine-readable `code` when the app may react to it or translate it: `new HttpError(status, message, details?, code?)`, or the last argument of the helpers (`conflict('…', 'EMAIL_TAKEN')`). The body is `{ message, code?, ...details }`. Validation 422s get `VALIDATION_ERROR` by themselves. List new codes in `lib/http-error.ts` and [api.md](api.md#conventions).
   - Never leak stack traces or ids of other users.
+- **Rate limits** (`middleware/rate-limit.ts`): `authLimit('<route>')` + `authIpLimit` on a signed-out route, `userLimit({ name, limit, windowMs })` after `requireAuth` on an expensive signed-in one (AI, uploads), or `createLimiter({ name, limit, windowMs, key })`. They answer `429 TOO_MANY_REQUESTS` with `retryAfter`. They are off in tests; a test of a limit calls `enforceRateLimitsInTests()` (and `enforceRateLimitsInTests(false)` after).
+- **Audit:** `recordAudit({ ...requestContext(req, res), action, summary, targetType?, targetId?, metadata? })` (`lib/request-context.ts` gives the actor, IP and User-Agent). Add new actions to `AUDIT_ACTIONS` and a label in the app's `audit_log_page.dart`.
+- **AI:** only through `lib/openrouter.ts` (`isAiConfigured()`, `chatJson()`); every AI feature must work, or say "not available", without `OPENROUTER_API_KEY`. Tests use `useFakeOpenRouter()` (`test/fake-openrouter.ts`), never the real service.
+- **Language:** a user's emails and notifications use their `user.locale` (`localeOfUser(user)`); before the account exists, `localeOf(req)` (`lib/i18n.ts`).
 - **Personal data** is always filtered by `currentUserId(res)`.
 - **Responses** are built by a `toXxxJson()` function that sends `id` (never `_id`) and follows the [API conventions](architecture.md#45-api-conventions).
 - **Seeds** are idempotent and reset only the demo student's own actions.
@@ -145,6 +150,7 @@ addTearDown(tester.view.reset);
 ```
 
 - **Fix the date:** tests must pass on any day, so pass a fixed `DateTime` (or override `clockProvider`) instead of using `DateTime.now()`.
+- **Texts:** a screen that uses `AppLocalizations` needs the delegates. Use `test/helpers/localized_app.dart`: `localizedApp(page)` for a plain `MaterialApp`, or pass `localizationsDelegates: testLocalizationsDelegates, supportedLocales: testSupportedLocales, locale: const Locale('en')` to your `MaterialApp.router`, and add `localeOverride()` to the overrides when something watches `localeProvider`. Tests run in English unless they ask for `AppLanguage.fr`.
 
 ### Backend tests
 
@@ -154,4 +160,30 @@ addTearDown(tester.view.reset);
 
 ### Current numbers
 
-**418 backend tests** (18 suites) and **555 app tests** (56 files). Keep them all green.
+**611 backend tests** (28 suites) and **696 app tests** (72 files). Keep them all green.
+
+## 5. Translations (French / English)
+
+The app speaks French and English. Its texts live in two ARB files, turned into Dart by Flutter's **gen-l10n**:
+
+- `lib/l10n/app_en.arb`: the **template**, with a `@key` description for each text.
+- `lib/l10n/app_fr.arb`: the same keys in French. French says **"tu"**, warm and simple.
+- `lib/l10n/app_localizations*.dart`: **generated, and committed** (`flutter analyze` and `flutter test` don't generate them, so a fresh clone works at once). Never edit them by hand.
+- `l10n.yaml` sets this up; `pubspec.yaml` has `generate: true`.
+
+**To add a text:**
+
+1. Add the key to **both** ARB files, in your feature's block. Prefix it with the feature, camelCase: `common…` (shared: errors, buttons), `account…`, `admin…`, `forum…`, `jobs…`, `timetable…`, `auth…`… Each feature keeps its keys together, so merging two branches' ARB files is just keeping both blocks.
+
+   ```json
+   "accountLanguageTitle": "Language",
+   "@accountLanguageTitle": { "description": "Settings row to choose the app's language." },
+   ```
+
+   Values with data use placeholders: `"jobsApplicants": "{count, plural, =1{1 applicant} other{{count} applicants}}"` with `"@jobsApplicants": { "placeholders": { "count": { "type": "int" } } }`.
+2. Run `flutter gen-l10n` (or `flutter pub get`, or just run the app): it rewrites the generated files. Commit the ARB files and the generated files together. On a merge conflict in the generated files, merge the ARB files, then run `flutter gen-l10n`.
+3. Use it in a widget: `context.l10n.accountLanguageTitle` (`import 'core/l10n/l10n.dart'`), the same as `AppLocalizations.of(context).accountLanguageTitle`.
+
+`test/core/l10n/app_language_test.dart` fails when a key is missing from one of the files.
+
+**The language:** `ref.watch(localeProvider)` gives the `AppLanguage` on screen (`fr` or `en`); `ref.read(localeProvider.notifier).set(AppLanguage.en)` changes it, saves it and updates the signed-in account. Error messages: show `failureText(context, failure)` to translate the error codes the app knows (`core/error/failure_text.dart`), else the server's message.

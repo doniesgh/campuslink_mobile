@@ -8,12 +8,15 @@ abstract final class ApiEndpoints {
   static const logout = '/auth/logout';
   static const forgotPassword = '/auth/forgot-password';
   static const resetPassword = '/auth/reset-password';
-  static const verifyEmail = '/auth/verify-email';
   static const me = '/users/me';
 
   // Timetable (query: ?date=YYYY-MM-DD)
   static const timetableDay = '/timetable/day';
   static const timetableWeek = '/timetable/week';
+
+  // Timetable admin (admins only: the weekly classes, POST adds one)
+  static const adminTimetableSlots = '/admin/timetable/slots';
+  static String adminTimetableSlot(String id) => '/admin/timetable/slots/$id';
 
   // Courses
   static const courses = '/courses';
@@ -28,15 +31,19 @@ abstract final class ApiEndpoints {
   static String ride(String id) => '/carpool/rides/$id';
   static String rideReservations(String id) => '/carpool/rides/$id/reservations';
 
-  // Jobs
+  // Jobs (POST on jobs posts an offer; PATCH / DELETE on job(id) edit / delete it)
   static const jobs = '/jobs';
   static String job(String id) => '/jobs/$id';
   static String jobApplications(String id) => '/jobs/$id/applications';
+  static String jobSummary(String id) => '/jobs/$id/summary';
 
-  // Forum (POST on lostItems publishes a notice, POST on ideas publishes an idea)
+  // Forum (POST on lostItems publishes a notice, POST on ideas publishes an idea;
+  // PATCH / DELETE on lostItem edits, resolves or deletes a notice)
   static const forumHighlights = '/forum/highlights';
   static const lostItems = '/forum/lost-items';
+  static String lostItem(String id) => '/forum/lost-items/$id';
   static String lostItemRequests(String id) => '/forum/lost-items/$id/requests';
+  static String lostItemMatches(String id) => '/forum/lost-items/$id/matches';
   static const ideas = '/forum/ideas';
   static String ideaUpvote(String id) => '/forum/ideas/$id/upvote';
   static String idea(String id) => '/forum/ideas/$id';
@@ -60,6 +67,8 @@ abstract final class ApiEndpoints {
   static const adminUsers = '/admin/users';
   static const adminUserStats = '/admin/users/stats';
   static const adminUserImport = '/admin/users/import';
+  /// GET: is "Read with AI" available? POST: the AI reads an import file's layout.
+  static const adminUserImportAssist = '/admin/users/import/assist';
   static String adminUser(String id) => '/admin/users/$id';
   static const adminAudit = '/admin/audit';
   static const adminAuditActions = '/admin/audit/actions';

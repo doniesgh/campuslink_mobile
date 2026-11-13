@@ -144,7 +144,7 @@ class _SessionCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${s.room} · ${s.teacher}',
+                    '${s.isOnline ? 'Online' : s.room} · ${s.teacher}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
@@ -163,6 +163,10 @@ class _SessionCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                      if (s.isOnline) ...[
+                        Icon(Icons.videocam_outlined, size: 16, color: scheme.primary),
+                        const SizedBox(width: AppSpacing.xs),
+                      ],
                       Icon(footerIcon, size: 16, color: footerColor),
                     ],
                   ),

@@ -7,7 +7,6 @@ import '../../../../core/providers/clock_provider.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_badge.dart';
-import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/campus_header.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../../../admin/presentation/providers/admin_providers.dart';
@@ -36,7 +35,7 @@ ForumSection _forumSectionFor(PostCategory category) => switch (category) {
 
 /// Stitch "02. Home & Today Hub".
 ///
-/// Admins and alumni have no timetable: no "Up next" or "Today's Schedule"
+/// Admins, alumni and companies have no timetable: no "Up next" or "Today's Schedule"
 /// for them. Admins get the [AdminOverviewCard] instead.
 class HomePage extends ConsumerWidget {
   const HomePage({super.key});
@@ -92,7 +91,6 @@ class HomePage extends ConsumerWidget {
                           now: now,
                           semesterWeek: timetable?.valueOrNull?.semesterWeek,
                           hasUnreadNotifications: unreadNotifications > 0,
-                          onSearch: () => showAppSnack(context, 'Search is coming soon.'),
                           onNotifications: () => context.push(RoutePaths.notifications),
                         ),
                       ),

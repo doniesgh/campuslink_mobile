@@ -1,6 +1,7 @@
 import '../../domain/entities/forum_post.dart';
 import '../../domain/entities/lost_item.dart';
 import '../../domain/entities/lost_item_draft.dart';
+import '../../domain/entities/lost_item_match.dart';
 
 /// Expected backend post JSON (one entry of GET /forum/highlights and
 /// GET /forum/ideas, and the body of POST /forum/ideas):
@@ -22,7 +23,6 @@ class ForumPostModel extends ForumPost {
     super.comments,
     super.status,
     super.isUpvotedByMe,
-    super.isMine,
   });
 
   factory ForumPostModel.fromJson(Map<String, dynamic> json) => ForumPostModel(
@@ -38,7 +38,6 @@ class ForumPostModel extends ForumPost {
         comments: _int(json['comments']),
         status: json['status'] as String?,
         isUpvotedByMe: (json['isUpvotedByMe'] as bool?) ?? false,
-        isMine: (json['isMine'] as bool?) ?? false,
       );
 }
 
@@ -55,7 +54,9 @@ IdeaUpvote ideaUpvoteFromJson(Map<String, dynamic> json) => (
 ///   "reporterName": "Youssef M.", "reporterIsStaff": false,
 ///   "reportedAt": "2026-11-06T12:15:00.000Z", "reference": "TF-409", "photoCount": 1,
 ///   "isUrgent": false, "reward": null, "distinctiveDetail": null,
-///   "dropOffNote": "...", "pickupDesk": "...", "isSerialHidden": false }
+///   "dropOffNote": "...", "pickupDesk": "...", "isSerialHidden": false,
+///   "status": "active", "reporterId": null, "isMine": false, "canManage": false }
+/// (`isMine` / `canManage` are the signed-in user's).
 class LostItemModel extends LostItem {
   const LostItemModel({
     required super.id,
@@ -76,7 +77,9 @@ class LostItemModel extends LostItem {
     super.dropOffNote,
     super.pickupDesk,
     super.isSerialHidden,
+    super.status,
     super.isMine,
+    super.canManage,
   });
 
   factory LostItemModel.fromJson(Map<String, dynamic> json) => LostItemModel(
@@ -103,9 +106,37 @@ class LostItemModel extends LostItem {
         dropOffNote: json['dropOffNote'] as String?,
         pickupDesk: json['pickupDesk'] as String?,
         isSerialHidden: (json['isSerialHidden'] as bool?) ?? false,
+        // Before statuses existed every notice was active.
+        status: _enumByName(
+          LostItemStatus.values,
+          json['status'],
+          fallback: LostItemStatus.active,
+        ),
         isMine: (json['isMine'] as bool?) ?? false,
+        canManage: (json['canManage'] as bool?) ?? false,
       );
 }
+
+/// Body of GET /forum/lost-items/:id/matches:
+/// { "items": [{ "item": {...an item...}, "score": 86, "reason": "Même catégorie · ...",
+///   "reasons": ["Même catégorie", ...], "ai": false }], "ai": false, "model": null }
+LostItemMatches lostItemMatchesFromJson(Map<String, dynamic> json) => LostItemMatches(
+      items: [
+        for (final match in (json['items'] as List<dynamic>).cast<Map<String, dynamic>>())
+          LostItemMatch(
+            item: LostItemModel.fromJson(match['item'] as Map<String, dynamic>),
+            score: _int(match['score']),
+            reason: (match['reason'] as String?) ?? '',
+            reasons: [
+              for (final reason in (match['reasons'] as List<dynamic>?) ?? const [])
+                reason as String,
+            ],
+            ai: (match['ai'] as bool?) ?? false,
+          ),
+      ],
+      ai: (json['ai'] as bool?) ?? false,
+      model: json['model'] as String?,
+    );
 
 extension LostItemDraftJson on LostItemDraft {
   /// Body of POST /forum/lost-items:
@@ -135,6 +166,26 @@ extension LostItemDraftJson on LostItemDraft {
         if (text(dropOffNote) case final note?) 'dropOffNote': note,
         if (text(pickupDesk) case final desk?) 'pickupDesk': desk,
       },
+    };
+  }
+
+  /// Body of PATCH /forum/lost-items/:id when the form is saved: the same
+  /// fields, but the blank optional fields of the form are sent as null so
+  /// the API clears them. (Switching the kind makes the API drop the other
+  /// kind's fields; a found item's drop-off note is not in the form, so kept.)
+  Map<String, dynamic> toUpdateJson() {
+    String? text(String? value) {
+      final trimmed = value?.trim() ?? '';
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    return {
+      ...toJson(),
+      if (isLost) ...{
+        'distinctiveDetail': text(distinctiveDetail),
+        'reward': text(reward),
+      } else
+        'pickupDesk': text(pickupDesk),
     };
   }
 }

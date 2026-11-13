@@ -26,7 +26,7 @@ const _tabs = [
   _Tab(4, 'Profile', Icons.person_outline, Icons.person),
 ];
 
-/// Persistent bottom navigation around the main app tabs. Admins and alumni
+/// Persistent bottom navigation around the main app tabs. Admins, alumni and companies
 /// have no timetable, so they don't get its tab.
 class ShellScaffold extends ConsumerWidget {
   const ShellScaffold({super.key, required this.shell});

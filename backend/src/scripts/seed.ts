@@ -9,7 +9,7 @@ import { seedJobs } from '../modules/jobs/jobs.seed';
 import { seedNotifications } from '../modules/notifications/notifications.seed';
 import { seedProfile } from '../modules/profile/profile.seed';
 import { seedTimetable } from '../modules/timetable/timetable.seed';
-import { backfillRoles, UserModel, type UserRole } from '../modules/users/user.model';
+import { backfillLocale, backfillRoles, UserModel, type UserRole } from '../modules/users/user.model';
 
 /**
  * Creates (or resets) the demo student and every module's demo data, the
@@ -30,7 +30,11 @@ const DEMO_ADMIN = {
   password: 'CampusPulseAdmin2026!',
 };
 
-/** More accounts, so the admin's user list isn't empty. They share the demo student's password. */
+/**
+ * More accounts, so the admin's user list isn't empty. They share the demo
+ * student's password. The two companies are recruiters (role `company`): Nadia
+ * Kooli of Medina Soft and Walid Sassi of Carthage Data, as in the PWA demo.
+ */
 const DEMO_ACCOUNTS: { displayName: string; email: string; role: UserRole; studentId?: string }[] =
   [
     { displayName: 'Amira Ben Salah', email: 'amira.bensalah@campus.test', role: 'teacher' },
@@ -72,6 +76,8 @@ const DEMO_ACCOUNTS: { displayName: string; email: string; role: UserRole; stude
       studentId: '221JMT0106',
     },
     { displayName: 'Selim Rekik', email: 'selim.rekik@campus.test', role: 'alumni' },
+    { displayName: 'Nadia Kooli', email: 'nadia.kooli@campus.test', role: 'company' },
+    { displayName: 'Walid Sassi', email: 'walid.sassi@campus.test', role: 'company' },
   ];
 
 const moduleSeeds = {
@@ -109,6 +115,7 @@ async function upsertAccount(account: {
 async function seed(): Promise<void> {
   await connectMongo(env.MONGO_URL);
   await backfillRoles();
+  await backfillLocale();
 
   const studentPasswordHash = await hashPassword(DEMO.password);
   const student = await upsertAccount({
@@ -119,11 +126,7 @@ async function seed(): Promise<void> {
     passwordHash: studentPasswordHash,
   });
 
-  for (const [name, seedModule] of Object.entries(moduleSeeds)) {
-    await seedModule(student._id);
-    console.info(`  seeded ${name}`);
-  }
-
+  // Before the modules: some of them give demo items to these accounts (e.g. the companies' offers).
   await upsertAccount({
     email: DEMO_ADMIN.email,
     displayName: DEMO_ADMIN.displayName,
@@ -135,6 +138,11 @@ async function seed(): Promise<void> {
   }
   console.info(`  seeded ${DEMO_ACCOUNTS.length + 1} demo accounts (admin included)`);
 
+  for (const [name, seedModule] of Object.entries(moduleSeeds)) {
+    await seedModule(student._id);
+    console.info(`  seeded ${name}`);
+  }
+
   console.info('Demo student ready:');
   console.info(`  ENT ID:   ${DEMO.studentId}`);
   console.info(`  Email:    ${DEMO.email}`);
@@ -142,6 +150,10 @@ async function seed(): Promise<void> {
   console.info('Demo admin ready:');
   console.info(`  Email:    ${DEMO_ADMIN.email}`);
   console.info(`  Password: ${DEMO_ADMIN.password}`);
+  const companies = DEMO_ACCOUNTS.filter((account) => account.role === 'company');
+  console.info('Demo companies ready (recruiters):');
+  console.info(`  Emails:   ${companies.map((account) => account.email).join(', ')}`);
+  console.info(`  Password: ${DEMO.password}`);
 }
 
 seed()

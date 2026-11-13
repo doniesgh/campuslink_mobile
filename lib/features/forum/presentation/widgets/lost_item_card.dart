@@ -10,12 +10,19 @@ import '../utils/lost_found_formatters.dart';
 import 'lost_found_visuals.dart';
 
 /// Item card of the Lost & Found board (Stitch "07. Lost & Found Campus Items").
+///
+/// The claim action is for other students' active notices. The reporter
+/// (or an admin) gets a "Gérer l'annonce" menu: edit, resolve, delete.
 class LostItemCard extends StatelessWidget {
   const LostItemCard({
     super.key,
     required this.item,
     required this.now,
     required this.onAction,
+    this.onMatches,
+    this.onEdit,
+    this.onToggleResolved,
+    this.onDelete,
   });
 
   final LostItem item;
@@ -24,14 +31,29 @@ class LostItemCard extends StatelessWidget {
   /// Claim / "J'ai trouvé cet objet !" / serial-number check.
   final VoidCallback onAction;
 
+  /// "Correspondances possibles" (active notices only). Null: no button.
+  final VoidCallback? onMatches;
+
+  /// The manage menu's entries, shown when [LostItem.canManage]. Null: no entry.
+  final VoidCallback? onEdit;
+  final VoidCallback? onToggleResolved;
+  final VoidCallback? onDelete;
+
+  /// Not on a resolved notice, nor on the student's own one.
+  bool get _showsAction => !item.isResolved && !item.isMine;
+
+  bool get _showsMenu =>
+      item.canManage && (onEdit != null || onToggleResolved != null || onDelete != null);
+
   @override
   Widget build(BuildContext context) {
     final accent = lostItemAccent(Theme.of(context).colorScheme, item.action);
     final strip = _DetailStrip.of(item);
+    final onMatches = this.onMatches;
 
     return AppCard(
       padding: EdgeInsets.zero,
-      onTap: onAction,
+      onTap: _showsAction ? onAction : null,
       child: ClipRRect(
         borderRadius: AppRadius.lgAll,
         child: Stack(
@@ -47,11 +69,28 @@ class LostItemCard extends StatelessWidget {
                       _Thumbnail(item: item, accent: accent),
                       const SizedBox(width: AppSpacing.md),
                       Expanded(child: _Summary(item: item, now: now, accent: accent)),
+                      if (_showsMenu)
+                        _ManageMenu(
+                          isResolved: item.isResolved,
+                          onEdit: onEdit,
+                          onToggleResolved: onToggleResolved,
+                          onDelete: onDelete,
+                        ),
                     ],
                   ),
                   if (strip != null) ...[const SizedBox(height: AppSpacing.md), strip],
-                  const SizedBox(height: AppSpacing.md),
-                  _ActionButton(action: item.action, onPressed: onAction),
+                  if (item.isResolved) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    const _ResolvedBanner(),
+                  ],
+                  if (_showsAction) ...[
+                    const SizedBox(height: AppSpacing.md),
+                    _ActionButton(action: item.action, onPressed: onAction),
+                  ],
+                  if (!item.isResolved && onMatches != null) ...[
+                    const SizedBox(height: AppSpacing.sm),
+                    _MatchesButton(prominent: !_showsAction, onPressed: onMatches),
+                  ],
                 ],
               ),
             ),
@@ -407,6 +446,133 @@ class _DetailStrip extends StatelessWidget {
           ),
       ],
     );
+  }
+}
+
+enum _ManageAction { edit, toggleResolved, delete }
+
+/// "Gérer l'annonce" (⋮): Modifier, Marquer comme résolue / Réactiver, Supprimer.
+class _ManageMenu extends StatelessWidget {
+  const _ManageMenu({
+    required this.isResolved,
+    required this.onEdit,
+    required this.onToggleResolved,
+    required this.onDelete,
+  });
+
+  final bool isResolved;
+  final VoidCallback? onEdit;
+  final VoidCallback? onToggleResolved;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final onEdit = this.onEdit;
+    final onToggleResolved = this.onToggleResolved;
+    final onDelete = this.onDelete;
+
+    PopupMenuItem<_ManageAction> entry(
+      _ManageAction value,
+      IconData icon,
+      String label, {
+      Color? color,
+    }) =>
+        PopupMenuItem(
+          value: value,
+          child: Row(
+            children: [
+              Icon(icon, size: 20, color: color),
+              const SizedBox(width: AppSpacing.md),
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(color: color),
+                ),
+              ),
+            ],
+          ),
+        );
+
+    return SizedBox(
+      width: 36,
+      height: 36,
+      child: PopupMenuButton<_ManageAction>(
+        tooltip: "Gérer l'annonce",
+        padding: EdgeInsets.zero,
+        iconSize: 20,
+        icon: Icon(Icons.more_vert, color: scheme.onSurfaceVariant),
+        onSelected: (action) => switch (action) {
+          _ManageAction.edit => onEdit?.call(),
+          _ManageAction.toggleResolved => onToggleResolved?.call(),
+          _ManageAction.delete => onDelete?.call(),
+        },
+        itemBuilder: (_) => [
+          if (onEdit != null) entry(_ManageAction.edit, Icons.edit_outlined, 'Modifier'),
+          if (onToggleResolved != null)
+            isResolved
+                ? entry(_ManageAction.toggleResolved, Icons.replay, "Réactiver l'annonce")
+                : entry(
+                    _ManageAction.toggleResolved,
+                    Icons.check_circle_outline,
+                    'Marquer comme résolue',
+                  ),
+          if (onDelete != null)
+            entry(_ManageAction.delete, Icons.delete_outline, 'Supprimer', color: scheme.error),
+        ],
+      ),
+    );
+  }
+}
+
+/// In place of the action on a resolved notice.
+class _ResolvedBanner extends StatelessWidget {
+  const _ResolvedBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final (bg, fg) = toneColors(theme.colorScheme, BadgeTone.success);
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: AppSpacing.md, vertical: AppSpacing.sm),
+      decoration: BoxDecoration(color: bg, borderRadius: AppRadius.mdAll),
+      child: Row(
+        children: [
+          Icon(Icons.check_circle, size: 18, color: fg),
+          const SizedBox(width: AppSpacing.sm),
+          Expanded(
+            child: Text(
+              'Résolu · objet rendu à son propriétaire',
+              style: theme.textTheme.labelMedium?.copyWith(color: fg, fontWeight: FontWeight.w700),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// "Correspondances possibles": filled on the student's own notice (it is
+/// then the main action), outlined under the claim action otherwise.
+class _MatchesButton extends StatelessWidget {
+  const _MatchesButton({required this.prominent, required this.onPressed});
+
+  final bool prominent;
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    final style = ButtonStyle(
+      minimumSize: const WidgetStatePropertyAll(Size.fromHeight(40)),
+      shape: WidgetStatePropertyAll(RoundedRectangleBorder(borderRadius: AppRadius.mdAll)),
+    );
+    const icon = Icon(Icons.auto_awesome, size: 18);
+    const label = Text('Correspondances possibles', maxLines: 1, overflow: TextOverflow.ellipsis);
+    return prominent
+        ? FilledButton.tonalIcon(onPressed: onPressed, style: style, icon: icon, label: label)
+        : OutlinedButton.icon(onPressed: onPressed, style: style, icon: icon, label: label);
   }
 }
 

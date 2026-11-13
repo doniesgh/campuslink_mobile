@@ -1,11 +1,16 @@
 import { createTransport, type Transporter } from 'nodemailer';
 
 import { env } from '../../config/env';
+import type { Locale } from '../../lib/i18n';
 
-/** Sends the auth emails. Swap the implementation with [setMailer]. */
+/**
+ * Sends the auth emails (only the password-reset code: sign-up sends none),
+ * in the recipient's language ([locale], English when not given: the auth
+ * service always passes the account's). Swap the implementation with
+ * [setMailer].
+ */
 export interface Mailer {
-  sendVerificationCode(to: string, code: string): Promise<void>;
-  sendPasswordResetCode(to: string, code: string): Promise<void>;
+  sendPasswordResetCode(to: string, code: string, locale?: Locale): Promise<void>;
 }
 
 export interface EmailContent {
@@ -14,10 +19,22 @@ export interface EmailContent {
   html: string;
 }
 
-const layout = (title: string, intro: string, code: string, outro: string): EmailContent => ({
+const layout = (
+  locale: Locale,
+  title: string,
+  intro: string,
+  code: string,
+  outro: string,
+): EmailContent => ({
   subject: title,
-  text: `${intro}\n\n${code}\n\n${outro}\n\n— CampusPulse`,
-  html: `<div style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#1e192b">
+  text: `${intro}
+
+${code}
+
+${outro}
+
+— CampusPulse`,
+  html: `<div lang="${locale}" style="font-family:Arial,sans-serif;max-width:480px;margin:auto;color:#1e192b">
   <h2 style="color:#6949a8">${title}</h2>
   <p>${intro}</p>
   <p style="font-size:32px;font-weight:bold;letter-spacing:8px;color:#6949a8">${code}</p>
@@ -26,30 +43,32 @@ const layout = (title: string, intro: string, code: string, outro: string): Emai
 </div>`,
 });
 
-/** [code] is always 6 digits, so it is safe to put in the HTML as-is. */
-export const verificationEmail = (code: string): EmailContent =>
-  layout(
-    'Verify your CampusPulse email',
-    'Welcome to CampusPulse! Enter this code in the app to verify your email:',
-    code,
-    'The code expires in 15 minutes. If you did not create an account, ignore this email.',
-  );
+/** The texts of the reset email, per language. French says "tu", like the rest of the app. */
+const RESET_TEXTS = {
+  en: {
+    title: 'Reset your CampusPulse password',
+    intro: 'Enter this code in the app to choose a new password:',
+    outro:
+      'The code expires in 15 minutes. If you did not ask for it, ignore this email: your password stays the same.',
+  },
+  fr: {
+    title: 'Réinitialise ton mot de passe CampusPulse',
+    intro: "Saisis ce code dans l'appli pour choisir un nouveau mot de passe :",
+    outro:
+      "Le code expire dans 15 minutes. Si tu n'es pas à l'origine de cette demande, ignore cet e-mail : ton mot de passe ne changera pas.",
+  },
+} satisfies Record<Locale, { title: string; intro: string; outro: string }>;
 
-export const passwordResetEmail = (code: string): EmailContent =>
-  layout(
-    'Reset your CampusPulse password',
-    'Enter this code in the app to choose a new password:',
-    code,
-    'The code expires in 15 minutes. If you did not ask for it, ignore this email: your password stays the same.',
-  );
+/** [code] is always 6 digits, so it is safe to put in the HTML as-is. */
+export const passwordResetEmail = (code: string, locale: Locale = 'en'): EmailContent => {
+  const { title, intro, outro } = RESET_TEXTS[locale];
+  return layout(locale, title, intro, code, outro);
+};
 
 /** Development mailer: prints the messages in the server console. */
 export const consoleMailer: Mailer = {
-  async sendVerificationCode(to, code) {
-    console.info(`[mail] Verification code for ${to}: ${code}`);
-  },
-  async sendPasswordResetCode(to, code) {
-    console.info(`[mail] Password reset code for ${to}: ${code}`);
+  async sendPasswordResetCode(to, code, locale = 'en') {
+    console.info(`[mail] Password reset code for ${to} (${locale}): ${code}`);
   },
 };
 
@@ -59,8 +78,7 @@ export function createSmtpMailer(transport: Pick<Transporter, 'sendMail'>, from:
     await transport.sendMail({ from, to, ...content });
   };
   return {
-    sendVerificationCode: (to, code) => send(to, verificationEmail(code)),
-    sendPasswordResetCode: (to, code) => send(to, passwordResetEmail(code)),
+    sendPasswordResetCode: (to, code, locale) => send(to, passwordResetEmail(code, locale)),
   };
 }
 
@@ -76,8 +94,8 @@ export function smtpTransportFromEnv(): Transporter | null {
     port: env.SMTP_PORT,
     secure: env.SMTP_PORT === 465,
     auth: env.SMTP_USER ? { user: env.SMTP_USER, pass: env.SMTP_PASS ?? '' } : undefined,
-    // Sign-up and password reset wait for the email, and the app gives up
-    // after 20 s. Nodemailer's defaults are minutes: a blocked port (e.g. 587
+    // The password reset waits for the email, and the app gives up after
+    // 20 s. Nodemailer's defaults are minutes: a blocked port (e.g. 587
     // on Render's free plan) would make those requests fail in the app.
     connectionTimeout: 8_000,
     greetingTimeout: 8_000,
@@ -135,8 +153,7 @@ export function createRelayMailer(
 ): Mailer {
   const send = (to: string, content: EmailContent) => sendThroughRelay(relay, to, content, post);
   return {
-    sendVerificationCode: (to, code) => send(to, verificationEmail(code)),
-    sendPasswordResetCode: (to, code) => send(to, passwordResetEmail(code)),
+    sendPasswordResetCode: (to, code, locale) => send(to, passwordResetEmail(code, locale)),
   };
 }
 
@@ -164,6 +181,5 @@ export const setMailer = (mailer: Mailer): void => {
 };
 
 export const mailer: Mailer = {
-  sendVerificationCode: (to, code) => current.sendVerificationCode(to, code),
-  sendPasswordResetCode: (to, code) => current.sendPasswordResetCode(to, code),
+  sendPasswordResetCode: (to, code, locale) => current.sendPasswordResetCode(to, code, locale),
 };

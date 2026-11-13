@@ -8,7 +8,7 @@ import {
 
 /**
  * Checks the email settings by sending a test email, the same way the API
- * sends the sign-up and password-reset codes: through the Gmail relay when
+ * sends the password-reset codes: through the Gmail relay when
  * MAIL_RELAY_URL is set, else through SMTP_*.
  *
  *   npm run mail:test -- <your email address>
@@ -20,9 +20,9 @@ const USAGE = 'Usage: npm run mail:test -- <your email address>';
 
 const TEST_EMAIL: EmailContent = {
   subject: 'CampusPulse email test',
-  text: 'If you can read this, CampusPulse can send its sign-up and password-reset codes.\n\n— CampusPulse',
+  text: 'If you can read this, CampusPulse can send its password-reset codes.\n\n— CampusPulse',
   html:
-    '<p>If you can read this, CampusPulse can send its sign-up and password-reset codes.</p>' +
+    '<p>If you can read this, CampusPulse can send its password-reset codes.</p>' +
     '<p>— CampusPulse</p>',
 };
 

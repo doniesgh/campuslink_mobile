@@ -1,12 +1,17 @@
 import { model, Schema, type HydratedDocument, type InferSchemaType } from 'mongoose';
 
-/** What an account can do. Sent as-is: the app reads them as its UserRole enum names. */
-export const USER_ROLES = ['student', 'teacher', 'admin', 'alumni'] as const;
+import { DEFAULT_LOCALE, LOCALES, type Locale } from '../../lib/i18n';
+
+/**
+ * What an account can do. Sent as-is: the app reads them as its UserRole enum
+ * names. `company` is a recruiter (a partner company): it posts job offers.
+ */
+export const USER_ROLES = ['student', 'teacher', 'admin', 'alumni', 'company'] as const;
 export type UserRole = (typeof USER_ROLES)[number];
 
 /**
  * The roles that follow classes, so have a timetable and courses. Admins run
- * the platform and alumni have graduated: they have neither.
+ * the platform, alumni have graduated and companies recruit: they have neither.
  */
 export const ROLES_WITH_CLASSES: readonly UserRole[] = ['student', 'teacher'];
 
@@ -16,6 +21,7 @@ export const ROLE_LABELS: Record<UserRole, string> = {
   teacher: 'Teacher',
   admin: 'Admin',
   alumni: 'Alumni',
+  company: 'Company',
 };
 
 const userSchema = new Schema(
@@ -32,11 +38,11 @@ const userSchema = new Schema(
     /** Sign-up always gives `student`; only an admin can change it (see the admin module). */
     role: { type: String, enum: USER_ROLES, default: 'student', index: true },
 
+    /** The language of the app, and of the emails and notifications the server writes for this user. */
+    locale: { type: String, enum: LOCALES, default: DEFAULT_LOCALE },
+
     // Secrets: never returned unless explicitly selected (.select('+field')).
     passwordHash: { type: String, required: true, select: false },
-    verificationCodeHash: { type: String, select: false },
-    verificationExpiresAt: { type: Date, select: false },
-    verificationAttempts: { type: Number, default: 0, select: false },
     resetCodeHash: { type: String, select: false },
     resetExpiresAt: { type: Date, select: false },
     resetAttempts: { type: Number, default: 0, select: false },
@@ -62,6 +68,23 @@ export async function backfillRoles(): Promise<number> {
   return result.modifiedCount;
 }
 
+/**
+ * Gives the default language (French) to the accounts created before
+ * languages existed. Idempotent: run at start-up and by the seed.
+ * Returns the number of accounts updated.
+ */
+export async function backfillLocale(): Promise<number> {
+  const result = await UserModel.updateMany(
+    { locale: { $exists: false } },
+    { $set: { locale: DEFAULT_LOCALE } },
+  );
+  return result.modifiedCount;
+}
+
+/** The language of [user] (French for an account saved before languages existed). */
+export const localeOfUser = (user: { locale?: string | null }): Locale =>
+  LOCALES.find((locale) => locale === user.locale) ?? DEFAULT_LOCALE;
+
 /** What the API sends for a user (the shape the app's UserModel.fromJson reads). */
 export interface PublicUser {
   id: string;
@@ -71,6 +94,7 @@ export interface PublicUser {
   avatarUrl: string | null;
   isEmailVerified: boolean;
   role: UserRole;
+  locale: Locale;
 }
 
 export const toPublicUser = (user: UserDocument): PublicUser => ({
@@ -81,4 +105,5 @@ export const toPublicUser = (user: UserDocument): PublicUser => ({
   avatarUrl: user.avatarUrl ?? null,
   isEmailVerified: user.isEmailVerified,
   role: user.role,
+  locale: localeOfUser(user),
 });

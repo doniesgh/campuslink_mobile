@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/validators.dart';
@@ -41,10 +42,10 @@ class _RegisterPageState extends ConsumerState<RegisterPage> {
     final failure = await ref
         .read(authControllerProvider.notifier)
         .register(_name.text.trim(), _email.text.trim(), _password.text);
-    // On success the router sends the new user to email verification.
+    // On success the new user is signed in and the router opens Home.
     if (!mounted) return;
     setState(() => _loading = false);
-    if (failure != null) showAppSnack(context, failure.message);
+    if (failure != null) showAppSnack(context, failureText(context, failure));
   }
 
   @override

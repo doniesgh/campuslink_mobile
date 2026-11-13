@@ -1,5 +1,8 @@
 enum SessionKind { lecture, lab, exam, workshop }
 
+/// On campus, or online through a Google Meet link.
+enum SessionMode { onsite, online }
+
 /// Where a session stands relative to "now". Only the first upcoming
 /// session of the day is [next]; the ones after it are [later].
 enum SessionStatus { done, ongoing, next, later }
@@ -18,6 +21,8 @@ class ClassSession {
     this.lectureCount,
     this.coefficient,
     this.notes,
+    this.mode = SessionMode.onsite,
+    this.meetUrl,
   });
 
   final String id;
@@ -37,6 +42,14 @@ class ClassSession {
 
   /// Practical details ("Chapters 1–4 · Bring a calculator"), when any.
   final String? notes;
+
+  /// On campus or online. [room] is "Online" for an online class without one.
+  final SessionMode mode;
+
+  /// The Google Meet link of an online class (null on campus).
+  final String? meetUrl;
+
+  bool get isOnline => mode == SessionMode.online;
 
   Duration get duration => end.difference(start);
 

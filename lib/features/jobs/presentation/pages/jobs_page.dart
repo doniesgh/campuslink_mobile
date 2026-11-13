@@ -11,7 +11,8 @@ import '../../../../shared/widgets/state_views.dart';
 import '../providers/job_providers.dart';
 import '../widgets/job_card.dart';
 
-/// "Jobs" tab: list of internship / job offers.
+/// "Jobs" tab: list of internship / job offers. Companies and admins get a
+/// "New offer" button.
 class JobsPage extends ConsumerStatefulWidget {
   const JobsPage({super.key});
 
@@ -25,7 +26,16 @@ class _JobsPageState extends ConsumerState<JobsPage> {
   @override
   Widget build(BuildContext context) {
     final jobs = ref.watch(jobsProvider);
+    final canPost = ref.watch(canPostJobsProvider);
     return Scaffold(
+      floatingActionButton: canPost
+          ? FloatingActionButton.extended(
+              heroTag: 'new-job',
+              icon: const Icon(Icons.add),
+              label: const Text('New offer'),
+              onPressed: () => context.push(RoutePaths.newJob),
+            )
+          : null,
       body: SafeArea(
         bottom: false,
         child: Column(
@@ -51,12 +61,14 @@ class _JobsPageState extends ConsumerState<JobsPage> {
                       .where((j) =>
                           _query.isEmpty ||
                           j.title.toLowerCase().contains(_query) ||
-                          j.company.toLowerCase().contains(_query))
+                          j.company.toLowerCase().contains(_query) ||
+                          j.location.toLowerCase().contains(_query))
                       .toList();
                   if (list.isEmpty) return const EmptyView(message: 'No offers found.');
                   return ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.page, 0, AppSpacing.page, AppSpacing.xl,
+                    // Room for the "New offer" button under the last card.
+                    padding: EdgeInsets.fromLTRB(
+                      AppSpacing.page, 0, AppSpacing.page, canPost ? 96 : AppSpacing.xl,
                     ),
                     itemCount: list.length,
                     separatorBuilder: (_, __) => const SizedBox(height: AppSpacing.md),

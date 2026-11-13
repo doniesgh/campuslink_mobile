@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
+import '../../../../core/providers/locale_provider.dart';
 import '../../../../core/providers/theme_provider.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_radius.dart';
@@ -22,8 +23,8 @@ const _page = EdgeInsets.symmetric(horizontal: AppSpacing.page);
 
 /// Stitch "10. Student Profile & Digital ID" (the Profile tab).
 ///
-/// The settings list (theme + sign out) does not depend on the profile
-/// request, so it stays usable when that request fails.
+/// The settings list (theme, language, sign out) does not depend on the
+/// profile request, so it stays usable when that request fails.
 class ProfilePage extends ConsumerWidget {
   const ProfilePage({super.key});
 
@@ -72,7 +73,7 @@ class ProfilePage extends ConsumerWidget {
     final profile = profileAsync.valueOrNull;
     final displayName = user?.displayName.trim() ?? '';
     final name = displayName.isEmpty ? 'Student' : displayName;
-    // Teachers, admins and alumni have no student card or grades.
+    // Teachers, admins, alumni and companies have no student card or grades.
     final role = user?.role ?? UserRole.student;
     final isStudent = role == UserRole.student;
 
@@ -140,6 +141,9 @@ class ProfilePage extends ConsumerWidget {
                           themeMode: themeMode,
                           onThemeModeChanged: (mode) =>
                               ref.read(themeModeProvider.notifier).set(mode),
+                          language: ref.watch(localeProvider),
+                          onLanguageChanged: (language) =>
+                              ref.read(localeProvider.notifier).set(language),
                           semesterLabel: profile?.semesterLabel,
                           unreadNotifications: profile?.unreadNotifications ?? 0,
                           hasCarpoolActivity: profile?.hasCarpoolActivity ?? false,

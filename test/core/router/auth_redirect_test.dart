@@ -10,6 +10,10 @@ const _verified = User(
   displayName: 'Student',
   isEmailVerified: true,
 );
+
+/// An account whose email was never verified (isEmailVerified defaults to
+/// false): an account created before sign-up stopped asking for a code, or
+/// one an admin marked unverified.
 const _unverified = User(
   id: 'u1',
   email: 'student@campus.test',
@@ -19,7 +23,7 @@ const _unverified = User(
 const AsyncValue<User?> _restoring = AsyncLoading<User?>();
 const AsyncValue<User?> _signedOut = AsyncData<User?>(null);
 const AsyncValue<User?> _signedIn = AsyncData<User?>(_verified);
-const AsyncValue<User?> _pendingVerification = AsyncData<User?>(_unverified);
+const AsyncValue<User?> _signedInUnverified = AsyncData<User?>(_unverified);
 
 void main() {
   group('authRedirect', () {
@@ -33,13 +37,6 @@ void main() {
         expect(authRedirect(_signedOut, RoutePaths.job('x')), RoutePaths.login);
       });
 
-      test('is sent to login from verify-email (e.g. after signing out there)', () {
-        expect(
-          authRedirect(_signedOut, RoutePaths.verifyEmail),
-          RoutePaths.login,
-        );
-      });
-
       test('can open the public auth pages', () {
         expect(authRedirect(_signedOut, RoutePaths.login), isNull);
         expect(authRedirect(_signedOut, RoutePaths.register), isNull);
@@ -49,19 +46,22 @@ void main() {
     });
 
     group('email not verified', () {
-      test('is sent to verify-email from anywhere else', () {
-        expect(
-          authRedirect(_pendingVerification, RoutePaths.home),
-          RoutePaths.verifyEmail,
-        );
-        expect(
-          authRedirect(_pendingVerification, RoutePaths.login),
-          RoutePaths.verifyEmail,
-        );
+      test('a freshly registered user goes from "Create account" to Home', () {
+        expect(authRedirect(_signedInUnverified, RoutePaths.register), RoutePaths.home);
+        expect(authRedirect(_signedInUnverified, RoutePaths.home), isNull);
       });
 
-      test('stays on verify-email', () {
-        expect(authRedirect(_pendingVerification, RoutePaths.verifyEmail), isNull);
+      test('is never sent to an auth screen: the app opens as for anyone', () {
+        for (final page in [
+          RoutePaths.home,
+          RoutePaths.jobs,
+          RoutePaths.forum,
+          RoutePaths.profile,
+          RoutePaths.timetable,
+        ]) {
+          expect(authRedirect(_signedInUnverified, page), isNull, reason: page);
+        }
+        expect(authRedirect(_signedInUnverified, RoutePaths.login), RoutePaths.home);
       });
     });
 
@@ -69,7 +69,7 @@ void main() {
       test('is sent home from the auth pages', () {
         expect(authRedirect(_signedIn, RoutePaths.login), RoutePaths.home);
         expect(authRedirect(_signedIn, RoutePaths.register), RoutePaths.home);
-        expect(authRedirect(_signedIn, RoutePaths.verifyEmail), RoutePaths.home);
+        expect(authRedirect(_signedIn, RoutePaths.forgotPassword), RoutePaths.home);
       });
 
       test('can open app pages', () {
@@ -99,6 +99,8 @@ void main() {
         RoutePaths.adminUser('u1'),
         RoutePaths.importUsers,
         RoutePaths.auditLog,
+        // Admins have no timetable tab, but manage the timetable here.
+        RoutePaths.adminTimetable,
       ];
 
       test('is open to admins', () {

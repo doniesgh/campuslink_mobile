@@ -3,12 +3,16 @@ import '../../../../core/error/result.dart';
 import '../../domain/entities/forum_post.dart';
 import '../../domain/entities/lost_item.dart';
 import '../../domain/entities/lost_item_draft.dart';
+import '../../domain/entities/lost_item_match.dart';
 import '../../domain/forum_rules.dart';
+import '../../domain/lost_item_matching.dart';
 import '../../domain/repositories/forum_repository.dart';
 
 /// In-memory demo data, used when USE_MOCK=true (the same content as the
-/// backend seed). What the student publishes and upvotes is kept in memory
-/// for the life of this object, and checked with the API's rules.
+/// backend seed). What the student publishes, edits, resolves, deletes and
+/// upvotes is kept in memory for the life of this object, and checked with
+/// the API's rules. The student manages their own notices only ("lf-407" and
+/// the ones they publish); matches are the API's rules, without AI.
 class MockForumRepository implements ForumRepository {
   static const _latency = Duration(milliseconds: 450);
 
@@ -18,10 +22,17 @@ class MockForumRepository implements ForumRepository {
   static const _studentInfo = '4BI - Software Eng.';
 
   static const _ideaGone = "Cette idée n'existe plus.";
+  static const _noticeGone = "Cette annonce n'existe plus.";
+  static const _notYourNotice =
+      "Seul l'auteur de l'annonce (ou un administrateur) peut la modifier ou la supprimer.";
 
   /// Published during this session, newest first.
   final _publishedItems = <LostItem>[];
   final _publishedIdeas = <ForumPost>[];
+
+  /// Notices edited or resolved during this session (seeded ones included), by id.
+  final _editedItems = <String, LostItem>{};
+  final _deletedItemIds = <String>{};
 
   /// Ideas the student upvoted (one vote each, on top of the seeded count).
   final _upvotedIdeaIds = <String>{};
@@ -62,7 +73,6 @@ class MockForumRepository implements ForumRepository {
       tag: theme.isEmpty ? defaultIdeaTag : theme,
       body: body.trim(),
       postedAt: DateTime.now(),
-      isMine: true,
     );
     _publishedIdeas.insert(0, idea);
     return Success(idea);
@@ -132,9 +142,19 @@ class MockForumRepository implements ForumRepository {
     return Success(List<LostItem>.unmodifiable(_allLostItems(DateTime.now())));
   }
 
-  List<LostItem> _allLostItems(DateTime now) =>
-      [..._publishedItems, ..._seedLostItems(now)]
-        ..sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+  List<LostItem> _allLostItems(DateTime now) => [
+        for (final item in [..._publishedItems, ..._seedLostItems(now)])
+          if (!_deletedItemIds.contains(item.id)) _editedItems[item.id] ?? item,
+      ]..sort((a, b) => b.reportedAt.compareTo(a.reportedAt));
+
+  /// Notice [id] if the student may manage it, else the API's failure.
+  Result<LostItem> _managed(String id) {
+    final matching = _allLostItems(DateTime.now()).where((item) => item.id == id);
+    if (matching.isEmpty) return const Err(ServerFailure(_noticeGone));
+    final item = matching.first;
+    if (!item.canManage) return const Err(ServerFailure(_notYourNotice));
+    return Success(item);
+  }
 
   @override
   Future<Result<LostItem>> publishLostItem(LostItemDraft draft) async {
@@ -164,9 +184,81 @@ class MockForumRepository implements ForumRepository {
       dropOffNote: draft.isLost ? null : text(draft.dropOffNote),
       pickupDesk: draft.isLost ? null : text(draft.pickupDesk),
       isMine: true,
+      canManage: true,
     );
     _publishedItems.insert(0, item);
     return Success(item);
+  }
+
+  @override
+  Future<Result<LostItem>> updateLostItem(String id, LostItemDraft draft) async {
+    await Future<void>.delayed(_latency);
+    final found = _managed(id);
+    if (found case Err(:final failure)) return Err(failure);
+    final item = found.dataOrNull!;
+    final error = lostItemDraftError(draft);
+    if (error != null) return Err(ValidationFailure(error));
+
+    String? text(String? value) {
+      final trimmed = value?.trim() ?? '';
+      return trimmed.isEmpty ? null : trimmed;
+    }
+
+    // As the API: the form's fields replace the stored ones, the other
+    // kind's fields are dropped, the rest (reporter, date, reference) kept.
+    final edited = LostItem(
+      id: item.id,
+      kind: draft.kind,
+      title: draft.title.trim(),
+      category: draft.category,
+      zone: draft.zone.trim(),
+      location: draft.location.trim(),
+      place: draft.place,
+      reporterName: item.reporterName,
+      reporterIsStaff: item.reporterIsStaff,
+      reportedAt: item.reportedAt,
+      reference: item.reference,
+      photoCount: item.photoCount,
+      distinctiveDetail: draft.isLost ? text(draft.distinctiveDetail) : item.distinctiveDetail,
+      reward: draft.isLost ? text(draft.reward) : null,
+      isUrgent: draft.isLost && draft.isUrgent,
+      dropOffNote: draft.isLost || item.isLost ? null : item.dropOffNote,
+      pickupDesk: draft.isLost ? null : text(draft.pickupDesk),
+      isSerialHidden: item.isSerialHidden,
+      status: item.status,
+      isMine: item.isMine,
+      canManage: item.canManage,
+    );
+    _editedItems[id] = edited;
+    return Success(edited);
+  }
+
+  @override
+  Future<Result<LostItem>> setLostItemStatus(String id, LostItemStatus status) async {
+    await Future<void>.delayed(_latency);
+    final found = _managed(id);
+    if (found case Err(:final failure)) return Err(failure);
+    final edited = found.dataOrNull!.withStatus(status);
+    _editedItems[id] = edited;
+    return Success(edited);
+  }
+
+  @override
+  Future<Result<void>> deleteLostItem(String id) async {
+    await Future<void>.delayed(_latency);
+    final found = _managed(id);
+    if (found case Err(:final failure)) return Err(failure);
+    _deletedItemIds.add(id);
+    return const Success(null);
+  }
+
+  @override
+  Future<Result<LostItemMatches>> getLostItemMatches(String id) async {
+    await Future<void>.delayed(_latency);
+    final board = _allLostItems(DateTime.now());
+    final matching = board.where((item) => item.id == id);
+    if (matching.isEmpty) return const Err(ServerFailure(_noticeGone));
+    return Success(matchLostItemsByRules(matching.first, board));
   }
 
   @override
@@ -181,24 +273,6 @@ class MockForumRepository implements ForumRepository {
     if (proof.trim().isEmpty) {
       return const Err(ValidationFailure('Please add a detail that identifies the item.'));
     }
-    return const Success(null);
-  }
-
-  @override
-  Future<Result<void>> deleteIdea(String id) async {
-    await Future<void>.delayed(_latency);
-    final idx = _publishedIdeas.indexWhere((p) => p.id == id);
-    if (idx == -1) return const Err(ServerFailure("Cette idée n'existe plus."));
-    _publishedIdeas.removeAt(idx);
-    return const Success(null);
-  }
-
-  @override
-  Future<Result<void>> deleteLostItem(String id) async {
-    await Future<void>.delayed(_latency);
-    final idx = _publishedItems.indexWhere((item) => item.id == id);
-    if (idx == -1) return const Err(ServerFailure('This item is no longer listed.'));
-    _publishedItems.removeAt(idx);
     return const Success(null);
   }
 
@@ -252,6 +326,22 @@ class MockForumRepository implements ForumRepository {
         isUrgent: true,
         reward: 'Café offert ☕',
         distinctiveDetail: 'Boîtier 3 boutons noir',
+      ),
+      // Reported by the demo student: they can edit, resolve or delete it,
+      // and its "Correspondances possibles" find lf-409.
+      LostItem(
+        id: 'lf-407',
+        kind: LostItemKind.lost,
+        title: 'Calculatrice graphique TI-84',
+        category: LostItemCategory.calculator,
+        zone: 'Bloc C',
+        location: 'Salle C10 (Ghazela)',
+        place: LostItemPlace.classroom,
+        reporterName: _studentName,
+        reportedAt: daysAgo(1, 11),
+        distinctiveDetail: 'Étiquette « D.M. » au dos',
+        isMine: true,
+        canManage: true,
       ),
       LostItem(
         id: 'lf-404',

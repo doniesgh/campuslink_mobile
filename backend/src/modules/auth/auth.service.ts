@@ -3,9 +3,18 @@ import type { Types } from 'mongoose';
 
 import { env } from '../../config/env';
 import { badRequest, conflict, unauthorized } from '../../lib/http-error';
+import { DEFAULT_LOCALE, type Locale } from '../../lib/i18n';
+import type { RequestMeta } from '../../lib/request-context';
+import { recordAudit } from '../admin/audit.service';
 import { notifyAdminsOfSignup } from '../notifications/account-notifications';
 import { removeAllDevices, unregisterDevice } from '../push/push-devices.service';
-import { toPublicUser, UserModel, type PublicUser, type UserDocument } from '../users/user.model';
+import {
+  localeOfUser,
+  toPublicUser,
+  UserModel,
+  type PublicUser,
+  type UserDocument,
+} from '../users/user.model';
 import type { LoginInput, RegisterInput, ResetPasswordInput } from './auth.schemas';
 import { mailer } from './mailer';
 import { RefreshTokenModel } from './refresh-token.model';
@@ -99,24 +108,26 @@ function checkCode(
 }
 
 /**
- * Creates a student account (sign-up never gives another role), emails its
- * verification code and tells the admins someone signed up.
+ * Creates a student account (sign-up never gives another role) and signs it
+ * in. No email is sent: the account counts as verified at once. Its language
+ * is [input.locale], else [fallbackLocale] (the language of the request).
+ * The admins are told someone signed up.
  */
-export async function register(input: RegisterInput): Promise<Session> {
+export async function register(
+  input: RegisterInput,
+  fallbackLocale: Locale = DEFAULT_LOCALE,
+): Promise<Session> {
   if (await UserModel.exists({ email: input.email })) {
     throw conflict('An account with this email already exists.');
   }
-  const { code, hash, expiresAt } = newCode();
   const user = await UserModel.create({
     email: input.email,
     displayName: input.displayName,
     role: 'student',
+    locale: input.locale ?? fallbackLocale,
     passwordHash: await hashPassword(input.password),
-    verificationCodeHash: hash,
-    verificationExpiresAt: expiresAt,
-    verificationAttempts: 0,
+    isEmailVerified: true,
   });
-  await sendSafely(() => mailer.sendVerificationCode(user.email, code));
   // The account exists: a notification problem must not fail the sign-up.
   try {
     await notifyAdminsOfSignup(user);
@@ -185,11 +196,18 @@ export async function forgotPassword(email: string): Promise<void> {
   user.resetExpiresAt = expiresAt;
   user.resetAttempts = 0;
   await user.save();
-  await sendSafely(() => mailer.sendPasswordResetCode(user.email, code));
+  await sendSafely(() => mailer.sendPasswordResetCode(user.email, code, localeOfUser(user)));
 }
 
-/** Sets a new password with the emailed code, then signs the user out everywhere. */
-export async function resetPassword({ email, code, password }: ResetPasswordInput): Promise<void> {
+/**
+ * Sets a new password with the emailed code, then signs the user out
+ * everywhere. Recorded in the audit log (`auth.password_reset`, by the user,
+ * from [meta]'s IP and User-Agent).
+ */
+export async function resetPassword(
+  { email, code, password }: ResetPasswordInput,
+  meta: RequestMeta,
+): Promise<void> {
   const user = await UserModel.findOne({ email }).select(
     '+resetCodeHash +resetExpiresAt +resetAttempts',
   );
@@ -211,40 +229,17 @@ export async function resetPassword({ email, code, password }: ResetPasswordInpu
   user.resetAttempts = 0;
   await user.save();
   await revokeAllSessions(user._id);
-}
-
-export async function verifyEmail(userId: string, code: string): Promise<PublicUser> {
-  const user = await UserModel.findById(userId).select(
-    '+verificationCodeHash +verificationExpiresAt +verificationAttempts',
-  );
-  if (!user) throw unauthorized();
-  if (user.isEmailVerified) return toPublicUser(user);
-
-  const attempts = user.verificationAttempts ?? 0;
-  const check = checkCode(user.verificationCodeHash, user.verificationExpiresAt, attempts, code);
-  if (check === 'expired') throw badRequest('This code has expired. Request a new one.');
-  if (check === 'wrong') {
-    user.verificationAttempts = attempts + 1;
-    await user.save();
-    throw badRequest('Invalid code. Check the email we sent you.');
+  // The password is already changed: an audit problem must not fail the reset.
+  try {
+    await recordAudit({
+      ...meta,
+      actorId: user.id as string,
+      action: 'auth.password_reset',
+      summary: `Password reset with an emailed code for ${user.email}`,
+      targetType: 'user',
+      targetId: user.id as string,
+    });
+  } catch (err) {
+    console.error('[audit] Could not record a password reset:', err);
   }
-
-  user.isEmailVerified = true;
-  user.verificationCodeHash = undefined;
-  user.verificationExpiresAt = undefined;
-  user.verificationAttempts = 0;
-  await user.save();
-  return toPublicUser(user);
-}
-
-export async function resendVerification(userId: string): Promise<void> {
-  const user = await UserModel.findById(userId);
-  if (!user) throw unauthorized();
-  if (user.isEmailVerified) return;
-  const { code, hash, expiresAt } = newCode();
-  user.verificationCodeHash = hash;
-  user.verificationExpiresAt = expiresAt;
-  user.verificationAttempts = 0;
-  await user.save();
-  await sendSafely(() => mailer.sendVerificationCode(user.email, code));
 }

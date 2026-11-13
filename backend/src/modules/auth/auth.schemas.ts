@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { localeSchema } from '../../lib/i18n';
 import { optionalPushToken } from '../push/push.schemas';
 
 // Messages are shown as-is in the app, so they are written for students.
@@ -23,6 +24,8 @@ export const registerSchema = z.object({
     .max(80, 'Name is too long'),
   email,
   password: newPassword,
+  /** The app's language (else the Accept-Language header, else French). */
+  locale: localeSchema.optional(),
 });
 
 export const loginSchema = z.object({
@@ -52,8 +55,6 @@ export const resetPasswordSchema = z.object({
   code: sixDigitCode,
   password: newPassword,
 });
-
-export const verifyEmailSchema = z.object({ code: sixDigitCode });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;

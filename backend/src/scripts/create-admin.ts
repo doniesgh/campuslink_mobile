@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { env } from '../config/env';
 import { connectMongo, disconnectMongo } from '../db/mongo';
 import { hashPassword, revokeAllSessions } from '../modules/auth/auth.service';
-import { backfillRoles, UserModel } from '../modules/users/user.model';
+import { backfillLocale, backfillRoles, UserModel } from '../modules/users/user.model';
 
 /**
  * Creates the first admin of a real server, or promotes an existing account:
@@ -28,6 +28,7 @@ const argsSchema = z.object({
 async function createAdmin(args: z.output<typeof argsSchema>): Promise<void> {
   await connectMongo(env.MONGO_URL);
   await backfillRoles();
+  await backfillLocale();
   const passwordHash = await hashPassword(args.password);
 
   const existing = await UserModel.findOne({ email: args.email });

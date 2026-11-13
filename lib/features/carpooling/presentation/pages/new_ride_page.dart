@@ -252,14 +252,7 @@ class _NewRidePageState extends ConsumerState<NewRidePage> {
                       _amenitiesSection(),
                       const SizedBox(height: AppSpacing.md),
                       _detailsSection(),
-                      const SizedBox(height: AppSpacing.md),
-                      const InfoBanner(
-                        icon: Icons.visibility_outlined,
-                        title: 'Ce que voient les passagers',
-                        message: 'Votre nom, votre voiture et sa plaque. Sans avis pour '
-                            "l'instant, vous apparaissez comme « New driver ». Paiement en "
-                            "espèces ou D17 à l'embarquement.",
-                      ),
+                     
                     ],
                   ),
                 ),

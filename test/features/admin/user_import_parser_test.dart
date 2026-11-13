@@ -103,6 +103,10 @@ void main() {
       expect(roleFromCell('prof'), UserRole.teacher);
       expect(roleFromCell('ADMINISTRATEUR'), UserRole.admin);
       expect(roleFromCell('Diplômé'), UserRole.alumni);
+      expect(roleFromCell('Company'), UserRole.company);
+      expect(roleFromCell('Société'), UserRole.company);
+      expect(roleFromCell('recruteuse'), UserRole.company);
+      expect(roleFromCell('Partenaire'), UserRole.company);
       expect(roleFromCell('boss'), isNull);
     });
 

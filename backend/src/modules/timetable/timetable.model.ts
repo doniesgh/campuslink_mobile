@@ -3,6 +3,10 @@ import { model, Schema } from 'mongoose';
 export const SESSION_KINDS = ['lecture', 'lab', 'exam', 'workshop'] as const;
 export type SessionKind = (typeof SESSION_KINDS)[number];
 
+/** On campus, or online through a Google Meet link. */
+export const SESSION_MODES = ['onsite', 'online'] as const;
+export type SessionMode = (typeof SESSION_MODES)[number];
+
 /** A class of the weekly template. Times are wall-clock 'HH:mm' on campus. */
 export interface TimetableSlot {
   /** Prefix of the session ids ('algo' -> 'algo-2026-11-5'). */
@@ -10,6 +14,7 @@ export interface TimetableSlot {
   /** 1 = Monday ... 7 = Sunday. */
   weekday: number;
   course: string;
+  /** '' for an online class without a room. */
   room: string;
   teacher: string;
   start: string;
@@ -19,6 +24,10 @@ export interface TimetableSlot {
   lectureCount: number | null;
   coefficient: number | null;
   notes: string | null;
+  /** Missing on slots saved before online classes existed: 'onsite'. */
+  mode: SessionMode;
+  /** The Google Meet link of an online class, else null. */
+  meetUrl: string | null;
 }
 
 /** The weekly timetable of a class group: the same classes every week. */
@@ -32,7 +41,7 @@ const slotSchema = new Schema<TimetableSlot>(
     slotId: { type: String, required: true },
     weekday: { type: Number, required: true, min: 1, max: 7 },
     course: { type: String, required: true },
-    room: { type: String, required: true },
+    room: { type: String, default: '' },
     teacher: { type: String, required: true },
     start: { type: String, required: true, match: /^\d{2}:\d{2}$/ },
     end: { type: String, required: true, match: /^\d{2}:\d{2}$/ },
@@ -41,6 +50,8 @@ const slotSchema = new Schema<TimetableSlot>(
     lectureCount: { type: Number, default: null },
     coefficient: { type: Number, default: null },
     notes: { type: String, default: null },
+    mode: { type: String, enum: SESSION_MODES, default: 'onsite' },
+    meetUrl: { type: String, default: null },
   },
   { _id: false },
 );

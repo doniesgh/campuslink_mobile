@@ -4,12 +4,16 @@ import 'package:flutter/foundation.dart';
 import '../config/env.dart';
 import '../storage/secure_storage.dart';
 import 'interceptors/auth_interceptor.dart';
+import 'interceptors/locale_interceptor.dart';
 
 /// Builds the app-wide Dio instance.
 abstract final class DioClient {
+  /// [languageCode] gives the app's language ("fr" or "en"), sent as
+  /// `Accept-Language` on every request.
   static Dio create({
     required SecureStorage storage,
     VoidCallback? onSessionExpired,
+    String Function()? languageCode,
   }) {
     final dio = Dio(
       BaseOptions(
@@ -20,6 +24,7 @@ abstract final class DioClient {
       ),
     );
 
+    if (languageCode != null) dio.interceptors.add(LocaleInterceptor(languageCode));
     dio.interceptors.add(
       AuthInterceptor(
         storage: storage,

@@ -50,17 +50,31 @@ class ParsedImport {
   bool get isUsable => error == null && missingColumns.isEmpty;
 }
 
+/// One line of an import file: where it starts in the file (1-based) and
+/// its cells. A title line added by the app (see `applyAssist`) is line 0.
+typedef ImportTableLine = ({int line, List<String> cells});
+
+/// The lines of [text] that hold something, with their cells: CSV (`,` or
+/// `;`) or cells pasted from Excel / Google Sheets (tab-separated).
+List<ImportTableLine> readImportTable(String text) => [
+      for (final r in _readRecords(text.replaceFirst('﻿', '')))
+        if (!r.isBlank) (line: r.line, cells: r.cells),
+    ];
+
 /// Reads an export of a spreadsheet: CSV (`,` or `;`) or cells pasted from
-/// Excel / Google Sheets (tab-separated).
+/// Excel / Google Sheets (tab-separated). See [parseImportTable].
+ParsedImport parseUserImport(String text, {Random? random}) =>
+    parseImportTable(readImportTable(text), random: random);
+
+/// Reads the lines of an import file (from [readImportTable]):
 ///
 /// - The title line is whichever of the first 12 lines has the most known
 ///   titles, in English or French ("Nom", "Prénom", "Courriel", "Rôle"...).
 /// - Required: an email column, and a name column or first/last name columns.
 /// - An empty role is Student. An empty password is generated with [random].
 /// - Line numbers are those of the file, so the admin can find them.
-ParsedImport parseUserImport(String text, {Random? random}) {
-  final records = _readRecords(text.replaceFirst('﻿', ''));
-  final nonEmpty = records.where((r) => !r.isBlank).toList();
+ParsedImport parseImportTable(List<ImportTableLine> table, {Random? random}) {
+  final nonEmpty = table.where((r) => r.cells.any((c) => c.trim().isNotEmpty)).toList();
   if (nonEmpty.isEmpty) return const ParsedImport(error: 'This file has no accounts.');
 
   final header = _findHeader(nonEmpty.take(12).toList());
@@ -138,7 +152,7 @@ ParsedImport parseUserImport(String text, {Random? random}) {
       }
     }
     if (role == null) {
-      problem('role', 'INVALID_ROLE', 'Role: not recognised (student, teacher, admin or alumni)');
+      problem('role', 'INVALID_ROLE', 'Role: not recognised (student, teacher, admin, alumni or company)');
     }
     if (password.length < 8) {
       problem('password', 'PASSWORD_TOO_SHORT', 'Password: at least 8 characters');
@@ -229,6 +243,10 @@ const _roleAliases = <UserRole, Set<String>>{
     'alumni', 'alumnus', 'alumna', 'diplome', 'diplomee', 'ancien', 'ancienne',
     'ancienetudiant',
   },
+  UserRole.company: {
+    'company', 'entreprise', 'societe', 'recruteur', 'recruteuse', 'recruiter',
+    'employeur', 'employer', 'partenaire', 'partner',
+  },
 };
 
 /// Lower case, without accents, letters and digits only: "Prénom(s)" → "prenoms".
@@ -255,13 +273,13 @@ class _Record {
 class _Header {
   _Header(this.record, this.columns);
 
-  final _Record record;
+  final ImportTableLine record;
 
   /// Column → cell index.
   final Map<ImportColumn, int> columns;
 }
 
-_Header? _findHeader(List<_Record> candidates) {
+_Header? _findHeader(List<ImportTableLine> candidates) {
   _Header? best;
   for (final record in candidates) {
     final columns = <ImportColumn, int>{};

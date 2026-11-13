@@ -7,6 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_search_field.dart';
 import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/campus_header.dart';
+import '../../../../shared/widgets/state_views.dart';
 import '../../../carpooling/presentation/providers/carpool_providers.dart';
 import '../../../carpooling/presentation/widgets/carpooling_section.dart';
 import '../providers/forum_providers.dart';
@@ -39,10 +40,7 @@ class ForumPage extends ConsumerStatefulWidget {
 
 class _ForumPageState extends ConsumerState<ForumPage> {
   String _query = '';
-
-  /// Bumped to rebuild (and so empty) the search field.
   int _searchFieldGeneration = 0;
-
   void _clearSearch() => setState(() {
         _query = '';
         _searchFieldGeneration++;
@@ -100,6 +98,7 @@ class _ForumPageState extends ConsumerState<ForumPage> {
             icon: const Icon(Icons.tips_and_updates_outlined),
             label: const Text('Proposer une idée'),
           ),
+        _ => null,
       },
       body: SafeArea(
         bottom: false,
@@ -113,7 +112,7 @@ class _ForumPageState extends ConsumerState<ForumPage> {
                 hint: switch (section) {
                   ForumSection.lostFound => 'Rechercher par objet, salle ou bloc...',
                   ForumSection.ideas => 'Rechercher une idée, un thème...',
-                  ForumSection.carpooling => 'Search rides, lost items, or campus...',
+                  _ => 'Search rides, lost items, or campus...',
                 },
                 onChanged: (v) => setState(() => _query = v),
               ),
@@ -146,6 +145,7 @@ class _ForumPageState extends ConsumerState<ForumPage> {
                 ForumSection.lostFound =>
                   LostFoundSection(query: _query, onClearSearch: _clearSearch),
                 ForumSection.ideas => IdeasSection(query: _query, onClearSearch: _clearSearch),
+                _ => EmptyView(message: '${section.label} is coming soon.', icon: section.icon),
               },
             ),
           ],

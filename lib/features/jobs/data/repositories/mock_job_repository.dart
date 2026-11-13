@@ -1,11 +1,18 @@
 import '../../../../core/error/failures.dart';
 import '../../../../core/error/result.dart';
 import '../../domain/entities/job.dart';
+import '../../domain/entities/job_draft.dart';
+import '../../domain/entities/job_summary.dart';
 import '../../domain/repositories/job_repository.dart';
 
-/// In-memory fake. Replace with a Dio-based implementation when the API exists.
+/// In-memory fake (USE_MOCK=true): the API's offers, and posting, editing and
+/// deleting in memory. Like the API, the seeded offers are not editable
+/// (`canEdit` false; the screens let an admin edit them anyway).
 class MockJobRepository implements JobRepository {
-  static const _latency = Duration(milliseconds: 500);
+  /// [latency]: how long each call takes (unit tests shorten it).
+  MockJobRepository({this.latency = const Duration(milliseconds: 500)});
+
+  final Duration latency;
 
   static const List<Job> _jobs = [
     Job(
@@ -100,32 +107,142 @@ class MockJobRepository implements JobRepository {
     ),
   ];
 
+  /// The catalogue plus the offers posted in this session (newest first).
+  final _offers = [..._jobs];
+
   /// Offers this fake student applied to, so "Applied" survives leaving the page.
   final _applied = <String>{};
+  var _posted = 0;
+
+  static const _notFound = ServerFailure('Job not found.');
+
+  Job? _find(String id) {
+    for (final job in _offers) {
+      if (job.id == id) return job;
+    }
+    return null;
+  }
 
   @override
   Future<Result<List<Job>>> getJobs() async {
-    await Future<void>.delayed(_latency);
-    return Success([for (final job in _jobs) job.withApplied(_applied.contains(job.id))]);
+    await Future<void>.delayed(latency);
+    return Success([for (final job in _offers) job.withApplied(_applied.contains(job.id))]);
   }
 
   @override
   Future<Result<Job>> getJob(String id) async {
-    await Future<void>.delayed(_latency);
-    for (final job in _jobs) {
-      if (job.id == id) return Success(job.withApplied(_applied.contains(id)));
-    }
-    return const Err(ServerFailure('Job not found.'));
+    await Future<void>.delayed(latency);
+    final job = _find(id);
+    return job == null ? const Err(_notFound) : Success(job.withApplied(_applied.contains(id)));
   }
 
   /// Same answers as the API: 404-like for unknown offers, 409-like when applying twice.
   @override
   Future<Result<void>> apply(String jobId) async {
-    await Future<void>.delayed(_latency);
-    if (!_jobs.any((job) => job.id == jobId)) return const Err(ServerFailure('Job not found.'));
+    await Future<void>.delayed(latency);
+    if (_find(jobId) == null) return const Err(_notFound);
     if (!_applied.add(jobId)) {
       return const Err(ServerFailure('You already applied to this offer.'));
     }
     return const Success(null);
   }
+
+  /// Posted by "me": editable, listed first, without the catalogue's rich fields.
+  @override
+  Future<Result<Job>> createJob(JobDraft draft) async {
+    await Future<void>.delayed(latency);
+    _posted++;
+    final job = _fromDraft('mock-job-$_posted', draft);
+    _offers.insert(0, job);
+    return Success(job);
+  }
+
+  /// Replaces what the form edits; the catalogue's rich fields stay.
+  @override
+  Future<Result<Job>> updateJob(String id, JobDraft draft) async {
+    await Future<void>.delayed(latency);
+    final old = _find(id);
+    if (old == null) return const Err(_notFound);
+    final job = Job(
+      id: id,
+      title: draft.title.trim(),
+      company: draft.company.trim(),
+      mission: draft.description.trim(),
+      location: draft.location.trim(),
+      period: draft.period.trim(),
+      durationMonths: draft.durationMonths,
+      stipendTnd: draft.stipendTnd,
+      skills: draft.skills,
+      tags: draft.tags,
+      featuredLabel: old.featuredLabel,
+      labGroup: old.labGroup,
+      labGroupNote: old.labGroupNote,
+      workspaceTitle: old.workspaceTitle,
+      workspaceBadges: old.workspaceBadges,
+      missionItems: old.missionItems,
+      matchPercent: old.matchPercent,
+      criteria: old.criteria,
+      authorId: old.authorId,
+      canEdit: old.canEdit,
+    );
+    _offers[_offers.indexOf(old)] = job;
+    return Success(job.withApplied(_applied.contains(id)));
+  }
+
+  @override
+  Future<Result<void>> deleteJob(String id) async {
+    await Future<void>.delayed(latency);
+    final job = _find(id);
+    if (job == null) return const Err(_notFound);
+    _offers.remove(job);
+    _applied.remove(id);
+    return const Success(null);
+  }
+
+  /// A canned summary built from the offer (no AI offline), with the API's
+  /// 422 for an offer too short to summarise.
+  @override
+  Future<Result<JobSummary>> summarize(String jobId) async {
+    await Future<void>.delayed(latency);
+    final job = _find(jobId);
+    if (job == null) return const Err(_notFound);
+    final described = [
+      job.mission,
+      for (final item in job.missionItems) item.description,
+      ...job.criteria,
+    ].join(' ').trim();
+    if (described.length < 80) {
+      return const Err(ValidationFailure('This offer is too short to summarise.'));
+    }
+    return Success(
+      JobSummary(
+        summary: '${job.title} at ${job.company}'
+            '${job.location.isEmpty ? '' : ', ${job.location}'}. ${job.mission.trim()}',
+        keyPoints: [
+          for (final item in job.missionItems.take(3)) item.title,
+          if (job.durationMonths != null) '${job.durationMonths} months',
+          if (job.stipendTnd != null) '${job.stipendTnd} TND per month',
+          if (job.period.isNotEmpty) job.period,
+        ].take(5).toList(),
+        skills: job.skills.take(8).toList(),
+        idealFor: 'A student who wants hands-on experience with ${job.company}.',
+        model: 'mock',
+      ),
+    );
+  }
+
+  static Job _fromDraft(String id, JobDraft draft) => Job(
+        id: id,
+        title: draft.title.trim(),
+        company: draft.company.trim(),
+        mission: draft.description.trim(),
+        location: draft.location.trim(),
+        period: draft.period.trim(),
+        durationMonths: draft.durationMonths,
+        stipendTnd: draft.stipendTnd,
+        skills: draft.skills,
+        tags: draft.tags,
+        authorId: 'mock-me',
+        canEdit: true,
+      );
 }

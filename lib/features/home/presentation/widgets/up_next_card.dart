@@ -5,6 +5,7 @@ import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../core/utils/formatters.dart';
 import '../../../timetable/domain/entities/class_session.dart';
+import '../../../timetable/presentation/widgets/meet_link.dart';
 
 /// Purple hero card: the class happening now, otherwise the next one today.
 class UpNextCard extends StatelessWidget {
@@ -85,11 +86,15 @@ class _SessionHero extends StatelessWidget {
         const SizedBox(height: AppSpacing.xs),
         Row(
           children: [
-            const Icon(Icons.meeting_room_outlined, size: 18, color: AppColors.onHero),
+            Icon(
+              s.isOnline ? Icons.videocam_outlined : Icons.meeting_room_outlined,
+              size: 18,
+              color: AppColors.onHero,
+            ),
             const SizedBox(width: 6),
             Expanded(
               child: Text(
-                '${s.room} · ${s.teacher}',
+                '${s.isOnline ? 'Online' : s.room} · ${s.teacher}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: theme.textTheme.bodyMedium?.copyWith(color: AppColors.onHero),
@@ -97,6 +102,10 @@ class _SessionHero extends StatelessWidget {
             ),
           ],
         ),
+        if (s.isOnline) ...[
+          const SizedBox(height: AppSpacing.md),
+          JoinMeetButton(url: s.meetUrl, onHero: true),
+        ],
         if (progress != null) ...[
           const SizedBox(height: AppSpacing.lg),
           Row(

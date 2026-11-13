@@ -103,11 +103,11 @@ Sign in with a demo account:
 | Demo student | `211JMT0428` | `dony.mansour@campus.test` | `CampusPulse2026!` |
 | Demo admin | — | `admin@campus.test` | `CampusPulseAdmin2026!` |
 
-The admin finds **Administration** on the Profile tab. The seed also creates nine more accounts (teachers, students, an alumnus) so the user list isn't empty; they all use `CampusPulse2026!`.
+The admin finds **Administration** on the Profile tab. The seed also creates eleven more accounts (teachers, students, an alumnus, and two companies: `nadia.kooli@campus.test` for Medina Soft and `walid.sassi@campus.test` for Carthage Data) so the user list isn't empty; they all use `CampusPulse2026!`.
 
 **An admin on a real server:** there is no default admin outside the demo seed. Create one with `npm run create-admin -- <email> <password> [display name]`; for an existing account, it promotes it to admin, sets the new password and signs it out everywhere.
 
-**Creating your own account:** Register in the app. The verification code is printed in the backend terminal (`[mail] Verification code for …: 042917`), unless you configured SMTP (see below).
+**Creating your own account:** Register in the app. You are signed in at once: there is no confirmation email or code. (Password-reset codes are printed in the backend terminal, `[mail] Password reset code for … (fr): 042917`, unless you configured SMTP: see below.)
 
 **A real phone instead of the emulator:** the emulator reaches your PC as `10.0.2.2`, but a phone on the same Wi-Fi needs your PC's IP address.
 1. Set `HOST=0.0.0.0` in `backend/.env` and restart the API.
@@ -168,7 +168,7 @@ Push notifications need a Firebase project (free). Without one, the app works th
 | `FIREBASE_SERVICE_ACCOUNT_FILE` | empty | The Firebase service-account JSON (path from `backend/`). Empty turns push notifications off |
 
 **Sending real emails:** fill in the `SMTP_*` keys and restart, then check them with `npm run mail:test -- <your address>`. Any provider works locally:
-- Gmail with an *app password* (`smtp.gmail.com`, port 587). It works on your PC. On Render, whose free plan blocks ports 25, 465 and 587, the same Gmail sends through the Apps Script relay (`MAIL_RELAY_URL`) instead: see [deploy.md](deploy.md#emails-sign-up-codes-and-password-resets).
+- Gmail with an *app password* (`smtp.gmail.com`, port 587). It works on your PC. On Render, whose free plan blocks ports 25, 465 and 587, the same Gmail sends through the Apps Script relay (`MAIL_RELAY_URL`) instead: see [deploy.md](deploy.md#emails-password-reset-codes).
 - Brevo (`smtp-relay.brevo.com`, port 2525), which also works on Render
 - Mailtrap, to catch test emails without delivering them
 

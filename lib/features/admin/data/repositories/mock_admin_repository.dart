@@ -5,8 +5,10 @@ import '../../../auth/domain/entities/user.dart';
 import '../../domain/entities/audit_entry.dart';
 import '../../domain/entities/managed_user.dart';
 import '../../domain/entities/user_import.dart';
+import '../../domain/import_assist.dart';
 import '../../domain/repositories/admin_repository.dart';
 import '../../domain/search_text.dart';
+import '../../domain/user_import_parser.dart';
 
 /// In-memory stand-in for `/admin/*` (USE_MOCK=true). Same accounts as the
 /// backend seed, and the same rules and messages as the API, so the screens
@@ -16,6 +18,7 @@ class MockAdminRepository implements AdminRepository {
     String? Function()? currentUserId,
     DateTime Function()? now,
     this.delay = const Duration(milliseconds: 400),
+    this.assistAvailable = true,
   })  : _currentUserId = currentUserId ?? (() => MockAuthRemoteDataSource.adminId),
         _now = now ?? DateTime.now {
     final created = _now().subtract(const Duration(days: 30));
@@ -36,6 +39,15 @@ class MockAdminRepository implements AdminRepository {
   final DateTime Function() _now;
   final Duration delay;
 
+  /// Whether "Read with AI" is offered (the server has an AI key).
+  final bool assistAvailable;
+
+  /// When set, [assistImport] fails with it (tests: busy, not available...).
+  Failure? assistFailure;
+
+  /// The model the mock AI answers as.
+  static const assistModel = 'mock/import-assist';
+
   final _users = <String, ManagedUser>{};
   final _audit = <AuditEntry>[];
   var _nextId = 1;
@@ -53,6 +65,8 @@ class MockAdminRepository implements AdminRepository {
     ('u-helene', 'Hélène Gharbi', 'helene.gharbi@campus.test', '221JMT0106', UserRole.student, true),
     ('u-rami', 'Rami Belhaj', 'rami.belhaj@campus.test', null, UserRole.student, false),
     ('u-selim', 'Selim Rekik', 'selim.rekik@campus.test', null, UserRole.alumni, true),
+    ('u-nadia', 'Nadia Kooli', 'nadia.kooli@campus.test', null, UserRole.company, true),
+    ('u-walid', 'Walid Sassi', 'walid.sassi@campus.test', null, UserRole.company, true),
   ];
 
   static const _notFound = ServerFailure('User not found.');
@@ -81,8 +95,10 @@ class MockAdminRepository implements AdminRepository {
         summary: summary,
         actorName: actor?.displayName,
         actorEmail: actor?.email,
+        targetType: targetId == null ? null : 'user',
         targetId: targetId,
         ip: '127.0.0.1',
+        userAgent: 'CampusPulse demo',
         createdAt: _now(),
       ),
     );
@@ -283,6 +299,29 @@ class MockAdminRepository implements AdminRepository {
   }
 
   @override
+  Future<Result<ImportAssistStatus>> getImportAssistStatus() async {
+    await _wait();
+    return Success(ImportAssistStatus(
+      available: assistAvailable,
+      model: assistAvailable ? assistModel : null,
+    ));
+  }
+
+  /// A fake AI: a deterministic guess from the lines, like the server's
+  /// answer (title line, column of each field, meaning of each role value).
+  @override
+  Future<Result<ImportAssistAnswer>> assistImport(AssistRequest request) async {
+    await _wait();
+    if (!assistAvailable) {
+      return const Err(ServerFailure('AI features are not available on this server.', 'AI_UNAVAILABLE'));
+    }
+    final failure = assistFailure;
+    if (failure != null) return Err(failure);
+    _record('user.import.assist', 'Asked the AI ($assistModel) how an import file is laid out');
+    return Success(ImportAssistAnswer(mapping: guessImportLayout(request), model: assistModel));
+  }
+
+  @override
   Future<Result<AuditPage>> getAudit({String? action, int page = 1, int limit = 30}) async {
     await _wait();
     final matches = _audit.where((e) {
@@ -303,4 +342,71 @@ class MockAdminRepository implements AdminRepository {
     await _wait();
     return Success(_audit.map((e) => e.action).toSet().toList()..sort());
   }
+}
+
+/// The mock AI's reading of [request]: the title line is the line above the
+/// first email; a column of emails is the email, of `•••` the password, of
+/// ENT IDs the ENT ID, of role words the role, of two words or more the full
+/// name (family name first when its title says "Nom Prénom").
+AssistMapping guessImportLayout(AssistRequest request) {
+  final lines = request.lines;
+  bool hasEmail(List<String> cells) => cells.any((c) => c.contains('@'));
+  final firstEmail = lines.indexWhere(hasEmail);
+  final headerRow = firstEmail > 0 ? firstEmail : 0;
+  final data = lines.skip(headerRow).toList();
+  final width = lines.fold(0, (w, cells) => w > cells.length ? w : cells.length);
+
+  final columns = <AssistField, int>{};
+  for (var column = 0; column < width; column++) {
+    final cells = [
+      for (final line in data)
+        if (column < line.length && line[column].trim().isNotEmpty) line[column].trim(),
+    ];
+    if (cells.isEmpty) continue;
+    final field = switch (cells) {
+      _ when cells.every((c) => c.contains('@')) => AssistField.email,
+      _ when cells.every((c) => c == maskedPassword) => AssistField.password,
+      _ when cells.every((c) => _entId.hasMatch(c.toUpperCase())) => AssistField.studentId,
+      _ when cells.where((c) => _guessRole(c) != null).length * 2 >= cells.length => AssistField.role,
+      _ when cells.every((c) => c.split(RegExp(r'\s+')).length >= 2) => AssistField.fullName,
+      _ => null,
+    };
+    if (field != null) columns.putIfAbsent(field, () => column);
+  }
+
+  final roleColumn = columns[AssistField.role];
+  final title = headerRow > 0 && columns.containsKey(AssistField.fullName)
+      ? foldAccents(lines[headerRow - 1][columns[AssistField.fullName]!]).replaceAll(RegExp('[^a-z]'), '')
+      : '';
+  final roleValues = roleColumn == null
+      ? const <String>[]
+      : {
+          for (final line in data)
+            if (roleColumn < line.length && line[roleColumn].trim().isNotEmpty) line[roleColumn].trim(),
+        }.toList();
+  return AssistMapping(
+    headerRow: headerRow,
+    columns: columns,
+    nameOrder: title.startsWith('nomprenom') || title.startsWith('nometprenom')
+        ? NameOrder.lastFirst
+        : NameOrder.firstLast,
+    roles: [for (final text in roleValues) (text: text, role: _guessRole(text))],
+  );
+}
+
+final _entId = RegExp(r'^[0-9]{3}[A-Z]{3}[0-9]{4}$');
+
+/// A role word, read loosely ("Enseignant(e) vacataire" is a teacher).
+UserRole? _guessRole(String text) {
+  final known = roleFromCell(text);
+  if (known != null) return known;
+  final key = foldAccents(text);
+  if (key.contains('prof') || key.contains('enseign')) return UserRole.teacher;
+  if (key.contains('etud') || key.contains('eleve') || key.contains('student')) return UserRole.student;
+  if (key.contains('admin')) return UserRole.admin;
+  if (key.contains('ancien') || key.contains('dipl') || key.contains('alumn')) return UserRole.alumni;
+  if (key.contains('entreprise') || key.contains('recrut') || key.contains('company')) {
+    return UserRole.company;
+  }
+  return null;
 }

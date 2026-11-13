@@ -6,7 +6,7 @@ import { seedForum } from '../src/modules/forum/forum.seed';
 import { IdeaVoteModel } from '../src/modules/forum/idea-vote.model';
 import { LostItemModel } from '../src/modules/forum/lost-item.model';
 import { StudentProfileModel } from '../src/modules/profile/profile.model';
-import { clearTestDb, closeTestDb, connectTestDb, createStudent } from './helpers';
+import { clearTestDb, closeTestDb, connectTestDb, createStudent, validationError } from './helpers';
 
 // Publishing in the forum: Lost & Found notices, ideas and idea upvotes.
 
@@ -110,6 +110,10 @@ describe('POST /api/forum/lost-items', () => {
       dropOffNote: null,
       pickupDesk: null,
       isSerialHidden: false,
+      status: 'active',
+      reporterId: user.id,
+      isMine: true,
+      canManage: true,
     });
     const stored = await LostItemModel.findById(res.body.id).lean();
     expect(stored?.reporterId?.toString()).toBe(user.id);
@@ -184,8 +188,9 @@ describe('POST /api/forum/lost-items', () => {
     const res = await publishItem(auth, foundCalculator).expect(201);
 
     const board = await request(app).get('/api/forum/lost-items').set(other.auth).expect(200);
-    expect(board.body).toHaveLength(7);
-    expect(board.body[0]).toEqual(res.body);
+    expect(board.body).toHaveLength(8);
+    // The same notice, but not theirs.
+    expect(board.body[0]).toEqual({ ...res.body, isMine: false, canManage: false });
   });
 
   describe('answers 422 with a French message and stores nothing', () => {
@@ -250,7 +255,7 @@ describe('POST /api/forum/lost-items', () => {
 
     test.each(cases)('%s', async (_name, body, message) => {
       const { auth } = await createStudent();
-      await publishItem(auth, body).expect(422, { message });
+      await publishItem(auth, body).expect(422, validationError(message));
       expect(await LostItemModel.countDocuments()).toBe(0);
     });
   });
@@ -363,7 +368,7 @@ describe('POST /api/forum/ideas', () => {
 
     test.each(cases)('%s', async (_name, body, message) => {
       const { auth } = await createStudent();
-      await publishIdea(auth, body).expect(422, { message });
+      await publishIdea(auth, body).expect(422, validationError(message));
       expect(await ForumPostModel.countDocuments()).toBe(0);
     });
   });

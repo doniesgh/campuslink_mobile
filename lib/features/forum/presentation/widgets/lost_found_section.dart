@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+
 import '../../../../core/error/failures.dart';
+import '../../../../core/error/result.dart';
 import '../../../../core/providers/clock_provider.dart';
-import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_radius.dart';
 import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_snack.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../../domain/entities/lost_item.dart';
 import '../providers/forum_providers.dart';
-import 'lost_found_visuals.dart';
+// import 'lost_found_visuals.dart';
 import 'lost_item_card.dart';
+import 'lost_item_matches_sheet.dart';
+import 'lost_item_publish_sheet.dart';
 import 'lost_item_request_sheet.dart';
 
 const _page = EdgeInsets.symmetric(horizontal: AppSpacing.page);
@@ -19,8 +21,7 @@ const _page = EdgeInsets.symmetric(horizontal: AppSpacing.page);
 /// Content of the "Lost & Found" tab of the forum
 /// (Stitch "07. Lost & Found Campus Items").
 class LostFoundSection extends ConsumerStatefulWidget {
-  const LostFoundSection(
-      {super.key, required this.query, required this.onClearSearch});
+  const LostFoundSection({super.key, required this.query, required this.onClearSearch});
 
   /// Text typed in the forum search field.
   final String query;
@@ -35,6 +36,17 @@ class LostFoundSection extends ConsumerStatefulWidget {
 class _LostFoundSectionState extends ConsumerState<LostFoundSection> {
   /// null = "Tous".
   LostItemKind? _kind;
+
+  /// The match picked in "Correspondances possibles", shown first.
+  String? _focusedId;
+
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
 
   Future<void> _refresh() async {
     ref.invalidate(lostItemsProvider);
@@ -52,9 +64,91 @@ class _LostFoundSectionState extends ConsumerState<LostFoundSection> {
 
   Future<void> _openRequest(LostItem item) async {
     final sent = await showLostItemRequestSheet(context, item);
-    if (sent && mounted)
-      showAppSnack(context, 'Signalement transmis au staff de sécurité !');
+    if (sent && mounted) showAppSnack(context, 'Signalement transmis au staff de sécurité !');
   }
+
+  /// "Correspondances possibles": a tapped match is shown first on the board.
+  Future<void> _openMatches(LostItem item) async {
+    final picked = await showLostItemMatchesSheet(context, item);
+    if (picked == null || !mounted) return;
+    setState(() => _focusedId = picked.id);
+    if (_scroll.hasClients) {
+      await _scroll.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  /// Reloads the board after a change, or shows why it failed.
+  void _afterChange(Result<Object?> result, String done) {
+    if (!mounted) return;
+    result.when(
+      success: (_) {
+        ref.invalidate(lostItemsProvider);
+        showAppSnack(context, done);
+      },
+      failure: (failure) => showAppSnack(context, failure.message),
+    );
+  }
+
+  Future<void> _edit(LostItem item) async {
+    final edited = await showPublishLostItemSheet(context, initial: item);
+    if (edited != null) _afterChange(Success(edited), 'Annonce mise à jour.');
+  }
+
+  Future<void> _toggleResolved(LostItem item) async {
+    final result = await ref.read(forumRepositoryProvider).setLostItemStatus(
+          item.id,
+          item.isResolved ? LostItemStatus.active : LostItemStatus.resolved,
+        );
+    _afterChange(
+      result,
+      item.isResolved ? 'Annonce réactivée.' : 'Annonce marquée comme résolue.',
+    );
+  }
+
+  Future<void> _delete(LostItem item) async {
+    final scheme = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text("Supprimer l'annonce ?"),
+        content: Text(
+          '« ${item.title} » sera retirée du tableau, avec les demandes reçues. '
+          'Cette action est définitive.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Annuler'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            style: FilledButton.styleFrom(
+              backgroundColor: scheme.error,
+              foregroundColor: scheme.onError,
+            ),
+            child: const Text('Supprimer'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final result = await ref.read(forumRepositoryProvider).deleteLostItem(item.id);
+    _afterChange(result, 'Annonce supprimée.');
+  }
+
+  Widget _card(LostItem item, DateTime now) => LostItemCard(
+        item: item,
+        now: now,
+        onAction: () => _openRequest(item),
+        onMatches: () => _openMatches(item),
+        onEdit: item.canManage ? () => _edit(item) : null,
+        onToggleResolved: item.canManage ? () => _toggleResolved(item) : null,
+        onDelete: item.canManage ? () => _delete(item) : null,
+      );
 
   @override
   Widget build(BuildContext context) {
@@ -71,12 +165,26 @@ class _LostFoundSectionState extends ConsumerState<LostFoundSection> {
       data: (all) {
         final matching = filterLostItems(all, query: widget.query);
         final visible = filterLostItems(matching, kind: _kind);
+        LostItem? focused;
+        for (final item in all) {
+          if (item.id == _focusedId) focused = item;
+        }
         return RefreshIndicator(
           onRefresh: _refresh,
           child: ListView(
-            padding: const EdgeInsets.only(
-                top: AppSpacing.xs, bottom: 96), // room for the FAB
+            controller: _scroll,
+            padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: 96), // room for the FAB
             children: [
+              if (focused != null)
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(
+                    AppSpacing.page, 0, AppSpacing.page, AppSpacing.lg,
+                  ),
+                  child: _FocusedMatch(
+                    onClose: () => setState(() => _focusedId = null),
+                    child: _card(focused, now),
+                  ),
+                ),
               const Padding(padding: _page, child: _CampusContextHeader()),
               const SizedBox(height: AppSpacing.md),
               _FilterPills(
@@ -84,40 +192,77 @@ class _LostFoundSectionState extends ConsumerState<LostFoundSection> {
                 counts: countLostItems(matching),
                 onSelected: (kind) => setState(() => _kind = kind),
               ),
+              
               const SizedBox(height: AppSpacing.lg),
               if (visible.isEmpty)
                 Padding(
                   padding: _page,
                   child: _NoMatchView(
-                    onReset: widget.query.trim().isEmpty && _kind == null
-                        ? null
-                        : _reset,
+                    onReset: widget.query.trim().isEmpty && _kind == null ? null : _reset,
                   ),
                 )
               else
                 for (final item in visible)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.page,
-                      0,
-                      AppSpacing.page,
-                      AppSpacing.md,
+                      AppSpacing.page, 0, AppSpacing.page, AppSpacing.md,
                     ),
-                    child: GestureDetector(
-                      onTap: () =>
-                          context.push(RoutePaths.lostItemDetail(item.id)),
-                      child: LostItemCard(
-                        item: item,
-                        now: now,
-                        onAction: () => _openRequest(item),
-                      ),
-                    ),
+                    child: _card(item, now),
                   ),
-            
             ],
           ),
         );
       },
+    );
+  }
+}
+
+/// The match picked in "Correspondances possibles", pinned above the board.
+class _FocusedMatch extends StatelessWidget {
+  const _FocusedMatch({required this.onClose, required this.child});
+
+  final VoidCallback onClose;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    return Container(
+      padding: const EdgeInsets.fromLTRB(AppSpacing.sm, AppSpacing.xs, AppSpacing.sm, AppSpacing.sm),
+      decoration: BoxDecoration(
+        color: scheme.primaryContainer.withValues(alpha: 0.35),
+        borderRadius: AppRadius.lgAll,
+        border: Border.all(color: scheme.primary.withValues(alpha: 0.4)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const SizedBox(width: AppSpacing.xs),
+              Icon(Icons.auto_awesome, size: 16, color: scheme.primary),
+              const SizedBox(width: AppSpacing.xs),
+              Expanded(
+                child: Text(
+                  'Correspondance sélectionnée',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    color: scheme.primary,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: 'Fermer',
+                visualDensity: VisualDensity.compact,
+                onPressed: onClose,
+                icon: const Icon(Icons.close, size: 18),
+              ),
+            ],
+          ),
+          child,
+        ],
+      ),
     );
   }
 }
@@ -130,19 +275,18 @@ class _CampusContextHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final label =
-        theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700);
+    final label = theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+     
         const SizedBox(height: AppSpacing.sm),
         Text('Objets Perdus & Trouvés', style: theme.textTheme.headlineSmall),
         const SizedBox(height: 2),
         Text(
           'Retrouvez vos effets ou déclarez un objet égaré dans les blocs',
-          style: theme.textTheme.bodySmall
-              ?.copyWith(color: scheme.onSurfaceVariant),
+          style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
         ),
       ],
     );
@@ -151,8 +295,7 @@ class _CampusContextHeader extends StatelessWidget {
 
 /// "Tous 18" / "● Objets Perdus 7" / "● Objets Trouvés 11".
 class _FilterPills extends StatelessWidget {
-  const _FilterPills(
-      {required this.selected, required this.counts, required this.onSelected});
+  const _FilterPills({required this.selected, required this.counts, required this.onSelected});
 
   final LostItemKind? selected;
   final LostItemCounts counts;
@@ -223,10 +366,8 @@ class _FilterPill extends StatelessWidget {
     final (bg, fg) = selected
         ? selectedColors
         : (scheme.surfaceContainer, scheme.onSurfaceVariant);
-    final bubble =
-        selected ? fg.withValues(alpha: 0.22) : scheme.surfaceContainerHighest;
-    final style = theme.textTheme.labelMedium
-        ?.copyWith(color: fg, fontWeight: FontWeight.w700);
+    final bubble = selected ? fg.withValues(alpha: 0.22) : scheme.surfaceContainerHighest;
+    final style = theme.textTheme.labelMedium?.copyWith(color: fg, fontWeight: FontWeight.w700);
 
     return Semantics(
       selected: selected,
@@ -246,22 +387,18 @@ class _FilterPill extends StatelessWidget {
                   Container(
                     width: 8,
                     height: 8,
-                    decoration:
-                        BoxDecoration(color: dotColor, shape: BoxShape.circle),
+                    decoration: BoxDecoration(color: dotColor, shape: BoxShape.circle),
                   ),
                   const SizedBox(width: 6),
                 ],
                 Text(label, style: style),
                 const SizedBox(width: 6),
                 Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                  decoration: BoxDecoration(
-                      color: bubble, borderRadius: BorderRadius.circular(10)),
+                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                  decoration: BoxDecoration(color: bubble, borderRadius: BorderRadius.circular(10)),
                   child: Text(
                     '$count',
-                    style: theme.textTheme.labelSmall
-                        ?.copyWith(color: fg, fontWeight: FontWeight.w700),
+                    style: theme.textTheme.labelSmall?.copyWith(color: fg, fontWeight: FontWeight.w700),
                   ),
                 ),
               ],
@@ -272,6 +409,7 @@ class _FilterPill extends StatelessWidget {
     );
   }
 }
+
 
 /// Empty search / filter result.
 class _NoMatchView extends StatelessWidget {
@@ -304,8 +442,7 @@ class _NoMatchView extends StatelessWidget {
             'Essayez un autre mot-clé ou publiez un avis de recherche pour alerter '
             'la communauté ESPRIT.',
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall
-                ?.copyWith(color: scheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
           ),
           if (onReset != null) ...[
             const SizedBox(height: AppSpacing.lg),
@@ -325,3 +462,4 @@ class _NoMatchView extends StatelessWidget {
     );
   }
 }
+

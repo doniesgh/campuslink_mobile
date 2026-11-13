@@ -12,7 +12,7 @@ export const MAX_IMPORT_ROWS = 50;
 /** An ENT ID: 3 to 20 letters or digits, stored in capitals. */
 export const STUDENT_ID_PATTERN = /^[A-Z0-9]{3,20}$/;
 const STUDENT_ID_MESSAGE = 'ENT ID: 3 to 20 letters or digits';
-const ROLE_MESSAGE = 'Role: not recognised (student, teacher, admin or alumni)';
+const ROLE_MESSAGE = 'Role: not recognised (student, teacher, admin, alumni or company)';
 
 const role = z.enum(USER_ROLES, { error: ROLE_MESSAGE });
 
@@ -152,9 +152,40 @@ export const importUsersSchema = z
     }
   });
 
+const assistCell = z.union([z.string(), z.number(), z.null()], {
+  error: 'Each cell of the file must be text',
+});
+
+/**
+ * `POST /admin/users/import/assist`: the first lines of the file (the service
+ * keeps 12) and the distinct values of short columns, emails and passwords
+ * masked by the app.
+ */
+export const importAssistSchema = z.object({
+  lines: z
+    .array(z.array(assistCell, { error: 'Each line of the file must be a list of cells' }), {
+      error: 'Send the first lines of the file in lines',
+    })
+    .min(1, 'Send the first lines of the file in lines')
+    .max(50, 'Send at most 50 lines'),
+  values: z
+    .array(
+      z.object({
+        column: z
+          .number({ error: 'column must be a column number' })
+          .int('column must be a column number')
+          .min(0, 'column must be a column number'),
+        values: z.array(assistCell, { error: 'values must be a list of cells' }),
+      }),
+      { error: 'values must be a list of columns' },
+    )
+    .default([]),
+});
+
 export type ListUsersQuery = z.output<typeof listUsersQuerySchema>;
 export type AuditQuery = z.output<typeof auditQuerySchema>;
 export type CreateUserInput = z.output<typeof createUserSchema>;
 export type UpdateUserInput = z.output<typeof updateUserSchema>;
 export type ImportUsersInput = z.output<typeof importUsersSchema>;
 export type ImportRowInput = ImportUsersInput['users'][number];
+export type ImportAssistInput = z.output<typeof importAssistSchema>;

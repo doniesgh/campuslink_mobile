@@ -110,6 +110,8 @@ flutter run --dart-define-from-file=env/local.json
 | Admin | `admin@campus.test` | `CampusPulseAdmin2026!` | Administration (Profile tab, and a card on Home); no timetable |
 | Teacher | `amira.bensalah@campus.test` | `CampusPulse2026!` | the timetable, no student card |
 | Alumni | `selim.rekik@campus.test` | `CampusPulse2026!` | no timetable |
+| Company (Medina Soft) | `nadia.kooli@campus.test` | `CampusPulse2026!` | a recruiter: no timetable, Offres on Home |
+| Company (Carthage Data) | `walid.sassi@campus.test` | `CampusPulse2026!` | the same |
 
 Run `npm run seed` again whenever you want the demo data fresh: today's rides, recent notifications, and none of your test changes.
 

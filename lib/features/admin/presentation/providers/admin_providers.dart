@@ -8,6 +8,7 @@ import '../../data/repositories/admin_repository_impl.dart';
 import '../../data/repositories/mock_admin_repository.dart';
 import '../../domain/entities/audit_entry.dart';
 import '../../domain/entities/managed_user.dart';
+import '../../domain/import_assist.dart';
 import '../../domain/repositories/admin_repository.dart';
 
 /// Mock data with USE_MOCK=true, the Node.js API otherwise. Kept alive so
@@ -25,6 +26,11 @@ final userStatsProvider = FutureProvider.autoDispose<UserStats>(
 /// One account, for its edit screen.
 final managedUserProvider = FutureProvider.autoDispose.family<ManagedUser, String>(
   (ref, id) async => (await ref.watch(adminRepositoryProvider).getUser(id)).unwrap(),
+);
+
+/// Whether the import screen can offer "Read with AI" (the server has an AI key).
+final importAssistStatusProvider = FutureProvider.autoDispose<ImportAssistStatus>(
+  (ref) async => (await ref.watch(adminRepositoryProvider).getImportAssistStatus()).unwrap(),
 );
 
 /// The audit log's actions, for its filter chips.

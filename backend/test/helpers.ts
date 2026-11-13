@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
 import { connectMongo, disconnectMongo } from '../src/db/mongo';
+import type { Locale } from '../src/lib/i18n';
 import { setMailer } from '../src/modules/auth/mailer';
 import { signAccessToken } from '../src/modules/auth/tokens';
 import {
@@ -11,6 +12,9 @@ import {
 import { UserModel, type UserDocument, type UserRole } from '../src/modules/users/user.model';
 
 let studentCount = 0;
+
+/** The body of a 422 from validateBody / parseQuery: the first problem, and the code. */
+export const validationError = (message: string) => ({ message, code: 'VALIDATION_ERROR' });
 
 export interface TestAccount {
   user: UserDocument;
@@ -76,18 +80,18 @@ export async function closeTestDb(): Promise<void> {
 }
 
 export interface SentMail {
-  codes: { to: string; code: string }[];
+  /** The password-reset codes, in order (the only email the API sends). */
   resets: { to: string; code: string }[];
+  /** Every email, in order, with the language it was asked in. */
+  emails: { kind: 'reset'; to: string; locale: Locale | undefined }[];
 }
 
 /** Captures the auth emails (into [sent], or a new record) instead of sending them. */
-export function captureMail(sent: SentMail = { codes: [], resets: [] }): SentMail {
+export function captureMail(sent: SentMail = { resets: [], emails: [] }): SentMail {
   setMailer({
-    async sendVerificationCode(to, code) {
-      sent.codes.push({ to, code });
-    },
-    async sendPasswordResetCode(to, code) {
+    async sendPasswordResetCode(to, code, locale) {
       sent.resets.push({ to, code });
+      sent.emails.push({ kind: 'reset', to, locale });
     },
   });
   return sent;

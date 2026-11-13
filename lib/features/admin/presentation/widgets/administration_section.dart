@@ -7,7 +7,7 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/app_badge.dart';
 import '../providers/admin_providers.dart';
 
-/// "Administration" on the Profile tab of admins: Users, Import, Audit log.
+/// "Administration" on the Profile tab of admins: Users, Import, Timetable, Audit log.
 class AdministrationSection extends ConsumerWidget {
   const AdministrationSection({super.key});
 
@@ -60,6 +60,13 @@ class AdministrationSection extends ConsumerWidget {
                 subtitle: 'From a CSV file or a spreadsheet',
                 trailing: chevron,
                 onTap: () => context.push(RoutePaths.importUsers),
+              ),
+              _AdminRow(
+                icon: Icons.calendar_month_outlined,
+                title: 'Timetable',
+                subtitle: 'Weekly classes, rooms and online sessions',
+                trailing: chevron,
+                onTap: () => context.push(RoutePaths.adminTimetable),
               ),
               _AdminRow(
                 icon: Icons.history,

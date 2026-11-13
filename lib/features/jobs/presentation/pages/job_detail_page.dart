@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../../core/error/failures.dart';
 import '../../../../core/router/route_names.dart';
@@ -9,11 +10,14 @@ import '../../../../shared/widgets/app_button.dart';
 import '../../../../shared/widgets/bottom_action_bar.dart';
 import '../../../../shared/widgets/detail_top_bar.dart';
 import '../../../../shared/widgets/state_views.dart';
+import '../../../auth/domain/entities/user.dart';
 import '../../domain/entities/job.dart';
 import '../providers/job_providers.dart';
 import '../widgets/job_detail_sections.dart';
+import '../widgets/job_summary_sheet.dart';
 
-/// "Job Detail & Application" screen.
+/// "Job Detail & Application" screen. Its author and admins also get Edit
+/// and Delete; everyone gets the AI summary.
 class JobDetailPage extends ConsumerStatefulWidget {
   const JobDetailPage({super.key, required this.jobId});
 
@@ -27,6 +31,7 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
   bool _saved = false;
   bool _applying = false;
   bool _applied = false;
+  bool _deleting = false;
 
   void _snack(String message) =>
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
@@ -47,6 +52,46 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
         // The list shows an "Applied" badge too.
         ref.invalidate(jobsProvider);
         _snack('Application sent to ${job.company}');
+      },
+      failure: (f) => _snack(f.message),
+    );
+  }
+
+  Future<void> _delete(Job job) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delete this offer?'),
+        content: Text(
+          '"${job.title}" will be removed for every student, with its applications. '
+          "This can't be undone.",
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(dialogContext).colorScheme.error,
+              foregroundColor: Theme.of(dialogContext).colorScheme.onError,
+            ),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Delete'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _deleting = true);
+    final result = await ref.read(jobRepositoryProvider).deleteJob(job.id);
+    if (!mounted) return;
+    setState(() => _deleting = false);
+    result.when(
+      success: (_) {
+        ref.invalidate(jobsProvider);
+        _snack('Offer deleted');
+        context.canPop() ? context.pop() : context.go(RoutePaths.jobs);
       },
       failure: (f) => _snack(f.message),
     );
@@ -75,6 +120,9 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
     final scheme = theme.colorScheme;
     // From the API (applied earlier) or from this visit.
     final applied = _applied || job.hasApplied;
+    // The API says so; an admin may manage every offer (the mock can't tell).
+    final canManage = job.canEdit || ref.watch(jobsRoleProvider) == UserRole.admin;
+    final canApply = ref.watch(canApplyToJobsProvider);
     return Column(
       children: [
         Expanded(
@@ -104,13 +152,55 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
               const SizedBox(height: AppSpacing.md),
               JobHeaderCard(job: job),
               const SizedBox(height: AppSpacing.md),
-              JobStatsRow(job: job),
-              const SizedBox(height: AppSpacing.md),
-              JobWorkspaceBanner(job: job),
+              AppButton(
+                label: 'AI summary',
+                icon: Icons.auto_awesome,
+                variant: AppButtonVariant.outlined,
+                onPressed: () => showJobSummarySheet(context, job),
+              ),
+              if (canManage) ...[
+                const SizedBox(height: AppSpacing.sm),
+                Row(
+                  children: [
+                    Expanded(
+                      child: AppButton(
+                        label: 'Edit',
+                        icon: Icons.edit_outlined,
+                        variant: AppButtonVariant.outlined,
+                        onPressed: () => context.push(RoutePaths.editJob(job.id)),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpacing.sm),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(foregroundColor: scheme.error),
+                        icon: _deleting
+                            ? const SizedBox.square(
+                                dimension: 18,
+                                child: CircularProgressIndicator(strokeWidth: 2),
+                              )
+                            : const Icon(Icons.delete_outline),
+                        label: const Text('Delete'),
+                        onPressed: _deleting ? null : () => _delete(job),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+              if (JobStatsRow.hasStats(job)) ...[
+                const SizedBox(height: AppSpacing.md),
+                JobStatsRow(job: job),
+              ],
+              if (job.workspaceTitle != null) ...[
+                const SizedBox(height: AppSpacing.md),
+                JobWorkspaceBanner(job: job),
+              ],
               const SizedBox(height: AppSpacing.md),
               JobMissionCard(job: job),
-              const SizedBox(height: AppSpacing.md),
-              JobFitCard(job: job),
+              if (JobFitCard.hasContent(job)) ...[
+                const SizedBox(height: AppSpacing.md),
+                JobFitCard(job: job),
+              ],
             ],
           ),
         ),
@@ -120,19 +210,33 @@ class _JobDetailPageState extends ConsumerState<JobDetailPage> {
             mainAxisSize: MainAxisSize.min,
             children: [
               Text(
-                'PROFILE MATCH',
+                job.matchPercent == null ? 'POSTED BY' : 'PROFILE MATCH',
                 style: theme.textTheme.labelSmall?.copyWith(color: scheme.onSurfaceVariant),
               ),
-              Text('${job.matchPercent}%', style: theme.textTheme.titleLarge),
+              Text(
+                job.matchPercent == null ? job.company : '${job.matchPercent}%',
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: job.matchPercent == null
+                    ? theme.textTheme.titleSmall
+                    : theme.textTheme.titleLarge,
+              ),
             ],
           ),
-          action: AppButton(
-            label: applied ? 'Applied' : 'Apply Now',
-            icon: applied ? Icons.check : Icons.send_rounded,
-            variant: AppButtonVariant.accent,
-            isLoading: _applying,
-            onPressed: applied ? null : () => _apply(job),
-          ),
+          action: canApply
+              ? AppButton(
+                  label: applied ? 'Applied' : 'Apply Now',
+                  icon: applied ? Icons.check : Icons.send_rounded,
+                  variant: AppButtonVariant.accent,
+                  isLoading: _applying,
+                  onPressed: applied ? null : () => _apply(job),
+                )
+              : const AppButton(
+                  label: 'Students apply',
+                  icon: Icons.school_outlined,
+                  variant: AppButtonVariant.outlined,
+                  onPressed: null,
+                ),
         ),
       ],
     );

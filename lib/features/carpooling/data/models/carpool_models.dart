@@ -1,17 +1,5 @@
 import '../../domain/entities/new_ride.dart';
 import '../../domain/entities/ride.dart';
-
-/// Backend ride JSON (GET /carpool/rides, GET /carpool/rides/:id):
-/// { "id": "es-4091", "code": "ES-4091", "pickup": "...", "dropoff": "...",
-///   "pickupTag": "...", "dropoffTag": "...", "dropoffNote": "...",
-///   "departure": "2026-11-06T12:15:00.000Z", "arrival": "...",
-///   "distanceKm": 14.2, "pricePerSeat": 2.5, "driver": {...},
-///   "seats": [{ "id": "s1", "label": "Sarra K.", "status": "driver" }, ...],
-///   "amenities": ["nonSmoking", ...], "isMine": false }
-///
-/// Seat labels come ready to show ("You", a passenger's name, "Seat #3").
-/// A ride a student published has `"dropoffNote": ""` and `"distanceKm": 0`
-/// when not given, and a new driver (`"rating": 0, "ridesCompleted": 0`).
 abstract final class RideModel {
   static Ride fromJson(Map<String, dynamic> json) => Ride(
         id: json['id'] as String,
@@ -59,15 +47,6 @@ abstract final class RideModel {
       );
 }
 
-/// Body of POST /carpool/rides (the server answers 201 with the ride JSON):
-/// { "pickup": "...", "pickupTag": "...", "dropoff": "...", "dropoffTag": "...",
-///   "departure": "2026-11-07T07:30:00.000Z", "arrival": "...",
-///   "seatCount": 3, "pricePerSeat": 2.5,
-///   "carModel": "...", "carColor": "...", "plate": "...",
-///   "amenities": ["nonSmoking"], "dropoffNote": "...", "distanceKm": 12.4 }
-///
-/// `seatCount` counts the passenger seats only. The note and the distance
-/// are left out when not given.
 abstract final class NewRideModel {
   static Map<String, dynamic> toJson(NewRide ride) => {
         'pickup': ride.pickup.trim(),

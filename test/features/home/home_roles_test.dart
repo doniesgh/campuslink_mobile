@@ -24,6 +24,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+import '../../helpers/localized_app.dart';
+
 class _FakeAuthController extends AuthController {
   _FakeAuthController(this.role);
 
@@ -92,6 +94,7 @@ Future<_CountingTimetableRepository> _pumpApp(
       overrides: [
         authControllerProvider.overrideWith(() => _FakeAuthController(role)),
         themeModeProvider.overrideWith(_FakeThemeModeNotifier.new),
+        localeOverride(),
         clockProvider.overrideWith((ref) => Stream.value(DateTime(2026, 11, 9, 9))),
         timetableRepositoryProvider.overrideWithValue(timetable),
         forumRepositoryProvider.overrideWithValue(_QuietForumRepository()),
@@ -109,6 +112,9 @@ Future<_CountingTimetableRepository> _pumpApp(
             colorScheme: ColorScheme.fromSeed(seedColor: AppColors.primary, brightness: brightness),
           ),
           routerConfig: ref.watch(routerProvider),
+          locale: const Locale('en'),
+          supportedLocales: testSupportedLocales,
+          localizationsDelegates: testLocalizationsDelegates,
           builder: (context, child) => MediaQuery(
             data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(textScale)),
             child: child!,
@@ -152,8 +158,8 @@ void main() {
       expect(find.text("Today's Schedule"), findsNothing);
       expect(find.text('Planning'), findsNothing);
       expect(find.text('Administration'), findsOneWidget);
-      // The 12 demo accounts of the mock repository.
-      expect(find.text('12 accounts on CampusPulse'), findsOneWidget);
+      // The 14 demo accounts of the mock repository.
+      expect(find.text('14 accounts on CampusPulse'), findsOneWidget);
       expect(find.text('Comptes'), findsOneWidget);
       expect(timetable.calls, 0);
     });
@@ -184,6 +190,16 @@ void main() {
         expect(tester.takeException(), isNull);
       });
     }
+  });
+
+  testWidgets('a company has no timetable: its shortcut is the job offers', (tester) async {
+    final timetable = await _pumpApp(tester, UserRole.company);
+
+    expect(_tabLabels(tester), ['Home', 'Forum', 'Jobs', 'Profile']);
+    expect(find.text("Today's Schedule"), findsNothing);
+    expect(find.text('Administration'), findsNothing);
+    expect(find.text('Offres'), findsOneWidget);
+    expect(timetable.calls, 0);
   });
 
   testWidgets('an alumni has no timetable and no Administration', (tester) async {

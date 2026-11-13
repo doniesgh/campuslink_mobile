@@ -57,7 +57,8 @@ To start from nothing instead:
 1. On dashboard.render.com, choose **New › Blueprint**, connect GitHub and pick **this repository**. Render reads `render.yaml`.
 2. Fill in the values it asks for:
    - **`MONGO_URL`**: the Atlas address above.
-   - **`MAIL_RELAY_URL`, `MAIL_RELAY_SECRET`, `SMTP_*`** (optional): real emails for sign-up codes and password resets. Leave them empty for now (see [Emails](#emails-sign-up-codes-and-password-resets) below): the codes are then printed in Render's **Logs**.
+   - **`MAIL_RELAY_URL`, `MAIL_RELAY_SECRET`, `SMTP_*`** (optional): real emails for password resets. Leave them empty for now (see [Emails](#emails-password-reset-codes) below): the reset codes are then printed in Render's **Logs**.
+   - **`OPENROUTER_API_KEY`, `OPENROUTER_MODEL`, `OPENROUTER_ALLOW_DATA_COLLECTION`** (optional): the AI features. Leave them empty to keep AI off. With a key from openrouter.ai/keys and the free models (`OPENROUTER_MODEL` empty), set `OPENROUTER_ALLOW_DATA_COLLECTION` to `true` (see `backend/.env.example`).
 
    Click **Apply**. Render generates `JWT_ACCESS_SECRET` itself.
 3. **Push notifications:**
@@ -83,9 +84,9 @@ Remove-Item Env:MONGO_URL
 - **`seed`** creates the demo accounts and the data of every screen. **Running it again resets them**, so everything teammates changed in the demo data is lost.
 - **`create-admin`** gives the demo admin a new password. The default one is written in this repository, so anyone could otherwise manage the users. Share the new one only with the team.
 
-### Emails: sign-up codes and password resets
+### Emails: password-reset codes
 
-Without email settings, the API prints the codes in Render's **Logs**. Teammates then can't verify a new account themselves, and an admin has to create their accounts.
+Sign-up sends no email: a new account is signed in at once. Emails are only used for **Forgot password**. Without email settings, the API prints the reset codes in Render's **Logs**, so a teammate who forgets their password needs someone who can read the logs (or an admin can set a new password from the Users screen).
 
 **Render's free plan blocks the usual email ports** (25, 465, 587), so Gmail's SMTP can't work there. Instead, the API sends through **Gmail with a small Google Apps Script**, which it calls over HTTPS. The emails come from your Gmail address, up to **100 a day**.
 
@@ -112,7 +113,7 @@ Without email settings, the API prints the codes in Render's **Logs**. Teammates
    - The relay replaces SMTP when both are set.
    - `SMTP_FROM` only gives the sender name and the test's default recipient.
 6. **Put them on Render:** in the service's **Environment**, set `MAIL_RELAY_URL`, `MAIL_RELAY_SECRET` and `SMTP_FROM` to the same values, then **Save, rebuild and deploy**.
-7. **Check it** by registering in the app with a real address: the code arrives by email.
+7. **Check it** with **Forgot password** in the app, for an account with a real address: the code arrives by email.
 
 If you change the script later, choose **Deploy › Manage deployments ›** ✏️ **› Version: New version › Deploy**. The URL stays the same.
 
@@ -133,7 +134,7 @@ If you change the script later, choose **Deploy › Manage deployments ›** ✏
    ```
    Then run `cd backend && npm run mail:test -- <your address>`. It must end with `Sent to …`, and the email arrives (check the spam folder). Otherwise it says what to fix.
 5. **Put them on Render:** in the service's **Environment**, set `SMTP_HOST`, `SMTP_USER`, `SMTP_PASS` and `SMTP_FROM` to the same values (`SMTP_PORT` is already `2525`), then **Save, rebuild and deploy**.
-6. **Check it** by registering in the app with a real address: the code arrives by email.
+6. **Check it** with **Forgot password** in the app, for an account with a real address: the code arrives by email.
 
 ### The free plan sleeps: UptimeRobot keeps it awake
 

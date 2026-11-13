@@ -1,5 +1,6 @@
 import type { Types } from 'mongoose';
 
+import { UserModel } from '../users/user.model';
 import { JobApplicationModel, JobModel } from './jobs.model';
 
 // The offers of the app's MockJobRepository.
@@ -114,5 +115,62 @@ export async function seedJobs(demoUserId: Types.ObjectId): Promise<void> {
   for (const job of DEMO_JOBS) {
     await JobModel.replaceOne({ _id: job._id }, job, { upsert: true, runValidators: true });
   }
+  await seedCompanyOffers();
   await JobApplicationModel.deleteMany({ userId: demoUserId });
+}
+
+/**
+ * Offers posted by the demo companies (created by the seed script before the
+ * modules), so a company account can show Edit / Delete right away. Skipped
+ * for a company account that doesn't exist.
+ */
+const COMPANY_OFFERS = [
+  {
+    _id: 'medina-soft-flutter',
+    email: 'nadia.kooli@campus.test',
+    title: 'Flutter Mobile Developer Intern',
+    company: 'Medina Soft',
+    location: 'Les Berges du Lac, Tunis',
+    period: 'Feb – Jul 2026',
+    durationMonths: 6,
+    stipendTnd: 800,
+    tags: ['PFE 2026', 'Hybrid'],
+    skills: ['Flutter', 'Dart', 'Riverpod', 'REST APIs', 'Git'],
+    mission:
+      'Medina Soft builds mobile apps for Tunisian retailers. As a PFE intern you will join the mobile team ' +
+      'to build a new loyalty app in Flutter: screens from Figma designs, state management with Riverpod, ' +
+      'a REST API written by our backend team, offline caching and push notifications. You will take part ' +
+      'in code reviews and sprint demos, and ship a first version to the stores before the end of your ' +
+      'internship. We are looking for a curious 5th-year engineering student who already built a small ' +
+      'Flutter or React Native app.',
+  },
+  {
+    _id: 'carthage-data-analyst',
+    email: 'walid.sassi@campus.test',
+    title: 'Junior Data Analyst',
+    company: 'Carthage Data',
+    location: 'Sfax (on site)',
+    period: 'From March 2026',
+    durationMonths: null,
+    stipendTnd: null,
+    tags: ['Full-time', 'Graduate job'],
+    skills: ['SQL', 'Python', 'Power BI', 'Statistics'],
+    mission:
+      'Carthage Data helps banks and insurers in Tunisia make sense of their data. You will clean and model ' +
+      'data with SQL and Python, build Power BI dashboards for our clients, and present your findings to ' +
+      'business teams. A senior analyst mentors you during your first six months. Recent graduates in ' +
+      'computer science, statistics or business intelligence are welcome; French and English are required.',
+  },
+];
+
+async function seedCompanyOffers(): Promise<void> {
+  for (const { email, ...offer } of COMPANY_OFFERS) {
+    const company = await UserModel.findOne({ email }).select('_id');
+    if (!company) continue;
+    await JobModel.replaceOne(
+      { _id: offer._id },
+      { ...offer, authorId: company._id },
+      { upsert: true, runValidators: true },
+    );
+  }
 }

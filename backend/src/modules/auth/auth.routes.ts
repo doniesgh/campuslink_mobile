@@ -1,8 +1,9 @@
 import { Router } from 'express';
 
+import { localeOf } from '../../lib/i18n';
+import { requestMeta } from '../../lib/request-context';
 import { validateBody } from '../../lib/validate';
-import { authRateLimit } from '../../middleware/rate-limit';
-import { currentUserId, requireAuth } from '../../middleware/require-auth';
+import { authIpLimit, authLimit } from '../../middleware/rate-limit';
 import {
   forgotPasswordSchema,
   loginSchema,
@@ -10,7 +11,6 @@ import {
   refreshSchema,
   registerSchema,
   resetPasswordSchema,
-  verifyEmailSchema,
   type LoginInput,
   type LogoutInput,
   type RegisterInput,
@@ -18,16 +18,33 @@ import {
 } from './auth.schemas';
 import * as auth from './auth.service';
 
-/** Routes under /api/auth. Bodies are validated (and normalised) before reaching the service. */
+/**
+ * Routes under /api/auth. Bodies are validated (and normalised) before
+ * reaching the service. Register, login and the password reset are
+ * rate-limited per route, IP and email (`authLimit`, before the body is
+ * validated) and per IP (`authIpLimit`). Refresh and logout are not.
+ */
 export const authRouter = Router();
 
-authRouter.post('/register', authRateLimit, validateBody(registerSchema), async (req, res) => {
-  res.status(201).json(await auth.register(req.body as RegisterInput));
-});
+authRouter.post(
+  '/register',
+  authLimit('register'),
+  authIpLimit,
+  validateBody(registerSchema),
+  async (req, res) => {
+    res.status(201).json(await auth.register(req.body as RegisterInput, localeOf(req)));
+  },
+);
 
-authRouter.post('/login', authRateLimit, validateBody(loginSchema), async (req, res) => {
-  res.json(await auth.login(req.body as LoginInput));
-});
+authRouter.post(
+  '/login',
+  authLimit('login'),
+  authIpLimit,
+  validateBody(loginSchema),
+  async (req, res) => {
+    res.json(await auth.login(req.body as LoginInput));
+  },
+);
 
 authRouter.post('/refresh', validateBody(refreshSchema), async (req, res) => {
   res.json(await auth.refresh((req.body as { refreshToken: string }).refreshToken));
@@ -41,7 +58,8 @@ authRouter.post('/logout', validateBody(logoutSchema), async (req, res) => {
 
 authRouter.post(
   '/forgot-password',
-  authRateLimit,
+  authLimit('forgot-password'),
+  authIpLimit,
   validateBody(forgotPasswordSchema),
   async (req, res) => {
     await auth.forgotPassword((req.body as { email: string }).email);
@@ -51,26 +69,11 @@ authRouter.post(
 
 authRouter.post(
   '/reset-password',
-  authRateLimit,
+  authLimit('reset-password'),
+  authIpLimit,
   validateBody(resetPasswordSchema),
   async (req, res) => {
-    await auth.resetPassword(req.body as ResetPasswordInput);
+    await auth.resetPassword(req.body as ResetPasswordInput, requestMeta(req));
     res.json({ message: 'Password updated. Sign in with your new password.' });
   },
 );
-
-authRouter.post(
-  '/verify-email',
-  authRateLimit,
-  requireAuth,
-  validateBody(verifyEmailSchema),
-  async (req, res) => {
-    const user = await auth.verifyEmail(currentUserId(res), (req.body as { code: string }).code);
-    res.json({ user });
-  },
-);
-
-authRouter.post('/resend-verification', authRateLimit, requireAuth, async (_req, res) => {
-  await auth.resendVerification(currentUserId(res));
-  res.status(204).end();
-});

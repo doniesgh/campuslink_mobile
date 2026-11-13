@@ -34,14 +34,11 @@ class CarpoolingSection extends ConsumerWidget {
             AppSpacing.page, AppSpacing.sm, AppSpacing.page, 96, // room for the FAB
           ),
           children: [
-            
-            const SizedBox(height: AppSpacing.lg),
+           
             Row(
               children: [
                 Text('Available Departures', style: theme.textTheme.titleMedium),
-                const Spacer(),
-                Text('Latest first', style: theme.textTheme.labelSmall),
-                const Icon(Icons.expand_more, size: 16),
+                
               ],
             ),
             const SizedBox(height: AppSpacing.md),
@@ -56,6 +53,7 @@ class CarpoolingSection extends ConsumerWidget {
                     onTap: () => context.push(RoutePaths.ride(ride.id)),
                   ),
                 ),
+          
           ],
         );
       },

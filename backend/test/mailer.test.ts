@@ -3,7 +3,6 @@ import {
   createSmtpMailer,
   passwordResetEmail,
   senderName,
-  verificationEmail,
 } from '../src/modules/auth/mailer';
 
 describe('createRelayMailer (Gmail through Google Apps Script)', () => {
@@ -19,7 +18,7 @@ describe('createRelayMailer (Gmail through Google Apps Script)', () => {
   test('posts the email with the secret as JSON, and follows the redirect', async () => {
     const post = answering(200, JSON.stringify({ ok: true, remainingToday: 99 }));
 
-    await createRelayMailer(relay, post).sendVerificationCode('sarra@campus.test', '042917');
+    await createRelayMailer(relay, post).sendPasswordResetCode('sarra@campus.test', '042917');
 
     expect(post).toHaveBeenCalledTimes(1);
     const [url, init] = post.mock.calls[0] as [string, RequestInit];
@@ -34,7 +33,7 @@ describe('createRelayMailer (Gmail through Google Apps Script)', () => {
       secret: relay.secret,
       to: 'sarra@campus.test',
       name: 'CampusPulse',
-      subject: 'Verify your CampusPulse email',
+      subject: 'Reset your CampusPulse password',
     });
     expect(body.text).toContain('042917');
     expect(body.html).toContain('042917');
@@ -50,14 +49,14 @@ describe('createRelayMailer (Gmail through Google Apps Script)', () => {
   test('a web page instead of JSON (wrong access or URL) says what to check', async () => {
     const post = answering(200, '<html><title>Sign in - Google Accounts</title></html>');
     await expect(
-      createRelayMailer(relay, post).sendVerificationCode('a@b.c', '123456'),
+      createRelayMailer(relay, post).sendPasswordResetCode('a@b.c', '123456'),
     ).rejects.toThrow('Who has access: Anyone');
   });
 
   test('network errors reach the caller', async () => {
     const post = jest.fn().mockRejectedValue(new TypeError('fetch failed'));
     await expect(
-      createRelayMailer(relay, post).sendVerificationCode('a@b.c', '123456'),
+      createRelayMailer(relay, post).sendPasswordResetCode('a@b.c', '123456'),
     ).rejects.toThrow('fetch failed');
   });
 });
@@ -69,30 +68,21 @@ test('the sender name comes from SMTP_FROM', () => {
 });
 
 describe('createSmtpMailer', () => {
-  test('sends the verification code from the configured address', async () => {
+  test('sends the password reset code from the configured address', async () => {
     const sendMail = jest.fn().mockResolvedValue({});
     const mailer = createSmtpMailer({ sendMail }, 'CampusPulse <no-reply@campus.test>');
 
-    await mailer.sendVerificationCode('sarra@campus.test', '042917');
+    await mailer.sendPasswordResetCode('sarra@campus.test', '042917');
 
     expect(sendMail).toHaveBeenCalledTimes(1);
     const message = sendMail.mock.calls[0][0];
     expect(message).toMatchObject({
       from: 'CampusPulse <no-reply@campus.test>',
       to: 'sarra@campus.test',
-      subject: 'Verify your CampusPulse email',
+      subject: 'Reset your CampusPulse password',
     });
     expect(message.text).toContain('042917');
     expect(message.html).toContain('042917');
-  });
-
-  test('sends the password reset code', async () => {
-    const sendMail = jest.fn().mockResolvedValue({});
-    await createSmtpMailer({ sendMail }, 'x@campus.test').sendPasswordResetCode('a@b.c', '123456');
-    expect(sendMail.mock.calls[0][0]).toMatchObject({
-      to: 'a@b.c',
-      subject: 'Reset your CampusPulse password',
-    });
   });
 
   test('passes SMTP errors to the caller (the auth service logs them)', async () => {
@@ -100,13 +90,12 @@ describe('createSmtpMailer', () => {
       { sendMail: jest.fn().mockRejectedValue(new Error('SMTP down')) },
       'x@campus.test',
     );
-    await expect(mailer.sendVerificationCode('a@b.c', '123456')).rejects.toThrow('SMTP down');
+    await expect(mailer.sendPasswordResetCode('a@b.c', '123456')).rejects.toThrow('SMTP down');
   });
 });
 
-test('email contents mention the code and its expiry', () => {
-  for (const email of [verificationEmail('654321'), passwordResetEmail('654321')]) {
-    expect(email.text).toContain('654321');
-    expect(email.text).toContain('15 minutes');
-  }
+test('the email mentions the code and its expiry', () => {
+  const email = passwordResetEmail('654321');
+  expect(email.text).toContain('654321');
+  expect(email.text).toContain('15 minutes');
 });

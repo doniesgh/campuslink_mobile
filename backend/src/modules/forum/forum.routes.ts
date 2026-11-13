@@ -6,9 +6,11 @@ import {
   lostItemRequestSchema,
   publishIdeaSchema,
   publishLostItemSchema,
+  updateLostItemSchema,
   type LostItemRequestInput,
   type PublishIdeaInput,
   type PublishLostItemInput,
+  type UpdateLostItemInput,
 } from './forum.schemas';
 import * as forum from './forum.service';
 
@@ -20,6 +22,7 @@ forumRouter.get('/highlights', async (_req, res) => {
   res.json(await forum.listHighlights(currentUserId(res)));
 });
 
+/** The board, with `isMine` / `canManage` for the signed-in user. */
 forumRouter.get('/lost-items', async (_req, res) => {
   res.json(await forum.listLostItems(currentUserId(res)));
 });
@@ -28,6 +31,33 @@ forumRouter.get('/lost-items', async (_req, res) => {
 forumRouter.post('/lost-items', validateBody(publishLostItemSchema), async (req, res) => {
   const input = req.body as PublishLostItemInput;
   res.status(201).json(await forum.publishLostItem(currentUserId(res), input));
+});
+
+/**
+ * Edits a notice and/or sets its `status` ('active' | 'resolved'). Its
+ * reporter or an admin only (403), 404 unknown. Answers the edited item.
+ */
+forumRouter.patch(
+  '/lost-items/:id',
+  validateBody(updateLostItemSchema),
+  async (req: Request<{ id: string }>, res) => {
+    const input = req.body as UpdateLostItemInput;
+    res.json(await forum.updateLostItem(currentUserId(res), req.params.id, input));
+  },
+);
+
+/** Deletes a notice (and the requests about it). Its reporter or an admin only. 204. */
+forumRouter.delete('/lost-items/:id', async (req: Request<{ id: string }>, res) => {
+  await forum.deleteLostItem(currentUserId(res), req.params.id);
+  res.status(204).end();
+});
+
+/**
+ * "Possible matches": `{ items: [{ item, score, reason, reasons, ai }], ai, model }`.
+ * Rules, re-ranked by the AI when it is configured (rules only if it fails).
+ */
+forumRouter.get('/lost-items/:id/matches', async (req: Request<{ id: string }>, res) => {
+  res.json(await forum.findLostItemMatches(currentUserId(res), req.params.id));
 });
 
 forumRouter.post(

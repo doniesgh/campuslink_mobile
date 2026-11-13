@@ -4,46 +4,61 @@ class MissionItem {
   final String description;
 }
 
+/// An internship / PFE / job offer.
+///
+/// The seeded catalogue has every field. Offers posted by a company or an
+/// admin only have what the form asks for: the other fields are null or
+/// empty, and the screens hide what is missing.
 class Job {
   const Job({
     required this.id,
     required this.title,
     required this.company,
-    required this.location,
-    required this.tags,
-    required this.stipendTnd,
-    required this.durationMonths,
-    required this.period,
-    required this.labGroup,
-    required this.labGroupNote,
-    required this.workspaceTitle,
-    required this.workspaceBadges,
     required this.mission,
-    required this.missionItems,
-    required this.matchPercent,
-    required this.criteria,
-    required this.skills,
+    this.location = '',
+    this.tags = const [],
+    this.stipendTnd,
+    this.durationMonths,
+    this.period = '',
+    this.labGroup,
+    this.labGroupNote,
+    this.workspaceTitle,
+    this.workspaceBadges = const [],
+    this.missionItems = const [],
+    this.matchPercent,
+    this.criteria = const [],
+    this.skills = const [],
     this.featuredLabel,
     this.hasApplied = false,
+    this.authorId,
+    this.canEdit = false,
   });
 
   final String id;
   final String title;
   final String company;
+
+  /// '' when the offer doesn't say.
   final String location;
 
   /// e.g. "PFE 2025", "Hybrid (3 days on-site)", "Coeff PFE 20.0"
   final List<String> tags;
-  final int stipendTnd;
-  final int durationMonths;
+  final int? stipendTnd;
+  final int? durationMonths;
+
+  /// e.g. "Feb – Jul 2025"; '' when the offer doesn't say.
   final String period;
-  final String labGroup;
-  final String labGroupNote;
-  final String workspaceTitle;
+  final String? labGroup;
+  final String? labGroupNote;
+  final String? workspaceTitle;
   final List<String> workspaceBadges;
+
+  /// The description of the offer.
   final String mission;
   final List<MissionItem> missionItems;
-  final int matchPercent;
+
+  /// The student's profile match; null for offers posted by recruiters.
+  final int? matchPercent;
   final List<String> criteria;
   final List<String> skills;
 
@@ -53,7 +68,16 @@ class Job {
   /// Whether the signed-in student already applied to this offer.
   final bool hasApplied;
 
+  /// The company or admin who posted it; null for the seeded catalogue.
+  final String? authorId;
+
+  /// Whether the signed-in user may edit and delete it (its author, or an admin).
+  final bool canEdit;
+
   bool get isFeatured => featuredLabel != null;
+
+  /// "Company · Location", or just the company when there is no location.
+  String get companyLine => location.isEmpty ? company : '$company · $location';
 
   /// This offer with [hasApplied] set to [applied].
   Job withApplied(bool applied) => Job(
@@ -76,6 +100,8 @@ class Job {
         skills: skills,
         featuredLabel: featuredLabel,
         hasApplied: applied,
+        authorId: authorId,
+        canEdit: canEdit,
       );
 
   String get companyInitials {

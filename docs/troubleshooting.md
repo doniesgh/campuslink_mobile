@@ -37,7 +37,7 @@ Problems we actually hit while building CampusPulse, and how to fix them.
 - **Fix:** sign in as `admin@campus.test` / `CampusPulseAdmin2026!` (after `npm run seed`). If an admin has just promoted you, sign out and in again.
 
 **There's no Timetable tab**
-- **This is expected for admins and alumni.** They follow no classes, so they get four tabs and no class sections on Home. The API refuses them the timetable and courses (403).
+- **This is expected for admins, alumni and companies.** They follow no classes, so they get four tabs and no class sections on Home. The API refuses them the timetable and courses (403).
 - **Fix:** if the account should have classes, an admin changes its role to Student or Teacher. The user then signs out and in again.
 
 **An admin screen says "Only administrators can do this."**
@@ -81,8 +81,8 @@ Problems we actually hit while building CampusPulse, and how to fix them.
 **"You already applied" / a seat is already booked in the demo**
 - **Fix:** `npm run seed` resets the demo student's own actions.
 
-**I registered but never got the verification email**
-- **Cause:** without `SMTP_HOST`, emails are not sent. The code is printed in the backend terminal: `[mail] Verification code for …: 123456`.
+**I asked for a password reset but never got the email**
+- **Cause:** without `SMTP_HOST` (or `MAIL_RELAY_URL`), emails are not sent. The code is printed in the backend terminal: `[mail] Password reset code for …: 123456`. (Sign-up sends no email at all: a new account is signed in at once.)
 - **Fix:** read the code there, or configure SMTP in `backend/.env`.
 
 ## Push notifications
@@ -95,7 +95,7 @@ Problems we actually hit while building CampusPulse, and how to fix them.
 5. **On an emulator**, the system image must include Google APIs (ours, `google_apis`, does).
 
 **No class reminder arrives.**
-- **Check the account:** reminders go to students and teachers only, never to admins or alumni.
+- **Check the account:** reminders go to students and teachers only, never to admins, alumni or companies.
 - **Check the timing:** they go out 15 minutes before a session of today's timetable (campus time, UTC+1), only while the API runs with push on. At start it logs `[push] Class reminders on`.
 - **Check the channel:** you may have muted **Class reminders** in Android's settings for CampusPulse.
 - **Test now:** `npm run push:test -- <you> --class` sends the next one.

@@ -27,6 +27,7 @@ import {
   createAdmin,
   createStudent,
   type TestAccount,
+  validationError,
 } from './helpers';
 
 const app = createApp();
@@ -38,7 +39,7 @@ afterAll(closeTestDb);
 beforeEach(async () => {
   await clearTestDb();
   push.reset();
-  mail.codes.length = 0;
+  mail.emails.length = 0;
   mail.resets.length = 0;
 });
 // No background push may leak into the next test.
@@ -161,7 +162,7 @@ describe('PUT /api/push/devices', () => {
       [{ token: 'fcm-token-1', platform: 'web' }, 'Platform: android or ios'],
     ];
     for (const [body, message] of cases) {
-      await registerDevice(student.auth, body).expect(422, { message });
+      await registerDevice(student.auth, body).expect(422, validationError(message));
     }
     await registerDevice(student.auth, { token: 'x'.repeat(4096), platform: 'android' }).expect(204);
   });
@@ -193,9 +194,10 @@ describe('DELETE /api/push/devices', () => {
   test('requires a session and a token', async () => {
     await request(app).delete('/api/push/devices').send({ token: 't' }).expect(401);
     const student = await createStudent();
-    await unregisterDevice(student.auth, {}).expect(422, {
-      message: 'Send the push token of this device',
-    });
+    await unregisterDevice(student.auth, {}).expect(
+      422,
+      validationError('Send the push token of this device'),
+    );
   });
 });
 
@@ -253,13 +255,15 @@ describe('cleaning up phones', () => {
 
   test('logout validates the pushToken', async () => {
     const { refreshToken } = await signUp();
-    await logout({ refreshToken, pushToken: 'x'.repeat(4097) }).expect(422, {
-      message: 'The push token is too long (at most 4096 characters)',
-    });
-    await logout({ refreshToken, pushToken: 42 }).expect(422, {
-      message: 'The push token must be text',
-    });
-    await logout({ pushToken: 'this-phone' }).expect(422, { message: 'Missing refresh token' });
+    await logout({ refreshToken, pushToken: 'x'.repeat(4097) }).expect(
+      422,
+      validationError('The push token is too long (at most 4096 characters)'),
+    );
+    await logout({ refreshToken, pushToken: 42 }).expect(
+      422,
+      validationError('The push token must be text'),
+    );
+    await logout({ pushToken: 'this-phone' }).expect(422, validationError('Missing refresh token'));
   });
 
   test("revokeAllSessions removes every phone of the user (and only theirs)", async () => {

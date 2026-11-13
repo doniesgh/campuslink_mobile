@@ -20,6 +20,7 @@ npm run dev               # http://127.0.0.1:3000/api, restarts on file changes
 
 Demo student: ENT ID `211JMT0428` (or email `dony.mansour@campus.test`), password `CampusPulse2026!`.
 Demo admin: `admin@campus.test`, password `CampusPulseAdmin2026!`.
+Demo companies (recruiters): `nadia.kooli@campus.test` (Medina Soft) and `walid.sassi@campus.test` (Carthage Data), password `CampusPulse2026!`.
 
 Run the app with `env/local.json` (VS Code: **CampusPulse (local backend)**) to use this API. With `env/dev.json` the app uses its built-in demo data and needs no server.
 
@@ -34,7 +35,7 @@ Run the app with `env/local.json` (VS Code: **CampusPulse (local backend)**) to 
 | `npm run db:check` | Check the database address in `MONGO_URL` (e.g. the Atlas one): connects, writes and deletes one document, and says what is wrong (password, network access, host) without printing the password |
 | `npm run push:test -- <email or ENT ID>` | Add a "Push test" notification to that account and push it to its phones. Prints how many phones got it, and says so when push is off or the account has no registered phone |
 | `npm run push:test -- <email or ENT ID> --class` | Push that account the reminder of the next class of the timetable, now (a preview: the real reminder still goes out 15 min before) |
-| `npm test` | Jest + Supertest on a throwaway `campuspulse_test_<n>` database. Set `TEST_DB_PREFIX` to keep simultaneous runs apart |
+| `npm test` | Jest + Supertest on a throwaway `campuspulse_test_<n>` database. Set `TEST_DB_PREFIX` to keep simultaneous runs apart. AI is always off in tests (a test turns on a fake with `useFakeOpenRouter()`), and so are the rate limits (`enforceRateLimitsInTests()`) |
 | `npm run typecheck` | Type-check src and tests |
 | `npm run build` / `npm start` | Compile to `dist/` and run it |
 
@@ -44,12 +45,15 @@ Run the app with `env/local.json` (VS Code: **CampusPulse (local backend)**) to 
 src/
 ├── server.ts / app.ts        start-up · Express app (security middleware, /api routers, error handler)
 ├── config/env.ts             .env validated with Zod
-├── lib/ · middleware/        HttpError, validateBody, requireAuth, requireRole, rate limit, error handler
+├── lib/                      http-error (HttpError + codes) · validate (Zod, 422 VALIDATION_ERROR) · request-context (actor, IP, User-Agent) · i18n (fr/en) · openrouter (AI client)
+├── middleware/               requireAuth · requireRole · rate-limit (createLimiter, authLimit, authIpLimit, userLimit) · error handler
 ├── modules/<name>/           routes · schemas · service · model · seed (one folder per feature)
 └── scripts/                  seed.ts (npm run seed) · create-admin.ts (npm run create-admin) · push-test.ts (npm run push:test) · db-check.ts (npm run db:check)
 ```
 
-The modules are auth, users, timetable, courses, carpool, jobs, forum, grades, profile, notifications, push (the phones that get push notifications) and admin (user management and audit log, admins only).
+The modules are auth, users (the signed-in user's own account: `GET`/`PATCH /users/me`), timetable, courses, carpool, jobs, forum, grades, profile, notifications, push (the phones that get push notifications) and admin (user management and audit log, admins only).
+
+Roles: `student`, `teacher`, `admin`, `alumni` and `company` (a recruiter). Only students and teachers have classes (`ROLES_WITH_CLASSES`). Every account has a `locale` (`fr`, the default, or `en`): its emails are written in it. Errors are `{ message, code?, ...details }`; the codes and the rate limits are listed in [api.md › Conventions](../docs/api.md#conventions).
 
 ## Settings
 
@@ -58,7 +62,8 @@ Every setting is documented in [`.env.example`](.env.example). The main ones are
 - `JWT_ACCESS_SECRET`, which is required.
 - `MONGO_URL`.
 - `HOST` and `PORT`. Use `HOST=0.0.0.0` for real phones on your Wi-Fi.
-- `SMTP_*`, for real emails. Without `SMTP_HOST`, verification and reset codes are printed in the console as `[mail] …`.
+- `SMTP_*`, for real emails. Without `SMTP_HOST`, password-reset codes are printed in the console as `[mail] …` (sign-up sends no email).
+- `OPENROUTER_API_KEY`, `OPENROUTER_MODEL` and `OPENROUTER_ALLOW_DATA_COLLECTION`, for the AI features (optional). Without a key, AI is off and every feature works without it. `OPENROUTER_MODEL` is one model or several, comma-separated, tried in order; empty, it is the free `nvidia/nemotron-3.5-lightning:free,google/gemma-4-31b-it:free` (about 50 requests a day), which need `OPENROUTER_ALLOW_DATA_COLLECTION=true`. Code: `src/lib/openrouter.ts` (`isAiConfigured()`, `chatJson({ system, user, schema?, schemaName?, maxTokens?, timeoutMs? })`).
 - `FIREBASE_SERVICE_ACCOUNT_FILE`, for push notifications: the path (relative paths start in `backend/`) of a service account key from the Firebase console (**Project settings › Service accounts › Generate new private key**). The key is a secret: keep it out of git (`.gitignore` skips `*firebase-adminsdk*.json`). At start-up the console says `[push] On: …`, or `[push] Off: …` with the reason. When it is off, phones are still registered but nothing is sent.
 
 ## Known limitation

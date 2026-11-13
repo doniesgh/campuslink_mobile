@@ -33,7 +33,7 @@ class JobCard extends StatelessWidget {
                   children: [
                     Text(job.title, style: theme.textTheme.titleSmall),
                     Text(
-                      '${job.company} · ${job.location}',
+                      job.companyLine,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: theme.textTheme.bodySmall?.copyWith(color: muted),
@@ -41,7 +41,8 @@ class JobCard extends StatelessWidget {
                   ],
                 ),
               ),
-              AppBadge('${job.matchPercent}% Match', tone: BadgeTone.success),
+              if (job.matchPercent != null)
+                AppBadge('${job.matchPercent}% Match', tone: BadgeTone.success),
             ],
           ),
           const SizedBox(height: AppSpacing.md),
@@ -52,7 +53,8 @@ class JobCard extends StatelessWidget {
               if (job.hasApplied)
                 const AppBadge('Applied', tone: BadgeTone.primary, icon: Icons.check, solid: true),
               for (final t in job.tags) AppBadge(t, tone: BadgeTone.neutral),
-              AppBadge('${formatThousands(job.stipendTnd)} TND/mo', tone: BadgeTone.accent),
+              if (job.stipendTnd != null)
+                AppBadge('${formatThousands(job.stipendTnd!)} TND/mo', tone: BadgeTone.accent),
             ],
           ),
         ],

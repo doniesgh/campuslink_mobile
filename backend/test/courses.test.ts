@@ -10,7 +10,7 @@ import {
 } from '../src/modules/courses/courses.model';
 import { seedCourses } from '../src/modules/courses/courses.seed';
 import type { CourseJson, CourseResourceJson } from '../src/modules/courses/courses.service';
-import { clearTestDb, closeTestDb, connectTestDb, createStudent } from './helpers';
+import { clearTestDb, closeTestDb, connectTestDb, createStudent, validationError } from './helpers';
 
 const app = createApp();
 
@@ -243,7 +243,7 @@ describe('PUT /api/courses/:courseId/attendance', () => {
       .set(auth)
       .send(body)
       .expect(422);
-    expect(res.body).toEqual({ message: 'Say whether you were present (true or false)' });
+    expect(res.body).toEqual(validationError('Say whether you were present (true or false)'));
   });
 });
 
@@ -309,7 +309,7 @@ describe('POST /api/courses/assignments/:assignmentId/submission', () => {
   ])('%s is a 422 with a readable message', async (_name, repoUrl) => {
     const { auth } = await demoStudent();
     const res = await submit(auth, 'gl-lab-3', repoUrl).expect(422);
-    expect(res.body).toEqual({ message: 'Enter a valid https:// repository link.' });
+    expect(res.body).toEqual(validationError('Enter a valid https:// repository link.'));
   });
 
   test('a missing link is a 422', async () => {
@@ -319,7 +319,7 @@ describe('POST /api/courses/assignments/:assignmentId/submission', () => {
       .set(auth)
       .send({})
       .expect(422);
-    expect(res.body).toEqual({ message: 'Enter a valid https:// repository link.' });
+    expect(res.body).toEqual(validationError('Enter a valid https:// repository link.'));
   });
 
   test.each(['nope', 'gl-lesson-7'])('%s is not an assignment: 404', async (id) => {

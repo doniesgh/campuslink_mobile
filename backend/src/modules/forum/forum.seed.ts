@@ -83,7 +83,15 @@ function demoPosts(now: Date) {
   ];
 }
 
-function demoLostItems(now: Date) {
+/** The demo student's name (scripts/seed.ts), as the app's mock shows it. */
+const DEMO_STUDENT_NAME = 'Dony Mansour';
+
+/**
+ * The demo notices. The demo student reported "lf-407" (so can edit,
+ * resolve or delete it, and its "Possible matches" find "lf-409"); the
+ * others have no account (only an admin can manage them).
+ */
+function demoLostItems(now: Date, demoUserId: Types.ObjectId) {
   return [
     {
       _id: 'lf-409',
@@ -131,6 +139,19 @@ function demoLostItems(now: Date) {
       distinctiveDetail: 'Boîtier 3 boutons noir',
     },
     {
+      _id: 'lf-407',
+      kind: 'lost',
+      title: 'Calculatrice graphique TI-84',
+      category: 'calculator',
+      zone: 'Bloc C',
+      location: 'Salle C10 (Ghazela)',
+      place: 'classroom',
+      reporterId: demoUserId,
+      reporterName: DEMO_STUDENT_NAME,
+      reportedAt: daysAgoAt(now, 1, 11),
+      distinctiveDetail: 'Étiquette « D.M. » au dos',
+    },
+    {
       _id: 'lf-404',
       kind: 'lost',
       title: "Carte d'étudiant ESPRIT",
@@ -176,13 +197,13 @@ function demoLostItems(now: Date) {
 /**
  * Demo data for this module. Called by `npm run seed` with the demo
  * student's id. Idempotent: the demo posts and items are replaced (fresh
- * dates), and the demo student's requests and idea votes are cleared so the
+ * dates, active again), and the demo student's requests and idea votes are cleared so the
  * claim and upvote flows can be shown again. Other students' requests and
  * votes, and the posts and notices published from the app, are kept.
  */
 export async function seedForum(demoUserId: Types.ObjectId, now = new Date()): Promise<void> {
   const posts = demoPosts(now);
-  const items = demoLostItems(now);
+  const items = demoLostItems(now, demoUserId);
 
   await ForumPostModel.deleteMany({ _id: { $in: posts.map((p) => p._id) } });
   await ForumPostModel.insertMany(posts);

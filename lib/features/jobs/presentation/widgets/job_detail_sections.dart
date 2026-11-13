@@ -52,7 +52,7 @@ class JobHeaderCard extends StatelessWidget {
                         const SizedBox(width: AppSpacing.xs),
                         Expanded(
                           child: Text(
-                            '${job.company} · ${job.location}',
+                            job.companyLine,
                             style: theme.textTheme.bodySmall
                                 ?.copyWith(color: scheme.onSurfaceVariant),
                           ),
@@ -64,63 +64,75 @@ class JobHeaderCard extends StatelessWidget {
               ),
             ],
           ),
-          const SizedBox(height: AppSpacing.md),
-          Wrap(
-            spacing: AppSpacing.sm,
-            runSpacing: AppSpacing.sm,
-            children: [
-              for (var i = 0; i < job.tags.length; i++)
-                AppBadge(job.tags[i], tone: _tones[i % _tones.length]),
-            ],
-          ),
+          if (job.tags.isNotEmpty) ...[
+            const SizedBox(height: AppSpacing.md),
+            Wrap(
+              spacing: AppSpacing.sm,
+              runSpacing: AppSpacing.sm,
+              children: [
+                for (var i = 0; i < job.tags.length; i++)
+                  AppBadge(job.tags[i], tone: _tones[i % _tones.length]),
+              ],
+            ),
+          ],
         ],
       ),
     );
   }
 }
 
-/// Stipend / duration / lab group tiles.
+/// Stipend / duration / lab group tiles: only those the offer has (posted
+/// offers may have none; check [hasStats] before showing the row).
 class JobStatsRow extends StatelessWidget {
   const JobStatsRow({super.key, required this.job});
 
   final Job job;
 
+  static bool hasStats(Job job) =>
+      job.stipendTnd != null ||
+      job.durationMonths != null ||
+      job.period.isNotEmpty ||
+      job.labGroup != null;
+
   @override
   Widget build(BuildContext context) {
+    final tiles = <Widget>[
+      if (job.stipendTnd != null)
+        StatTile(
+          icon: Icons.payments_outlined,
+          label: 'Stipend',
+          value: formatThousands(job.stipendTnd!),
+          caption: 'TND/mo',
+        ),
+      if (job.durationMonths != null || job.period.isNotEmpty)
+        StatTile(
+          icon: Icons.schedule,
+          label: 'Duration',
+          value: job.durationMonths == null ? job.period : '${job.durationMonths} Months',
+          caption: job.durationMonths == null || job.period.isEmpty ? null : job.period,
+        ),
+      if (job.labGroup != null)
+        StatTile(
+          icon: Icons.groups_outlined,
+          label: 'Lab Group',
+          value: job.labGroup!,
+          caption: job.labGroupNote,
+        ),
+    ];
     return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: StatTile(
-            icon: Icons.payments_outlined,
-            label: 'Stipend',
-            value: formatThousands(job.stipendTnd),
-            caption: 'TND/mo',
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: StatTile(
-            icon: Icons.schedule,
-            label: 'Duration',
-            value: '${job.durationMonths} Months',
-            caption: job.period,
-          ),
-        ),
-        const SizedBox(width: AppSpacing.sm),
-        Expanded(
-          child: StatTile(
-            icon: Icons.groups_outlined,
-            label: 'Lab Group',
-            value: job.labGroup,
-            caption: job.labGroupNote,
-          ),
-        ),
+        for (var i = 0; i < tiles.length; i++) ...[
+          if (i > 0) const SizedBox(width: AppSpacing.sm),
+          Expanded(child: tiles[i]),
+        ],
       ],
     );
   }
 }
 
 /// Workspace banner (gradient placeholder until real photos are provided).
+/// Only for offers with a [Job.workspaceTitle] (the seeded catalogue).
 class JobWorkspaceBanner extends StatelessWidget {
   const JobWorkspaceBanner({super.key, required this.job});
 
@@ -144,7 +156,7 @@ class JobWorkspaceBanner extends StatelessWidget {
               child: Wrap(
                 spacing: AppSpacing.sm,
                 children: [
-                  AppBadge(job.workspaceTitle, tone: BadgeTone.accent, solid: true),
+                  AppBadge(job.workspaceTitle ?? job.company, tone: BadgeTone.accent, solid: true),
                   const AppBadge('ESPRIT Partner Lab', tone: BadgeTone.neutral),
                 ],
               ),
@@ -210,7 +222,7 @@ class JobMissionCard extends StatelessWidget {
           ),
           const SizedBox(height: AppSpacing.md),
           Text(job.mission, style: theme.textTheme.bodyMedium),
-          const SizedBox(height: AppSpacing.md),
+          if (job.missionItems.isNotEmpty) const SizedBox(height: AppSpacing.md),
           for (var i = 0; i < job.missionItems.length; i++)
             Padding(
               padding: const EdgeInsets.only(bottom: AppSpacing.sm),
@@ -256,11 +268,15 @@ class JobMissionCard extends StatelessWidget {
   }
 }
 
-/// "Candidate Fit & Criteria" section with match percentage and skills.
+/// "Candidate Fit & Criteria" section with match percentage and skills
+/// (check [hasContent] before showing it).
 class JobFitCard extends StatelessWidget {
   const JobFitCard({super.key, required this.job});
 
   final Job job;
+
+  static bool hasContent(Job job) =>
+      job.matchPercent != null || job.criteria.isNotEmpty || job.skills.isNotEmpty;
 
   @override
   Widget build(BuildContext context) {
@@ -277,7 +293,8 @@ class JobFitCard extends StatelessWidget {
               Expanded(
                 child: Text('Candidate Fit & Criteria', style: theme.textTheme.titleMedium),
               ),
-              AppBadge('${job.matchPercent}% Match', tone: BadgeTone.success),
+              if (job.matchPercent != null)
+                AppBadge('${job.matchPercent}% Match', tone: BadgeTone.success),
             ],
           ),
           const SizedBox(height: AppSpacing.md),

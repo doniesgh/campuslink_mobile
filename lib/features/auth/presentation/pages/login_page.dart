@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/config/env.dart';
+import '../../../../core/error/failure_text.dart';
 import '../../../../core/router/route_names.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_spacing.dart';
@@ -45,7 +46,7 @@ class _LoginPageState extends ConsumerState<LoginPage> {
     // On success the router redirects away and this page is disposed.
     if (!mounted) return;
     setState(() => _loading = false);
-    if (failure != null) showAppSnack(context, failure.message);
+    if (failure != null) showAppSnack(context, failureText(context, failure));
   }
 
   @override
