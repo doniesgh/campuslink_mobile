@@ -92,7 +92,6 @@ class HomePage extends ConsumerWidget {
                           now: now,
                           semesterWeek: timetable?.valueOrNull?.semesterWeek,
                           hasUnreadNotifications: unreadNotifications > 0,
-                          onSearch: () => showAppSnack(context, 'Search is coming soon.'),
                           onNotifications: () => context.push(RoutePaths.notifications),
                         ),
                       ),

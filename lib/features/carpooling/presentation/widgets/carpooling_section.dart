@@ -8,7 +8,6 @@ import '../../../../core/theme/app_spacing.dart';
 import '../../../../shared/widgets/info_banner.dart';
 import '../../../../shared/widgets/state_views.dart';
 import '../providers/carpool_providers.dart';
-import 'impact_card.dart';
 import 'ride_card.dart';
 
 /// Content of the "Covoiturage" tab of the forum.
@@ -36,18 +35,11 @@ class CarpoolingSection extends ConsumerWidget {
             AppSpacing.page, AppSpacing.sm, AppSpacing.page, 96, // room for the FAB
           ),
           children: [
-            const InfoBanner(
-              icon: Icons.verified_user_outlined,
-              title: 'ESPRIT Verified Drivers Only',
-              message: 'Student ID badge & vehicle inspection active',
-            ),
-            const SizedBox(height: AppSpacing.lg),
+           
             Row(
               children: [
                 Text('Available Departures', style: theme.textTheme.titleMedium),
-                const Spacer(),
-                Text('Latest first', style: theme.textTheme.labelSmall),
-                const Icon(Icons.expand_more, size: 16),
+                
               ],
             ),
             const SizedBox(height: AppSpacing.md),
@@ -62,10 +54,7 @@ class CarpoolingSection extends ConsumerWidget {
                     onTap: () => context.push(RoutePaths.ride(ride.id)),
                   ),
                 ),
-            ref.watch(impactProvider).maybeWhen(
-                  data: (impact) => ImpactCard(impact: impact),
-                  orElse: () => const SizedBox.shrink(),
-                ),
+          
           ],
         );
       },

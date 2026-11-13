@@ -133,8 +133,7 @@ class _TimetablePageState extends ConsumerState<TimetablePage> {
                         // TODO: show the seat map once the exam API exposes seat plans.
                         onFindSeat: (_) => showAppSnack(context, 'Seat finder is coming soon.'),
                         // TODO: show the student barcode once the ENT API exposes it.
-                        onOpenPass: () =>
-                            showAppSnack(context, 'Digital Student Pass is coming soon.'),
+                       
                       ),
                     ),
                   ],
@@ -156,7 +155,6 @@ class _DaySchedule extends StatelessWidget {
     required this.now,
     required this.onOpenSession,
     required this.onFindSeat,
-    required this.onOpenPass,
   });
 
   final TimetableWeek week;
@@ -164,7 +162,6 @@ class _DaySchedule extends StatelessWidget {
   final DateTime now;
   final ValueChanged<ClassSession> onOpenSession;
   final ValueChanged<ClassSession> onFindSeat;
-  final VoidCallback onOpenPass;
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +192,6 @@ class _DaySchedule extends StatelessWidget {
               onFindSeat: onFindSeat,
             ),
           const SizedBox(height: AppSpacing.xl),
-          StudentPassCard(examRoom: examRoom, onOpen: onOpenPass),
         ],
       ),
     );

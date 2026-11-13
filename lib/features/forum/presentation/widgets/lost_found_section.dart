@@ -192,14 +192,7 @@ class _LostFoundSectionState extends ConsumerState<LostFoundSection> {
                 counts: countLostItems(matching),
                 onSelected: (kind) => setState(() => _kind = kind),
               ),
-              const SizedBox(height: AppSpacing.md),
-              Padding(
-                padding: _page,
-                child: _DropOffBanner(
-                  // TODO: open the campus map on the drop-off points.
-                  onTap: () => showAppSnack(context, 'The campus map is coming soon.'),
-                ),
-              ),
+              
               const SizedBox(height: AppSpacing.lg),
               if (visible.isEmpty)
                 Padding(
@@ -216,8 +209,6 @@ class _LostFoundSectionState extends ConsumerState<LostFoundSection> {
                     ),
                     child: _card(item, now),
                   ),
-              const SizedBox(height: AppSpacing.sm),
-              const Padding(padding: _page, child: _StudentTipCard()),
             ],
           ),
         );
@@ -289,51 +280,7 @@ class _CampusContextHeader extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.xs,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: AppSpacing.xs),
-              decoration: ShapeDecoration(
-                color: scheme.surfaceContainerHigh,
-                shape: const StadiumBorder(),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.school_outlined, size: 14, color: scheme.primary),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      'ESPRIT Ghazela & Charguia',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: label?.copyWith(color: scheme.primary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.schedule, size: 16, color: lostFoundSuccessColor(scheme)),
-                const SizedBox(width: AppSpacing.xs),
-                Flexible(
-                  child: Text(
-                    "Guichet ouvert jusqu'à 18h",
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: label?.copyWith(color: scheme.onSurfaceVariant),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+     
         const SizedBox(height: AppSpacing.sm),
         Text('Objets Perdus & Trouvés', style: theme.textTheme.headlineSmall),
         const SizedBox(height: 2),
@@ -463,60 +410,6 @@ class _FilterPill extends StatelessWidget {
   }
 }
 
-/// "Point de collecte central" banner.
-class _DropOffBanner extends StatelessWidget {
-  const _DropOffBanner({required this.onTap});
-
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Material(
-      color: scheme.surfaceContainer,
-      borderRadius: AppRadius.lgAll,
-      child: InkWell(
-        borderRadius: AppRadius.lgAll,
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpacing.md),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  color: scheme.surfaceContainerLowest,
-                  borderRadius: AppRadius.mdAll,
-                ),
-                child: Icon(Icons.pin_drop_outlined, size: 20, color: scheme.primary),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Point de collecte central',
-                      style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-                    ),
-                    Text(
-                      'Accueil Bloc C (Ghazela) & Hall Central (Charguia)',
-                      style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(width: AppSpacing.sm),
-              Icon(Icons.chevron_right, size: 18, color: scheme.outline),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
 
 /// Empty search / filter result.
 class _NoMatchView extends StatelessWidget {
@@ -570,45 +463,3 @@ class _NoMatchView extends StatelessWidget {
   }
 }
 
-/// "Conseil étudiant" card at the end of the list.
-class _StudentTipCard extends StatelessWidget {
-  const _StudentTipCard();
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    return Container(
-      padding: const EdgeInsets.all(AppSpacing.lg),
-      decoration: BoxDecoration(color: scheme.surfaceContainer, borderRadius: AppRadius.lgAll),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: scheme.surfaceContainerHighest,
-            child: Icon(Icons.lightbulb_outline, size: 18, color: scheme.secondary),
-          ),
-          const SizedBox(width: AppSpacing.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Conseil étudiant',
-                  style: theme.textTheme.labelMedium?.copyWith(fontWeight: FontWeight.w700),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  'Pour tout objet de valeur (PC, smartphone), le service de sécurité '
-                  "ESPRIT effectue une vérification d'adresse MAC et compte ENT.",
-                  style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}

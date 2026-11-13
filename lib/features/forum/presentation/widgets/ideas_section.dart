@@ -16,7 +16,8 @@ const _page = EdgeInsets.symmetric(horizontal: AppSpacing.page);
 /// Content of the "Ideas" tab of the forum: the students' proposals, most
 /// upvoted first. Votes are optimistic (see [ideaUpvotesProvider]).
 class IdeasSection extends ConsumerWidget {
-  const IdeasSection({super.key, required this.query, required this.onClearSearch});
+  const IdeasSection(
+      {super.key, required this.query, required this.onClearSearch});
 
   /// Text typed in the forum search field.
   final String query;
@@ -24,9 +25,11 @@ class IdeasSection extends ConsumerWidget {
   /// Empties the forum search field ("Réinitialiser la recherche").
   final VoidCallback onClearSearch;
 
-  Future<void> _upvote(BuildContext context, WidgetRef ref, ForumPost idea) async {
+  Future<void> _upvote(
+      BuildContext context, WidgetRef ref, ForumPost idea) async {
     final failure = await ref.read(ideaUpvotesProvider.notifier).toggle(idea);
-    if (failure != null && context.mounted) showAppSnack(context, failure.message);
+    if (failure != null && context.mounted)
+      showAppSnack(context, failure.message);
   }
 
   @override
@@ -43,13 +46,17 @@ class IdeasSection extends ConsumerWidget {
         onRetry: () => ref.invalidate(ideasProvider),
       ),
       data: (all) {
-        final visible = [for (final idea in all) if (idea.matches(query)) idea];
+        final visible = [
+          for (final idea in all)
+            if (idea.matches(query)) idea
+        ];
         return RefreshIndicator(
           onRefresh: () => ref.read(ideasProvider.notifier).refresh(),
           child: ListView(
             // Scrollable even when short, so pull to refresh always works.
             physics: const AlwaysScrollableScrollPhysics(),
-            padding: const EdgeInsets.only(top: AppSpacing.xs, bottom: 96), // room for the FAB
+            padding: const EdgeInsets.only(
+                top: AppSpacing.xs, bottom: 96), // room for the FAB
             children: [
               Padding(padding: _page, child: _IdeasHeader(count: all.length)),
               const SizedBox(height: AppSpacing.lg),
@@ -64,7 +71,10 @@ class IdeasSection extends ConsumerWidget {
                 for (final idea in visible)
                   Padding(
                     padding: const EdgeInsets.fromLTRB(
-                      AppSpacing.page, 0, AppSpacing.page, AppSpacing.md,
+                      AppSpacing.page,
+                      0,
+                      AppSpacing.page,
+                      AppSpacing.md,
                     ),
                     child: IdeaCard(
                       key: ValueKey(idea.id),
@@ -92,61 +102,46 @@ class _IdeasHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final label = theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700);
+    final label =
+        theme.textTheme.labelSmall?.copyWith(fontWeight: FontWeight.w700);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  
+return Column(
+  crossAxisAlignment: CrossAxisAlignment.start,
+  children: [
+    Row(
+      crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        Wrap(
-          alignment: WrapAlignment.spaceBetween,
-          crossAxisAlignment: WrapCrossAlignment.center,
-          spacing: AppSpacing.sm,
-          runSpacing: AppSpacing.xs,
-          children: [
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: AppSpacing.xs),
-              decoration: ShapeDecoration(
-                color: scheme.surfaceContainerHigh,
-                shape: const StadiumBorder(),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.how_to_vote_outlined, size: 14, color: scheme.primary),
-                  const SizedBox(width: 6),
-                  Flexible(
-                    child: Text(
-                      'Boîte à idées · BDE ESPRIT',
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: label?.copyWith(color: scheme.primary),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.lightbulb_outline, size: 16, color: scheme.secondary),
-                const SizedBox(width: AppSpacing.xs),
-                Text(
-                  ideaCountLabel(count),
-                  style: label?.copyWith(color: scheme.onSurfaceVariant),
-                ),
-              ],
-            ),
-          ],
-        ),
-        const SizedBox(height: AppSpacing.sm),
-        Text('Idées du campus', style: theme.textTheme.headlineSmall),
-        const SizedBox(height: 2),
         Text(
-          'Proposez vos idées et votez pour celles que le BDE doit étudier en priorité',
-          style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+          'Idées du campus',
+          style: theme.textTheme.headlineSmall,
+        ),
+        const SizedBox(width: AppSpacing.sm),
+        Icon(
+          Icons.lightbulb_outline,
+          size: 18,
+          color: scheme.secondary,
+        ),
+        const SizedBox(width: 4),
+        Text(
+          ideaCountLabel(count),
+          style: label?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
         ),
       ],
-    );
+    ),
+    const SizedBox(height: 4),
+    Text(
+      'Proposez vos idées et votez pour celles que le BDE doit étudier en priorité',
+      style: theme.textTheme.bodySmall?.copyWith(
+        color: scheme.onSurfaceVariant,
+      ),
+    ),
+  ],
+);
+
+  
   }
 }
 
@@ -158,7 +153,8 @@ class _NoIdeasView extends StatelessWidget {
   Widget build(BuildContext context) => const _EmptyMessage(
         icon: Icons.tips_and_updates_outlined,
         title: "Aucune idée pour l'instant",
-        message: 'Soyez le premier à proposer une idée pour améliorer le campus !',
+        message:
+            'Soyez le premier à proposer une idée pour améliorer le campus !',
       );
 }
 
@@ -174,7 +170,8 @@ class _NoMatchView extends StatelessWidget {
     return _EmptyMessage(
       icon: Icons.travel_explore,
       title: 'Aucune idée correspondante',
-      message: 'Essayez un autre mot-clé, ou proposez cette idée à la communauté.',
+      message:
+          'Essayez un autre mot-clé, ou proposez cette idée à la communauté.',
       action: TextButton(
         onPressed: onReset,
         style: TextButton.styleFrom(
@@ -216,14 +213,19 @@ class _EmptyMessage extends StatelessWidget {
             child: Icon(icon, size: 32, color: scheme.primary),
           ),
           const SizedBox(height: AppSpacing.md),
-          Text(title, textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
+          Text(title,
+              textAlign: TextAlign.center, style: theme.textTheme.titleMedium),
           const SizedBox(height: AppSpacing.xs),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: theme.textTheme.bodySmall?.copyWith(color: scheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall
+                ?.copyWith(color: scheme.onSurfaceVariant),
           ),
-          if (action != null) ...[const SizedBox(height: AppSpacing.lg), action!],
+          if (action != null) ...[
+            const SizedBox(height: AppSpacing.lg),
+            action!
+          ],
         ],
       ),
     );
